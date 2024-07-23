@@ -1,7 +1,7 @@
 export const routes = [
   {
     path: "/products/",
-    component: () =>  import ("@controleonline/quasar-layout-ui/src/layouts/AdminLayout.vue"),
+    component: () =>  import ("@controleonline/ui-layout/src/layouts/AdminLayout.vue"),
     children: [
       {
         name: "ProductList",
@@ -12,7 +12,7 @@ export const routes = [
   },
   {
     path: "/product/",
-    component: () =>  import ("@controleonline/quasar-layout-ui/src/layouts/AdminLayout.vue"),
+    component: () =>  import ("@controleonline/ui-layout/src/layouts/AdminLayout.vue"),
     children: [
       {
         name: "ProductDetails",

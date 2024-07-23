@@ -21,7 +21,7 @@
 
 <script>
 import { mapGetters, mapActions } from "vuex";
-import DefaultForm from "@controleonline/quasar-default-ui/src/components/Default/Common/DefaultForm.vue";
+import DefaultForm from "@controleonline/ui-default/src/components/Default/Common/DefaultForm.vue";
 
 import Imagens from "./imagens";
 
