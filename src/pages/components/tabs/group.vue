@@ -168,7 +168,7 @@ export default {
         data.priceCalculation.value || data.priceCalculation;
       this.saveProductGroups(data).then(() => {
         this.$q.notify({
-          message: this.$translate(this.configs.store, "success", "message"),
+          message: this.$tt(this.configs.store, "message", "success"),
           position: "bottom",
           type: "positive",
         });

@@ -7,7 +7,7 @@
     @click="openModal"
   >
     <q-tooltip>
-      {{ $translate(configs.store, "feedstock", "tooltip") }}
+      {{ $tt(configs.store, "tooltip", "feedstock") }}
     </q-tooltip>
   </q-btn>
 
