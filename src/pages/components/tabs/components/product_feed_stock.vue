@@ -18,11 +18,11 @@
 <script>
 import { mapActions, mapGetters } from "vuex";
 import SelectInput from "@controleonline/ui-default/src/components/Default/Common/Inputs/SelectInput.vue";
-import DefaultTable from "@controleonline/ui-default/src/components/Default/DefaultTable";
+
 
 export default {
   components: {
-    DefaultTable,
+    
     SelectInput,
   },
   props: {

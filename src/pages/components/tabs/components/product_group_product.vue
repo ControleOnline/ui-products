@@ -4,12 +4,12 @@
 <script>
 import { mapActions, mapGetters } from "vuex";
 import SelectInput from "@controleonline/ui-default/src/components/Default/Common/Inputs/SelectInput.vue";
-import DefaultTable from "@controleonline/ui-default/src/components/Default/DefaultTable";
+
 import product_feed_stock from "./product_feed_stock.vue";
 
 export default {
   components: {
-    DefaultTable,
+    
     SelectInput,
   },
   props: {

@@ -2,12 +2,12 @@
   <DefaultTable :configs="configs" v-if="configs" />
 </template>
 <script>
-import DefaultTable from "@controleonline/ui-default/src/components/Default/DefaultTable";
+
 
 export default {
   name: "Products",
   components: {
-    DefaultTable,
+    
     //acoes
   },
 
