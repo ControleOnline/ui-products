@@ -21,14 +21,12 @@
 
 <script>
 import { mapGetters, mapActions } from "vuex";
-import DefaultForm from "@controleonline/ui-default/src/components/Default/Common/DefaultForm.vue";
 
 import Imagens from "./imagens";
 
 export default {
   components: {
     Imagens,
-    DefaultForm,
   },
   props: {
     ProductId: {
