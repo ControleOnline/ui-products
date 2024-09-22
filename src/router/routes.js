@@ -7,7 +7,7 @@ export const routes = [
         name: "ProductList",
         path: "",
         component: () =>  import ("../pages/list.vue"),
-      },
+      },    
     ],
   },
   {
@@ -23,6 +23,17 @@ export const routes = [
         name: "ProductNew",
         path: "new",
         component: () =>  import ("../pages/details.vue"),
+      },
+    ],
+  },
+  {
+    path: "/machine/",
+    component: () =>  import ("@controleonline/ui-layout/src/layouts/AdminLayout.vue"),
+    children: [
+      {
+        name: "ProductFinder",
+        path: "find",
+        component: () =>  import ("../pages/finder.vue"),
       },
     ],
   },
