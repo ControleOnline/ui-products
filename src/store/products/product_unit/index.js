@@ -33,7 +33,7 @@ export default {
       {
         sortable: true,
         name: "productUnit",
-        externalFilter: true,
+        externalFilter: false,
         align: "left",
         label: "productUnit",
         sum: false,
@@ -41,7 +41,7 @@ export default {
       {
         sortable: true,
         name: "unitType",
-        externalFilter: true,
+        externalFilter: false,
         align: "left",
         label: "unitType",
         sum: false,

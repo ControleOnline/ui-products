@@ -33,7 +33,7 @@ export default {
       {
         sortable: true,
         name: "sku",
-        externalFilter: true,
+        externalFilter: false,
         align: "left",
         label: "sku",
         sum: false,
@@ -47,7 +47,7 @@ export default {
       {
         sortable: true,
         name: "product",
-        externalFilter: true,
+        externalFilter: false,
         align: "left",
         label: "product",
         format: function (value) {
@@ -57,7 +57,7 @@ export default {
       {
         sortable: true,
         name: "description",
-        externalFilter: true,
+        externalFilter: false,
         align: "left",
         label: "description",
         format: function (value) {
@@ -66,7 +66,7 @@ export default {
       },
       {
         sortable: true,
-        externalFilter: true,
+        externalFilter: false,
         name: "productUnit",
         align: "left",
         list: "product_unit/getItems",
@@ -88,7 +88,7 @@ export default {
 
       {
         sortable: true,
-        externalFilter: true,
+        externalFilter: false,
         name: "type",
         align: "left",
         list: [
@@ -106,7 +106,7 @@ export default {
       {
         sortable: true,
         name: "productCondition",
-        externalFilter: true,
+        externalFilter: false,
         list: [
           { value: "new", label: "Novo" },
           { value: "used", label: "Usado" },
