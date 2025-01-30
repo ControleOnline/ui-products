@@ -92,6 +92,7 @@ export default {
         name: "type",
         align: "left",
         list: [
+          { value: "custom", label: "Produto Customizado" },
           { value: "product", label: "Produto" },
           { value: "service", label: "Serviço" },
           { value: "component", label: "Componente" },
