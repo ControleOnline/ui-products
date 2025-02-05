@@ -1,5 +1,18 @@
 <template>
   <div class="row">
+    <DefaultButtonDialog
+      v-if="configs.editable != false"
+      :configs="{
+        icon: 'add',
+        store: configs.store,
+        label: 'add',
+        component: this.$components.DefaultForm,
+        componentConfigs: configs,
+      }"
+      @saved="saved"
+      @error="error"
+    />
+
     <q-list padding bordered class="rounded-borders full-width">
       <q-expansion-item
         v-for="(group, index) in product_groups"
