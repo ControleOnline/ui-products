@@ -43,7 +43,12 @@
                 <Group :ProductId="ProductId" />
               </q-tab-panel>
               <q-tab-panel class="items-center" name="categories">
-                <Categories :ProductId="ProductId" />
+                <Categories
+                  :ProductId="ProductId"
+                  :context="'products'"
+                  :company="myCompany"
+                  :linkConfigs="linkConfigs"
+                />
               </q-tab-panel>
               <q-tab-panel class="items-center" name="price">
                 <Price :ProductId="ProductId" />
@@ -98,11 +103,22 @@ export default {
     };
   },
   created() {
-    let ProductId = decodeURIComponent(this.$route.params.id);
-    this.ProductId = ProductId == "undefined" ? null : ProductId;
+    this.ProductId = decodeURIComponent(this.$route.params.id);
   },
 
-  computed: {},
+  computed: {
+    ...mapGetters({
+      myCompany: "people/currentCompany",
+    }),
+    linkConfigs() {
+      return {
+        store: "product_category",
+        filters: {
+          product: "/products/" + this.ProductId,
+        },
+      };
+    },
+  },
 
   methods: {},
 
