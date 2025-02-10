@@ -36,7 +36,7 @@ export default {
         columns: {
           productChild: {
             filters: {
-              type: "component",
+              type: ["component", "product", "service"],
             },
           },
         },
