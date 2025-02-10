@@ -85,7 +85,28 @@ export default {
           return value ? "/product_unities/" + (value.value || value) : null;
         },
       },
-
+      {
+        sortable: true,
+        externalFilter: false,
+        editable: true,
+        name: "queue",
+        align: "left",
+        list: "queues/getItems",
+        label: "queue",
+        format: function (value) {
+          return value?.queue;
+        },
+        formatList: function (value) {
+          if (value)
+            return {
+              value: value["@id"]?.split("/").pop(),
+              label: value.queue,
+            };
+        },
+        saveFormat: function (value) {
+          return value ? "/queues/" + (value.value || value) : null;
+        },
+      },
       {
         sortable: true,
         externalFilter: false,

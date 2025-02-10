@@ -48,6 +48,9 @@
                   :context="'products'"
                   :company="myCompany"
                   :linkConfigs="linkConfigs"
+                  :linkObj="{
+                    product: '/products/' + this.ProductId,
+                  }"
                 />
               </q-tab-panel>
               <q-tab-panel class="items-center" name="price">

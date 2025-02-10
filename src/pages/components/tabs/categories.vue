@@ -15,10 +15,9 @@
   <q-tree
     :nodes="categoryTree"
     node-key="value"
-    tick-strategy="strict"
+    tick-strategy="leaf"
     default-expand-all
-    v-model:selected="selectedCategories"
-    @update:selected="getNode"
+    v-model:ticked="selectedCategories"
   />
 </template>
 
@@ -28,6 +27,7 @@ import { mapActions, mapGetters } from "vuex";
 export default {
   data() {
     return {
+      linkedData: [],
       selectedCategories: [],
       categoryTree: [],
     };
@@ -40,6 +40,9 @@ export default {
       required: true,
     },
     linkConfigs: {
+      required: true,
+    },
+    linkObj: {
       required: true,
     },
   },
@@ -62,12 +65,41 @@ export default {
       };
     },
   },
+
+  created() {
+    this.buildCategoryTree();
+    let filters = { context: this.context, company: this.company.id };
+    this.$store.commit(this.configs.store + "/SET_FILTERS", filters);
+  },
   methods: {
     ...mapActions({
       getCategories: "categories/getItems",
     }),
     saved() {
       this.buildCategoryTree();
+    },
+    removeLinkedCategory(categoryIds) {
+      categoryIds.forEach((categoryId, i) => {
+        let obj =
+          this.linkedData.find((data) => {
+            return data.category.replace(/\D/g, "") == categoryId;
+          }) || {};
+
+        if (obj && obj["@id"])
+          this.$store.dispatch(
+            this.linkConfigs.store + "/remove",
+            obj["@id"].replace(/\D/g, "")
+          );
+      });
+    },
+    addLinkedCategory(categoryIds) {
+      let obj = this.linkObj;
+      categoryIds.forEach((categoryId, i) => {
+        this.$store.dispatch(this.linkConfigs.store + "/save", {
+          category: "/categories/" + categoryId,
+          ...obj,
+        });
+      });
     },
     async buildSelected() {
       return await this.$store.dispatch(
@@ -79,6 +111,8 @@ export default {
       const map = {};
       const roots = [];
       this.buildSelected().then((selectedCategories) => {
+        this.linkedData = selectedCategories;
+
         this.getCategories({
           context: this.context,
           company: this.company.id,
@@ -102,26 +136,31 @@ export default {
 
             selectedCategories.some((item) => {
               if (item.category === category["@id"])
-                this.selectedCategories.push({
-                  value: category.id,
-                  label: category.name,
-                });
+                this.selectedCategories.push(category.id);
             });
           });
           this.categoryTree = roots;
-
-          console.log(this.selectedCategories);
         });
       });
     },
-    getNode(node) {
-      console.log(node);
-    },
   },
-  created() {
-    this.buildCategoryTree();
-    let filters = { context: this.context, company: this.company.id };
-    this.$store.commit(this.configs.store + "/SET_FILTERS", filters);
+  watch: {
+    selectedCategories: {
+      handler: function (selectedCategories, oldSelectedCategories) {
+        if (selectedCategories.length > oldSelectedCategories.length) {
+          const categoryIds = selectedCategories.filter(
+            (id) => !oldSelectedCategories.includes(id)
+          );
+          this.addLinkedCategory(categoryIds);
+        } else if (selectedCategories.length < oldSelectedCategories.length) {
+          const categoryIds = oldSelectedCategories.filter(
+            (id) => !selectedCategories.includes(id)
+          );
+          this.removeLinkedCategory(categoryIds);
+        }
+      },
+      deep: true,
+    },
   },
 };
 </script>

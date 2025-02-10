@@ -56,10 +56,18 @@ export default {
   computed: {
     ...mapGetters({
       isLoading: "products/isLoading",
+      myCompany: "people/currentCompany",
     }),
     configs() {
       return {
         store: "products",
+        columns: {
+          queue: {
+            filters: {
+              company: this.myCompany.id,
+            },
+          },
+        },
       };
     },
   },
