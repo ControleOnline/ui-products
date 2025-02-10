@@ -44,6 +44,7 @@ export default {
         sortable: true,
         name: "productChild",
         externalFilter: false,
+        searchParam: "product",
         editable: false,
         align: "left",
         label: "productChild",
