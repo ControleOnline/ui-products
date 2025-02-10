@@ -9,7 +9,6 @@ import product_feed_stock from "./product_feed_stock.vue";
 
 export default {
   components: {
-    
     SelectInput,
   },
   props: {
@@ -34,6 +33,13 @@ export default {
         store: "product_group_product",
         selection: false,
         search: {},
+        columns: {
+          productChild: {
+            filters: {
+              type: "component",
+            },
+          },
+        },
         components: {
           tableActions: {
             component: product_feed_stock,
