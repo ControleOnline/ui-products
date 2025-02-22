@@ -26,15 +26,4 @@ export const routes = [
       },
     ],
   },
-  {
-    path: "/machine/",
-    component: () =>  import ("@controleonline/ui-layout/src/layouts/AdminLayout.vue"),
-    children: [
-      {
-        name: "ProductFinder",
-        path: "find",
-        component: () =>  import ("../pages/finder.vue"),
-      },
-    ],
-  },
 ];

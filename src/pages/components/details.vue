@@ -14,7 +14,85 @@
         ' row col-xs-12 col-sm-12 justify-content q-pa-sm'
       "
     >
-      <DefaultForm :configs="configs" :data="product" v-if="product" />
+      <!--<DefaultForm :configs="configs" :data="product" v-if="product" />-->
+      <div class="row q-col-gutter-md">
+        <!-- SKU -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'sku'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+
+        <!-- Produto -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'product'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+
+        <!-- Descrição -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'description'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+
+        <!-- Unidade do Produto -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'productUnit'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+
+        <!-- Tipo -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'type'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+
+        <!-- Condição do Produto -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'productCondition'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+
+        <!-- Preço -->
+        <div class="col-12 col-md-4">
+          <DefaultInput
+            :columnName="'price'"
+            :row="product"
+            :configs="configs"
+            @saved="getData"
+            @loadData="loadData"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -61,6 +139,8 @@ export default {
     configs() {
       return {
         store: "products",
+        showLabels: false,
+        labelType:'dense',
         columns: {
           queue: {
             filters: {

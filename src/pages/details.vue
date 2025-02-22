@@ -43,7 +43,7 @@
                 <Group :ProductId="ProductId" />
               </q-tab-panel>
               <q-tab-panel class="items-center" name="categories">
-                <Categories
+                <DefaultTree
                   :ProductId="ProductId"
                   :context="'products'"
                   :company="myCompany"
@@ -80,7 +80,7 @@
 import { mapGetters, mapActions } from "vuex";
 import Product from "./components/details.vue";
 import Advertisement from "./components/tabs/advertisement.vue";
-import Categories from "./components/tabs/categories.vue";
+import DefaultTree from "@controleonline/ui-default/src/components/Default/Common/DefaultTree.vue";
 import Group from "./components/tabs/group.vue";
 import Price from "./components/tabs/price.vue";
 import Provider from "./components/tabs/provider.vue";
@@ -91,7 +91,7 @@ export default {
   components: {
     Product,
     Group,
-    Categories,
+    DefaultTree,
     Price,
     Provider,
     Stock,
