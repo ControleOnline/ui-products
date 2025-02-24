@@ -4,7 +4,11 @@
       v-if="product.id"
       class="row col-xs-12 col-sm-12 col-md-4 col-lg-4 col-xl-4 justify-content q-pa-sm"
     >
-      <Imagens :product="product" />
+      <DefaultCarousel
+        :object="{ product: product['@id'] }"
+        :configs="carouselConfigs"
+        :files="product.productFiles"
+      />
     </div>
     <div
       :class="
@@ -100,11 +104,11 @@
 <script>
 import { mapGetters, mapActions } from "vuex";
 
-import Imagens from "./imagens";
+import DefaultCarousel from "@controleonline/ui-default/src/components/Default/Common/DefaultCarousel.vue";
 
 export default {
   components: {
-    Imagens,
+    DefaultCarousel,
   },
   props: {
     ProductId: {
@@ -136,11 +140,16 @@ export default {
       isLoading: "products/isLoading",
       myCompany: "people/currentCompany",
     }),
+    carouselConfigs() {
+      return {
+        store: "product_file",
+      };
+    },
     configs() {
       return {
         store: "products",
         showLabels: false,
-        labelType:'dense',
+        labelType: "dense",
         columns: {
           queue: {
             filters: {

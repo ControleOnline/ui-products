@@ -22,6 +22,7 @@
             >
               <q-tab name="group" icon="tab" :label="$t('Group')" />
               <q-tab name="categories" icon="tab" :label="$t('Categories')" />
+              <q-tab name="marketplace" icon="tab" :label="$t('Marketplace')" />
               <q-tab name="price" icon="tab" :label="$t('Price')" />
               <q-tab name="provider" icon="tab" :label="$t('Provider')" />
               <q-tab name="stock" icon="tab" :label="$t('Stock')" />
@@ -47,6 +48,17 @@
                   :ProductId="ProductId"
                   :context="'products'"
                   :company="myCompany"
+                  :linkConfigs="linkConfigs"
+                  :linkObj="{
+                    product: '/products/' + this.ProductId,
+                  }"
+                />
+              </q-tab-panel>
+              <q-tab-panel class="items-center" name="marketplace">
+                <DefaultTree
+                  :ProductId="ProductId"
+                  :context="'products'"
+                  :company="defaultCompany"
                   :linkConfigs="linkConfigs"
                   :linkObj="{
                     product: '/products/' + this.ProductId,
@@ -112,6 +124,7 @@ export default {
   computed: {
     ...mapGetters({
       myCompany: "people/currentCompany",
+      defaultCompany: "people/defaultCompany",
     }),
     linkConfigs() {
       return {
