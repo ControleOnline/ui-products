@@ -143,6 +143,7 @@ export default {
     carouselConfigs() {
       return {
         store: "product_file",
+        isAdmin: true,
       };
     },
     configs() {
