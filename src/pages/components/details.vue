@@ -104,11 +104,10 @@
 <script>
 import { mapGetters, mapActions } from "vuex";
 
-import DefaultCarousel from "@controleonline/ui-default/src/components/Default/Common/DefaultCarousel.vue";
 
 export default {
   components: {
-    DefaultCarousel,
+    
   },
   props: {
     ProductId: {
@@ -144,6 +143,7 @@ export default {
       return {
         store: "product_file",
         isAdmin: true,
+        context: "products",
       };
     },
     configs() {
