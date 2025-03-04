@@ -134,9 +134,7 @@ export default {
       };
     },
     filters() {
-      return this.$copyObject(
-        this.$store.getters[this.configs.store + "/filters"]
-      );
+      return this.$store.getters[this.configs.store + "/filters"];
     },
   },
   data() {

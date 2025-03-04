@@ -19,10 +19,8 @@
 import { mapActions, mapGetters } from "vuex";
 import SelectInput from "@controleonline/ui-default/src/components/Default/Common/Inputs/SelectInput.vue";
 
-
 export default {
   components: {
-    
     SelectInput,
   },
   props: {
@@ -52,9 +50,7 @@ export default {
       };
     },
     filters() {
-      return this.$copyObject(
-        this.$store.getters[this.configs.store + "/filters"]
-      );
+      return this.$store.getters[this.configs.store + "/filters"];
     },
   },
   data() {
