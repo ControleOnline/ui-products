@@ -3,14 +3,11 @@
 </template>
 <script>
 import { mapActions, mapGetters } from "vuex";
-import SelectInput from "@controleonline/ui-default/src/components/Default/Common/Inputs/SelectInput.vue";
 
 import product_feed_stock from "./product_feed_stock.vue";
 
 export default {
-  components: {
-    SelectInput,
-  },
+  components: {},
   props: {
     products: {
       required: true,

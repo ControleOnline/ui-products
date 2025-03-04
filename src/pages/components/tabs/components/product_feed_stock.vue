@@ -17,12 +17,9 @@
 </template>
 <script>
 import { mapActions, mapGetters } from "vuex";
-import SelectInput from "@controleonline/ui-default/src/components/Default/Common/Inputs/SelectInput.vue";
 
 export default {
-  components: {
-    SelectInput,
-  },
+  components: {},
   props: {
     row: {
       required: true,
