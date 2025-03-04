@@ -6,7 +6,7 @@
         <q-card-section v-if="ProductId">
           <div
             class="q-card q-pa-sm"
-            style="max-width: calc(var(--zoom-width) - 30px)"
+            style="max-width: calc(100vw - 30px)"
           >
             <Product :ProductId="ProductId" />
             <q-tabs
