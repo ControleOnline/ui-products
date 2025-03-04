@@ -15,6 +15,7 @@ export default {
         store: "products",
         selection: false,
         search: {},
+        categories: ["products"],
         components: {
           headerActions: [
             {
