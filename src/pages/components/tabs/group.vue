@@ -186,16 +186,13 @@ export default {
       });
     },
     loadData() {
-      if (this.myCompany) {
-        this.filters.people = this.myCompany.id;
-        this.getProductGroups(this.filters)
-          .then((response) => {
-            this.product_groups = this.$copyObject(response);
-          })
-          .finally(() => {
-            this.key++;
-          });
-      }
+      this.getProductGroups(this.filters)
+        .then((response) => {
+          this.product_groups = response;
+        })
+        .finally(() => {
+          this.key++;
+        });
     },
   },
   watch: {
@@ -210,6 +207,7 @@ export default {
   created() {
     let filters = {
       productParent: "/products/" + this.ProductId,
+      people: this.myCompany.id,
     };
     this.$store.commit(this.configs.store + "/SET_FILTERS", filters);
     this.loadData();
