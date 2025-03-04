@@ -104,11 +104,8 @@
 <script>
 import { mapGetters, mapActions } from "vuex";
 
-
 export default {
-  components: {
-    
-  },
+  components: {},
   props: {
     ProductId: {
       required: false,
@@ -149,7 +146,7 @@ export default {
     configs() {
       return {
         store: "products",
-        showLabels: false,
+        showLabels: true,
         labelType: "dense",
         columns: {
           queue: {
