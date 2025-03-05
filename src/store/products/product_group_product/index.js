@@ -54,9 +54,7 @@ items:[],
         saveFormat(value, column, row) {
           return "/products/" + value.value;
         },
-        formatList(value, column, row) {
-          return { value: value["@id"].split("/").pop(), label: value.product };
-        },
+
 
         format: function (value) {
           return value.product;

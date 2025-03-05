@@ -76,13 +76,7 @@ export default {
         format: function (value) {
           return value?.productUnit;
         },
-        formatList: function (value) {
-          if (value)
-            return {
-              value: value["@id"]?.split("/").pop() || value.value,
-              label: value.productUnit || value.label,
-            };
-        },
+
         saveFormat: function (value) {
           return value ? "/product_unities/" + (value.value || value) : null;
         },
@@ -98,13 +92,7 @@ export default {
         format: function (value) {
           return value?.queue;
         },
-        formatList: function (value) {
-          if (value)
-            return {
-              value: value["@id"]?.split("/").pop() || value.value,
-              label: value.queue || value.label,
-            };
-        },
+
         saveFormat: function (value) {
           return value ? "/queues/" + (value.value || value) : null;
         },
