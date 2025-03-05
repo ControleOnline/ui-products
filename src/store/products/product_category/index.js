@@ -8,7 +8,6 @@ export default {
   state: {
  item:{},
 items:[],
-filters:{},
     resourceEndpoint: "product_categories",
     isLoading: false,
     error: "",
