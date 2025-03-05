@@ -6,8 +6,8 @@ import Formatter from "@controleonline/ui-common/src/utils/formatter.js";
 export default {
   namespaced: true,
   state: {
- item:{},
-items:[],
+    item: {},
+    items: [],
     resourceEndpoint: "products",
     isLoading: false,
     error: "",
@@ -79,8 +79,8 @@ items:[],
         formatList: function (value) {
           if (value)
             return {
-              value: value["@id"]?.split("/").pop(),
-              label: value.productUnit,
+              value: value["@id"]?.split("/").pop() || value.value,
+              label: value.productUnit || value.label,
             };
         },
         saveFormat: function (value) {
@@ -101,8 +101,8 @@ items:[],
         formatList: function (value) {
           if (value)
             return {
-              value: value["@id"]?.split("/").pop(),
-              label: value.queue,
+              value: value["@id"]?.split("/").pop() || value.value,
+              label: value.queue || value.label,
             };
         },
         saveFormat: function (value) {

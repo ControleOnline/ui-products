@@ -18,7 +18,7 @@
         ' row col-xs-12 col-sm-12 justify-content q-pa-sm'
       "
     >
-      <!--<DefaultForm :configs="configs" :data="product" v-if="product" />-->
+      <!--<DefaultForm :configs="configs" :row="product" v-if="product" />-->
       <div class="row q-col-gutter-md">
         <!-- SKU -->
         <div class="col-12 col-md-4">
