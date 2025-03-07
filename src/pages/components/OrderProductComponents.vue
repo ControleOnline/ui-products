@@ -36,7 +36,7 @@ export default {
 
   methods: {
     ...mapActions({
-      getOrderProducts: "product_orders/getItems",
+      getOrderProducts: "order_products/getItems",
     }),
     onRequest() {
       let filter = {
