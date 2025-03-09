@@ -6,8 +6,9 @@ import Formatter from "@controleonline/ui-common/src/utils/formatter.js";
 export default {
   namespaced: true,
   state: {
- item:{},
-items:[],
+    offline: true,
+    item: {},
+    items: [],
     resourceEndpoint: "product_group_products",
     isLoading: false,
     error: "",
@@ -55,7 +56,6 @@ items:[],
           return "/products/" + value.value;
         },
 
-
         format: function (value) {
           return value.product;
         },
@@ -76,7 +76,6 @@ items:[],
           return Formatter.formatMoney(value);
         },
       },
-      
     ],
   },
   actions,
