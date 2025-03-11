@@ -92,7 +92,7 @@
 import { mapGetters, mapActions } from "vuex";
 import Product from "./components/details.vue";
 import Advertisement from "./components/tabs/advertisement.vue";
-import DefaultTree from "@controleonline/ui-default/src/components/Default/Common/DefaultTree.vue";
+import DefaultTree from "@controleonline/ui-default/src/vue/components/Default/Common/DefaultTree.vue";
 import Group from "./components/tabs/group.vue";
 import Price from "./components/tabs/price.vue";
 import Provider from "./components/tabs/provider.vue";

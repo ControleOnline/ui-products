@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, ActivityIndicator, TouchableOpacity, Text, View, SafeAreaView, ScrollView } from "react-native";
-import globalStyles from "@controleonline/ui-shop/src/react/styles/global";
+import globalStyles from "@controleonline/ui-shop/src/vue/react/styles/global";
 
 export default ProductsList = (props) => {
     const { orderId } = props;
