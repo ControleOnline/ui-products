@@ -14,7 +14,7 @@ export default ProductsList = props => {
     actions.getItems({
       company: '/people/4',
       order: 'orders/' + orderId,
-      exists: {parentProduct: 'false'},
+      'exists[parentProduct]': 'false',
     });
   }, [orderId]);
 
