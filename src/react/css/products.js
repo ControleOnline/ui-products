@@ -1,5 +1,6 @@
 import {StyleSheet} from 'react-native';
 import {useTheme} from '@controleonline/ui-layout/src/react/components/ThemeProvider';
+import globalStyles from '@controleonline/ui-shop/src/react/styles/global';
 
 const css = () => {
   const {colors} = useTheme();
@@ -69,7 +70,7 @@ const css = () => {
     },
   });
 
-  return styles;
+  return {styles, globalStyles};
 };
 
 export default css;

@@ -6,7 +6,7 @@ import StateStore from '@controleonline/ui-layout/src/react/components/StateStor
 
 export default ProductsList = props => {
   const {orderId} = props;
-  const styles = css();
+  const {styles, globalStyles} = css();
 
   const {getters, actions} = getStore('order_products');
   const {items, isLoading, error, columns} = getters;
