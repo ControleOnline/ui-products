@@ -37,7 +37,7 @@ export default ProductsList = props => {
               <View>
                 <View style={styles.boxHeader}>
                   <Text style={[styles.boxTextColor, styles.boxOrderText]}>
-                    {' '}
+                    
                     #{product.id}
                   </Text>
                   <Text style={[styles.boxTextColor, styles.boxPrice]}>
