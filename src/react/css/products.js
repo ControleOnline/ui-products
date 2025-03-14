@@ -1,76 +1,70 @@
-import {StyleSheet} from 'react-native';
-import {useTheme} from '@controleonline/ui-layout/src/react/components/ThemeProvider';
+import { StyleSheet } from 'react-native';
+import { useTheme } from '@controleonline/ui-layout/src/react/components/ThemeProvider';
 import globalStyles from '@controleonline/ui-shop/src/react/styles/global';
 
 const css = () => {
-  const {colors} = useTheme();
+  const { colors } = useTheme();
 
   const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      padding: 10,
-      backgroundColor: '#fff',
-    },
-
-    header: {
-      fontSize: 20,
+    /* ProductList */
+    subHeader: {
+      fontSize: 18,
       fontWeight: 'bold',
       marginBottom: 10,
-      color: '#1B5587',
+      color: '#333',
     },
     boxWrap: {
-      flex: 1,
       backgroundColor: '#fff',
-      marginBottom: 15,
-      borderLeftColor: '#40b8af',
-      borderLeftWidth: 7,
       elevation: 3,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
     },
-
-    boxHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 10,
-      borderTopEndRadius: 7,
-      borderTopLeftRadius: 7,
-      borderBottomColor: '#ccc',
-      borderBottomWidth: 1,
-    },
-    boxContent: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 10,
-      borderTopEndRadius: 7,
-      borderTopLeftRadius: 7,
+    boxTextColor: {
+      color: '#000',
     },
     boxOrderText: {
       fontWeight: '700',
     },
-    boxTextColor: {
-      color: '#000000',
-    },
     boxDateText: {
-      color: '#000000',
       fontSize: 13,
-      fontWeight: '700',
+      marginTop: 5,
     },
     boxPrice: {
-      color: '#000000',
       fontSize: 14,
       fontWeight: '700',
     },
     boxStatusText: {
-      padding: 7,
-      borderRadius: 20,
       fontSize: 13,
-      color: '#5bbf4b',
-      fontWeight: '500',
+      color: '#000',
+      marginTop: 5,
     },
+    boxHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    boxContent: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 5,
+    },
+
+    /** Carousel */
+    slidecontainer: {
+      flex: 1,
+    },
+    slide: {
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    image: {
+      borderRadius: 10,
+    },
+
   });
 
-  return {styles, globalStyles};
+  return { styles, globalStyles };
 };
 
 export default css;
