@@ -1,9 +1,9 @@
-import AddProductToOrder from "@controleonline/ui-products/src/react/components/products/addProductToOrder";
+import ProductsIndex from "@controleonline/ui-products/src/react/components/products";
 
 const productsRoutes = [
   {
-    name: "AddProductToOrder",
-    component: AddProductToOrder,
+    name: "ProductsIndex",
+    component: ProductsIndex,
     options: { headerShown: true, title: "Adicionar Produto ao Pedido" },
   },
 ];
