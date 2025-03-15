@@ -1,10 +1,10 @@
-import { StyleSheet } from 'react-native';
-import { useTheme } from '@controleonline/ui-layout/src/react/components/ThemeProvider';
+import {StyleSheet} from 'react-native';
+import {getStore} from '@store';
 import globalStyles from '@controleonline/ui-shop/src/react/styles/global';
 
 const css = () => {
-  const { colors } = useTheme();
-
+  const {getters} = getStore('theme');
+  const {colors} = getters;
   const styles = StyleSheet.create({
     /* ProductList */
     subHeader: {
@@ -17,7 +17,7 @@ const css = () => {
       backgroundColor: '#fff',
       elevation: 3,
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
+      shadowOffset: {width: 0, height: 2},
       shadowOpacity: 0.1,
       shadowRadius: 4,
     },
@@ -61,10 +61,9 @@ const css = () => {
     image: {
       borderRadius: 10,
     },
-
   });
 
-  return { styles, globalStyles };
+  return {styles, globalStyles};
 };
 
 export default css;

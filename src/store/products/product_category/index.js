@@ -12,7 +12,7 @@ export default {
     resourceEndpoint: "product_categories",
     isLoading: false,
     error: "",
-    violations: null,
+    
     totalItems: 0,
     filters: {},
     columns: [],
