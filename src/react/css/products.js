@@ -13,13 +13,7 @@ const css = () => {
       marginBottom: 10,
       color: '#333',
     },
-    btnAdd: {
-      flex: 1,
-      color: '#fff',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: colors['primary'],
-    },
+
     boxWrap: {
       backgroundColor: '#fff',
       elevation: 3,
@@ -70,7 +64,7 @@ const css = () => {
     },
   });
 
-  return {styles, globalStyles};
+  return {styles, globalStyles: globalStyles()};
 };
 
 export default css;
