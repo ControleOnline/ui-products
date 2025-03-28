@@ -1,18 +1,18 @@
 import React from 'react';
-import { TouchableOpacity, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import {TouchableOpacity, Text, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import css from '@controleonline/ui-products/src/react/css/products';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 
-const ProductItem = ({ product, category, onQuantityChange }) => {
+const ProductItem = ({product, category, onQuantityChange}) => {
   const navigation = useNavigation();
-  const { styles, globalStyles } = css();
+  const {styles, globalStyles} = css();
   const currentPageName =
     navigation.getState().routes[navigation.getState().index].name;
 
-  const customize = (product) => {
+  const customize = product => {
     console.log(product);
   };
 
@@ -46,7 +46,7 @@ const ProductItem = ({ product, category, onQuantityChange }) => {
               style={[
                 styles.boxTextColor,
                 styles.boxOrderText,
-                { fontSize: 16, fontWeight: 'bold' },
+                {fontSize: 16, fontWeight: 'bold'},
               ]}>
               {product.product}
             </Text>
@@ -54,7 +54,7 @@ const ProductItem = ({ product, category, onQuantityChange }) => {
               style={[
                 styles.boxDateText,
                 styles.boxTextColor,
-                { fontSize: 14, color: '#666', marginTop: 2 },
+                {fontSize: 14, color: '#666', marginTop: 2},
               ]}>
               {product.description}
             </Text>
@@ -83,8 +83,13 @@ const ProductItem = ({ product, category, onQuantityChange }) => {
             justifyContent: 'center',
             padding: 5,
           }}>
+          <Text style={{color: '#666'}}>
+            {product.quantity} X {Formatter.formatMoney(product.price)}
+          </Text>
+          <Text style={{color: '#666'}}>
+            {Formatter.formatMoney(product.quantity * product.price)}
+          </Text>
         </View>
-
         <View
           style={{
             width: 100,
@@ -92,7 +97,11 @@ const ProductItem = ({ product, category, onQuantityChange }) => {
             alignItems: 'center',
           }}>
           {product.type === 'product' && (
-            <ProductQuantity product={product} category={category} onQuantityChange={onQuantityChange} />
+            <ProductQuantity
+              product={product}
+              category={category}
+              onQuantityChange={onQuantityChange}
+            />
           )}
           {product.type === 'custom' && (
             <TouchableOpacity
