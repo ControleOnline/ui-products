@@ -12,8 +12,8 @@ const ProductItem = ({product, category, onQuantityChange}) => {
   const currentPageName =
     navigation.getState().routes[navigation.getState().index].name;
 
-  const customize = product => {
-    console.log(product);
+  const handleCustomize = product => {
+    navigation.navigate('CustomizeScreen', {product});
   };
 
   return (
@@ -38,10 +38,7 @@ const ProductItem = ({product, category, onQuantityChange}) => {
             flex: 1,
             padding: 5,
           }}>
-          <View
-            style={{
-              flexDirection: 'column',
-            }}>
+          <View style={{flexDirection: 'column'}}>
             <Text
               style={[
                 styles.boxTextColor,
@@ -105,16 +102,11 @@ const ProductItem = ({product, category, onQuantityChange}) => {
           )}
           {product.type === 'custom' && (
             <TouchableOpacity
-              onPress={() => customize(product)}
-              style={[
-                globalStyles.button,
-                styles.btnPay,
-                {
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                },
-              ]}>
-              <Text style={styles.textWhite}>CUSTOMIZAR</Text>
+              onPress={() => handleCustomize(product)}
+              style={[globalStyles.button, styles.customizeProduct?.Button]}>
+              <Text style={styles.customizeProduct?.ButtonText}>
+                CUSTOMIZAR
+              </Text>
             </TouchableOpacity>
           )}
         </View>
