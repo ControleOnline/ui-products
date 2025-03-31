@@ -1,6 +1,10 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useCallback} from 'react';
 import {View, Text, TouchableOpacity, ScrollView} from 'react-native';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  useFocusEffect,
+} from '@react-navigation/native';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
 import {getStore} from '@store';
@@ -11,69 +15,77 @@ const CustomizeScreen = () => {
   const {product} = route.params || {};
   const {globalStyles, styles} = css();
   const [selectedItems, setSelectedItems] = useState({});
-  const [groups, setGroups] = useState([]);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState({});
 
-  const {actions: productGroupActions} = getStore('product_group');
+  const {getters: ordersGetters} = getStore('orders');
+  const {getters: productGroupsGetters, actions: productGroupActions} =
+    getStore('product_group');
+  const {items: productGroups} = productGroupsGetters;
   const {actions: productGroupProductActions} = getStore(
     'product_group_product',
   );
+  const {getters: orderProductGetters, actions: orderProductActions} =
+    getStore('order_products');
+  const {item: order} = ordersGetters;
+  const {items: orderProducs} = orderProductGetters;
 
-  useEffect(() => {
-    if (product) {
+  useFocusEffect(
+    useCallback(() => {
       product.selectedItems = {...selectedItems};
-    }
-  }, [selectedItems, product]);
+    }, [selectedItems, product]),
+  );
 
-  useEffect(() => {
-    init();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      init();
+    }, []),
+  );
+  useFocusEffect(
+    useCallback(() => {
+      if (Object.keys(saved).length == 0) return;
+      const updatedOrderProducts = orderProducs.map(op =>
+        op['@id'] === saved['@id']
+          ? {...op, sub_products: getSubproducts()}
+          : op,
+      );
+      setSaved({});
+      orderProductActions.setItems(updatedOrderProducts);
+      navigation.pop(3);
+    }, [orderProducs, saved]),
+  );
 
-  const init = async () => {
-    if (!product || !product['@id'] || !product.id) {
-      setError('Produto inválido');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const response = await productGroupActions.getItems({
-        product: product.id,
-        'product.productType': 'component',
-      });
-      const newGroups = Array.isArray(response) ? [...response] : [];
-
-      for (let group of newGroups) {
-        const groupProducts = await fetchProductGroupProducts(group);
-        setSelectedItems(prev => ({
-          ...prev,
-          [group.id]: [],
-        }));
-        group.products = Array.isArray(groupProducts)
-          ? groupProducts.map(product => ({...product, selected: false}))
-          : [];
+  useFocusEffect(
+    useCallback(() => {
+      for (let group of productGroups) {
+        productGroupProductActions
+          .getItems({
+            productGroup: `/product_groups/${group.id}`,
+            productType: 'component',
+          })
+          .then(groupProducts => {
+            setSelectedItems(prev => ({
+              ...prev,
+              [group.id]: groupProducts.map(item => ({
+                ...item,
+                selected: false,
+              })),
+            }));
+          });
       }
-      setGroups(newGroups);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, [productGroups]),
+  );
 
-  const fetchProductGroupProducts = async group => {
-    const result = await productGroupProductActions.getItems({
-      productGroup: `/product_groups/${group.id}`,
-      productType: 'component',
+  const init = () => {
+    productGroupActions.getItems({
+      product: product.id,
+      'product.productType': 'component',
     });
-    return result;
   };
 
   const getProcessedOptions = group => {
     let options = getProductOptions(group);
-    const selectedCount = selectedItems[group.id]?.length || 0;
+    const selectedCount =
+      selectedItems[group.id]?.filter(item => item.selected).length || 0;
     const isMaxReached = group.maximum && selectedCount >= group.maximum;
 
     if (isMaxReached) {
@@ -87,17 +99,19 @@ const CustomizeScreen = () => {
   };
 
   const getProductOptions = group => {
-    if (!Array.isArray(group.products)) return [];
-    return group.products.map(product => ({
-      label: product.productChild?.product || 'Sem Nome',
+    const groupItems = selectedItems[group.id] || [];
+    if (!Array.isArray(groupItems)) return [];
+    return groupItems.map(product => ({
+      label: product.productChild?.product,
       value: product,
     }));
   };
 
   const isSelected = (groupId, value) => {
     return (
-      selectedItems[groupId]?.some(item => item['@id'] === value['@id']) ||
-      false
+      selectedItems[groupId]?.some(
+        item => item['@id'] === value['@id'] && item.selected,
+      ) || false
     );
   };
 
@@ -105,33 +119,68 @@ const CustomizeScreen = () => {
     if (!group.maximum) return false;
     const selectedGroup = selectedItems[group.id] || [];
     return (
-      selectedGroup.length >= group.maximum &&
-      !selectedGroup.some(p => p['@id'] === product['@id'])
+      selectedGroup.filter(item => item.selected).length >= group.maximum &&
+      !selectedGroup.some(p => p['@id'] === product['@id'] && p.selected)
     );
   };
 
   const handleToggleOption = (groupId, option) => {
-    const selectedGroup = selectedItems[groupId] || [];
-    const isOptionSelected = isSelected(groupId, option.value);
+    setSelectedItems(prev => {
+      const selectedGroup = prev[groupId] || [];
+      const updatedGroup = selectedGroup.map(item =>
+        item['@id'] === option.value['@id']
+          ? {...item, selected: !item.selected}
+          : item,
+      );
 
-    if (isOptionSelected) {
-      setSelectedItems({
-        ...selectedItems,
-        [groupId]: selectedGroup.filter(
-          item => item['@id'] !== option.value['@id'],
-        ),
+      if (!updatedGroup.some(item => item['@id'] === option.value['@id'])) {
+        if (
+          !isMaxSelected(
+            {
+              id: groupId,
+              maximum: productGroups.find(g => g.id === groupId)?.maximum,
+            },
+            option.value,
+          )
+        ) {
+          updatedGroup.push({...option.value, selected: true});
+        }
+      }
+
+      return {
+        ...prev,
+        [groupId]: updatedGroup,
+      };
+    });
+  };
+
+  const getSubproducts = () => {
+    const subProducts = [];
+    Object.entries(selectedItems).forEach(([groupId, groupItems]) => {
+      groupItems.forEach(item => {
+        if (item.selected) {
+          subProducts.push({
+            product: item.productChild['@id'].replace(/\D/g, ''),
+            productGroup: parseInt(groupId),
+            quantity: 1,
+          });
+        }
       });
-    } else if (
-      !isMaxSelected(
-        {id: groupId, maximum: groups.find(g => g.id === groupId)?.maximum},
-        option.value,
-      )
-    ) {
-      setSelectedItems({
-        ...selectedItems,
-        [groupId]: [...selectedGroup, option.value],
-      });
-    }
+    });
+    return subProducts;
+  };
+
+  const addHandle = () => {
+    const orderProductData = {
+      product: product['@id'],
+      sub_products: getSubproducts(),
+      order: order['@id'],
+      quantity: 1,
+    };
+
+    orderProductActions.save(orderProductData).then(data => {
+      setSaved(data);
+    });
   };
 
   const renderOption = (group, option, index) => {
@@ -149,8 +198,11 @@ const CustomizeScreen = () => {
           onPress={() => handleToggleOption(group.id, option)}
           style={{flexDirection: 'row', flex: 1, alignItems: 'center'}}
           disabled={option.disable}>
-          <View style={{flex: 0.6}}>
-            <Text style={styles.text}>{option.label || 'Sem Nome'}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center', flex: 0.6}}>
+            <Text style={{marginRight: 8, color: '#007AFF', fontSize: 18}}>
+              {isOptionSelected ? '✓' : '○'}
+            </Text>
+            <Text style={styles.text}>{option.label}</Text>
           </View>
           <View
             style={{
@@ -160,7 +212,7 @@ const CustomizeScreen = () => {
               justifyContent: 'flex-end',
             }}>
             <Text style={styles.text}>
-              {Formatter.formatMoney(option.value?.price || 0, 'R$', 'pt-br')}
+              {Formatter.formatMoney(option.value?.price, 'R$', 'pt-br')}
             </Text>
           </View>
         </TouchableOpacity>
@@ -171,19 +223,16 @@ const CustomizeScreen = () => {
   const renderGroup = group => {
     return (
       <View key={group.id} style={{marginTop: 16, padding: 16}}>
-        <Text style={styles.text}>
-          {group.productGroup || 'Grupo sem nome'}
-        </Text>
+        <Text style={styles.text}>{group.productGroup}</Text>
         {group.required && <Text>Grupo obrigatório!</Text>}
         {group.minimum > 0 && group.maximum > 0 ? (
           <Text style={styles.text}>
-            Escolha entre {group.minimum} e {group.maximum}{' '}
-            {group.productGroup || 'itens'}
+            Escolha entre {group.minimum} e {group.maximum} {group.productGroup}
           </Text>
         ) : null}
         {!group.minimum && group.maximum > 0 ? (
           <Text style={styles.text}>
-            Escolha até {group.maximum} {group.productGroup || 'itens'}
+            Escolha até {group.maximum} {group.productGroup}
           </Text>
         ) : null}
         <View>
@@ -198,16 +247,16 @@ const CustomizeScreen = () => {
   return (
     <View style={{flex: 1, padding: 16}}>
       <ScrollView style={{flex: 1}}>
-        {groups.map(group => renderGroup(group))}
+        {productGroups.map(group => renderGroup(group))}
       </ScrollView>
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+        onPress={addHandle}
         style={[
           globalStyles.button,
           styles.customizeProduct?.Button,
           {marginTop: 16},
         ]}>
-        <Text style={styles.customizeProduct?.ButtonText}>VOLTAR</Text>
+        <Text style={styles.customizeProduct?.ButtonText}>ADICIONAR</Text>
       </TouchableOpacity>
     </View>
   );
