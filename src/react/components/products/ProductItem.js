@@ -1,49 +1,31 @@
 import React from 'react';
-import {TouchableOpacity, Text, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import { TouchableOpacity, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import css from '@controleonline/ui-products/src/react/css/products';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 
-const ProductItem = ({product, category, onQuantityChange}) => {
+const ProductItem = ({ product, category, onQuantityChange }) => {
   const navigation = useNavigation();
-  const {styles, globalStyles} = css();
+  const { styles, globalStyles } = css();
   const currentPageName =
     navigation.getState().routes[navigation.getState().index].name;
 
   const handleCustomize = product => {
-    navigation.navigate('CustomizeScreen', {product});
+    navigation.navigate('CustomizeScreen', { product });
   };
 
   return (
-    <View
-      style={[
-        styles.boxWrap,
-        {
-          borderRadius: 10,
-          marginBottom: 10,
-          overflow: 'hidden',
-          backgroundColor: '#fff',
-        },
-      ]}>
-      <View
-        style={{
-          flexDirection: 'row',
-          padding: 10,
-          alignItems: 'flex-start',
-        }}>
-        <View
-          style={{
-            flex: 1,
-            padding: 5,
-          }}>
-          <View style={{flexDirection: 'column'}}>
+    <View style={[styles.boxWrap, styles.productItem.cardContainer]}>
+      <View style={styles.productItem.rowContainer}>
+        <View style={styles.productItem.infoContainer}>
+          <View style={styles.productItem.columnContainer}>
             <Text
               style={[
                 styles.boxTextColor,
                 styles.boxOrderText,
-                {fontSize: 16, fontWeight: 'bold'},
+                styles.productItem.productName,
               ]}>
               {product.product}
             </Text>
@@ -51,48 +33,28 @@ const ProductItem = ({product, category, onQuantityChange}) => {
               style={[
                 styles.boxDateText,
                 styles.boxTextColor,
-                {fontSize: 14, color: '#666', marginTop: 2},
+                styles.productItem.productDescription,
               ]}>
               {product.description}
             </Text>
           </View>
         </View>
 
-        <View
-          style={{
-            width: 100,
-            height: 100,
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-          }}>
+        <View style={styles.productItem.imageContainer}>
           <Carousel images={product.productFiles} />
         </View>
       </View>
 
-      <View
-        style={{
-          flexDirection: 'row',
-          padding: 10,
-        }}>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            padding: 5,
-          }}>
-          <Text style={{color: '#666'}}>
+      <View style={styles.productItem.priceRow}>
+        <View style={styles.productItem.priceContainer}>
+          <Text style={styles.productItem.priceText}>
             {product.quantity} X {Formatter.formatMoney(product.price)}
           </Text>
-          <Text style={{color: '#666'}}>
+          <Text style={styles.productItem.priceTotalText}>
             {Formatter.formatMoney(product.quantity * product.price)}
           </Text>
         </View>
-        <View
-          style={{
-            width: 100,
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}>
+        <View style={styles.productItem.actionContainer}>
           {product.type === 'product' && (
             <ProductQuantity
               product={product}
@@ -103,8 +65,8 @@ const ProductItem = ({product, category, onQuantityChange}) => {
           {product.type === 'custom' && (
             <TouchableOpacity
               onPress={() => handleCustomize(product)}
-              style={[globalStyles.button, styles.customizeProduct?.Button]}>
-              <Text style={styles.customizeProduct?.ButtonText}>
+              style={[globalStyles.button, styles.productItem.customizeButton]}>
+              <Text style={styles.productItem.customizeButtonText}>
                 CUSTOMIZAR
               </Text>
             </TouchableOpacity>
