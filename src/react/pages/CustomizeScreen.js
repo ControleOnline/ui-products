@@ -7,6 +7,7 @@ import {
 } from '@react-navigation/native';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
+import CustomIngredients from './CustomIngredients';
 import {getStore} from '@store';
 
 const CustomizeScreen = () => {
@@ -214,6 +215,13 @@ const CustomizeScreen = () => {
             <Text style={styles.text}>
               {Formatter.formatMoney(option.value?.price, 'R$', 'pt-br')}
             </Text>
+            {isOptionSelected  &&(
+              <CustomIngredients
+              productGroupProducts={
+                option.value
+                }
+              />
+            )}
           </View>
         </TouchableOpacity>
       </View>
