@@ -1,19 +1,19 @@
 import React from 'react';
-import { TouchableOpacity, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import {TouchableOpacity, Text, View} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import css from '@controleonline/ui-products/src/react/css/products';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 
-const ProductItem = ({ product, category, onQuantityChange }) => {
+const ProductItem = ({product, category, onQuantityChange}) => {
   const navigation = useNavigation();
-  const { styles, globalStyles } = css();
+  const {styles, globalStyles} = css();
   const currentPageName =
     navigation.getState().routes[navigation.getState().index].name;
 
   const handleCustomize = product => {
-    navigation.navigate('CustomizeScreen', { product });
+    navigation.navigate('CustomizeScreen', {product});
   };
 
   return (
@@ -48,11 +48,14 @@ const ProductItem = ({ product, category, onQuantityChange }) => {
       <View style={styles.productItem.priceRow}>
         <View style={styles.productItem.priceContainer}>
           <Text style={styles.productItem.priceText}>
-            {product.quantity} X {Formatter.formatMoney(product.price)}
+            {product.quantity > 0 ? product.quantity + ' X ' : ''}
+            {Formatter.formatMoney(product.price)}
           </Text>
-          <Text style={styles.productItem.priceTotalText}>
-            {Formatter.formatMoney(product.quantity * product.price)}
-          </Text>
+          {product.quantity > 0 && (
+            <Text style={styles.productItem.priceTotalText}>
+              {Formatter.formatMoney(product.quantity * product.price)}
+            </Text>
+          )}
         </View>
         <View style={styles.productItem.actionContainer}>
           {product.type === 'product' && (
