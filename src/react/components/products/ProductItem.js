@@ -58,14 +58,7 @@ const ProductItem = ({product, category, onQuantityChange}) => {
           )}
         </View>
         <View style={styles.productItem.actionContainer}>
-          {product.type === 'product' && (
-            <ProductQuantity
-              product={product}
-              category={category}
-              onQuantityChange={onQuantityChange}
-            />
-          )}
-          {product.type === 'custom' && (
+          {product.type === 'custom' ? (
             <TouchableOpacity
               onPress={() => handleCustomize(product)}
               style={[globalStyles.button, styles.productItem.customizeButton]}>
@@ -73,6 +66,12 @@ const ProductItem = ({product, category, onQuantityChange}) => {
                 CUSTOMIZAR
               </Text>
             </TouchableOpacity>
+          ) : (
+            <ProductQuantity
+              product={product}
+              category={category}
+              onQuantityChange={onQuantityChange}
+            />
           )}
         </View>
       </View>

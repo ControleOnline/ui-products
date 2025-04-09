@@ -105,6 +105,7 @@ export default {
         align: 'left',
         list: [
           {value: 'custom', label: 'Produto Customizado'},
+          {value: 'manufactured', label: 'Produto Manufaturado'},
           {value: 'product', label: 'Produto'},
           {value: 'service', label: 'Serviço'},
           {value: 'component', label: 'Componente'},
