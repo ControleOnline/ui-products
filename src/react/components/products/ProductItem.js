@@ -1,4 +1,4 @@
-import React from 'react';
+import {React, useEffect} from 'react';
 import {TouchableOpacity, Text, View} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import css from '@controleonline/ui-products/src/react/css/products';
