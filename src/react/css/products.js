@@ -1,6 +1,6 @@
 import {StyleSheet} from 'react-native';
 import {getStore} from '@store';
-import globalStyles from '@controleonline/ui-shop/src/react/styles/global';
+import globalStyles from '@controleonline/ui-layout/src/react/styles/global';
 
 const css = () => {
   const {getters} = getStore('theme');
