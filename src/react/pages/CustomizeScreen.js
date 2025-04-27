@@ -25,10 +25,10 @@ const CustomizeScreen = () => {
   const {actions: productGroupProductActions} = getStore(
     'product_group_product',
   );
-  const {getters: orderProductGetters, actions: orderProductActions} =
+  const {getters: orderProductsGetters, actions: orderProductsActions} =
     getStore('order_products');
   const {item: order} = ordersGetters;
-  const {items: orderProducs} = orderProductGetters;
+  const {items: orderProducs} = orderProductsGetters;
 
   useFocusEffect(
     useCallback(() => {
@@ -50,7 +50,7 @@ const CustomizeScreen = () => {
           : op,
       );
       setSaved({});
-      orderProductActions.setItems(updatedOrderProducts);
+      orderProductsActions.setItems(updatedOrderProducts);
       navigation.pop(3);
     }, [orderProducs, saved]),
   );
@@ -179,7 +179,7 @@ const CustomizeScreen = () => {
       quantity: 1,
     };
 
-    orderProductActions.save(orderProductData).then(data => {
+    orderProductsActions.save(orderProductData).then(data => {
       setSaved(data);
     });
   };
