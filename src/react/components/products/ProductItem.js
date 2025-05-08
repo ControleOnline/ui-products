@@ -6,7 +6,7 @@ import Carousel from '@controleonline/ui-products/src/react/components/products/
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 
-const ProductItem = ({product, category, onQuantityChange}) => {
+const ProductItem = ({product, category}) => {
   const navigation = useNavigation();
   const {styles, globalStyles} = css();
   const currentPageName =
@@ -70,7 +70,6 @@ const ProductItem = ({product, category, onQuantityChange}) => {
             <ProductQuantity
               product={product}
               category={category}
-              onQuantityChange={onQuantityChange}
             />
           )}
         </View>
