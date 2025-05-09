@@ -1,12 +1,12 @@
-import {React} from 'react';
+import {React, useCallback} from 'react';
 import {TouchableOpacity, Text, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import css from '@controleonline/ui-products/src/react/css/products';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 
-const ProductItem = ({product, category}) => {
+const ProductItem = ({product, category, changePrice}) => {
   const navigation = useNavigation();
   const {styles, globalStyles} = css();
   const currentPageName =
@@ -70,6 +70,7 @@ const ProductItem = ({product, category}) => {
             <ProductQuantity
               product={product}
               category={category}
+              changePrice={changePrice}
             />
           )}
         </View>
