@@ -9,8 +9,6 @@ import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart
 const ProductItem = ({product, category, changePrice}) => {
   const navigation = useNavigation();
   const {styles, globalStyles} = css();
-  const currentPageName =
-    navigation.getState().routes[navigation.getState().index].name;
 
   const handleCustomize = product => {
     navigation.navigate('CustomizeScreen', {product});

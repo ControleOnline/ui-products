@@ -18,17 +18,15 @@ const CustomizeScreen = () => {
   const [selectedItems, setSelectedItems] = useState({});
   const [saved, setSaved] = useState({});
 
-  const {getters: ordersGetters} = getStore('orders');
+  const {actions: ordersActions, getters: ordersGetters} = getStore('orders');
   const {getters: productGroupsGetters, actions: productGroupActions} =
     getStore('product_group');
   const {items: productGroups} = productGroupsGetters;
   const {actions: productGroupProductActions} = getStore(
     'product_group_product',
   );
-  const {getters: orderProductsGetters, actions: orderProductsActions} =
-    getStore('order_products');
+  const {actions: orderProductsActions} = getStore('order_products');
   const {item: order} = ordersGetters;
-  const {items: orderProducs} = orderProductsGetters;
 
   useFocusEffect(
     useCallback(() => {
@@ -44,15 +42,18 @@ const CustomizeScreen = () => {
   useFocusEffect(
     useCallback(() => {
       if (Object.keys(saved).length == 0) return;
-      const updatedOrderProducts = orderProducs.map(op =>
+      const updatedOrderProducts = order.orderProducs.map(op =>
         op['@id'] === saved['@id']
           ? {...op, sub_products: getSubproducts()}
           : op,
       );
       setSaved({});
-      orderProductsActions.setItems(updatedOrderProducts);
+      let currentOrder = {...order};
+      currentOrder.orderProducts = updatedOrderProducts;
+      ordersActions.setItem(currentOrder);
+
       navigation.pop(3);
-    }, [orderProducs, saved]),
+    }, [order, saved]),
   );
 
   useFocusEffect(
@@ -215,12 +216,8 @@ const CustomizeScreen = () => {
             <Text style={styles.text}>
               {Formatter.formatMoney(option.value?.price, 'R$', 'pt-br')}
             </Text>
-            {isOptionSelected  &&(
-              <CustomIngredients
-              productGroupProducts={
-                option.value
-                }
-              />
+            {isOptionSelected && (
+              <CustomIngredients productGroupProducts={option.value} />
             )}
           </View>
         </TouchableOpacity>
