@@ -2,7 +2,7 @@
   <div class="row col-12" v-if="product">
     <div
       v-if="product.id"
-      class="row col-xs-12 col-sm-12 col-md-4 col-lg-4 col-xl-4 justify-content q-pa-sm"
+      class="row col-xs-12 col-sm-12 col-md-2 col-lg-2 col-xl-2 justify-content q-pa-sm"
     >
       <DefaultCarousel
         :object="{ product: product['@id'] }"
@@ -13,7 +13,7 @@
     <div
       :class="
         (product.id
-          ? 'col-md-8 col-lg-8 col-xl-8'
+          ? 'col-md-10 col-lg-10 col-xl-10'
           : 'col-md-12 col-lg-12 col-xl-12') +
         ' row col-xs-12 col-sm-12 justify-content q-pa-sm'
       "
@@ -101,6 +101,7 @@
   </div>
 </template>
 
+
 <script>
 import { mapGetters, mapActions } from "vuex";
 
@@ -141,13 +142,14 @@ export default {
         store: "product_file",
         isAdmin: true,
         context: "products",
+        zoom: false,
       };
     },
     configs() {
       return {
         store: "products",
-        showLabels: true,
-        labelType: "dense",
+        showLabels: false,
+        labelType: "stack-label",
         columns: {
           queue: {
             filters: {
