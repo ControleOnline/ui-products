@@ -41,7 +41,9 @@ const CustomizeScreen = () => {
   );
   useFocusEffect(
     useCallback(() => {
-      if (Object.keys(saved).length == 0) return;
+      if (Object.keys(saved).length == 0) {
+        return;
+      }
       const updatedOrderProducts = order.orderProducs.map(op =>
         op['@id'] === saved['@id']
           ? {...op, sub_products: getSubproducts()}
@@ -102,7 +104,9 @@ const CustomizeScreen = () => {
 
   const getProductOptions = group => {
     const groupItems = selectedItems[group.id] || [];
-    if (!Array.isArray(groupItems)) return [];
+    if (!Array.isArray(groupItems)) {
+      return [];
+    }
     return groupItems.map(product => ({
       label: product.productChild?.product,
       value: product,
@@ -118,7 +122,9 @@ const CustomizeScreen = () => {
   };
 
   const isMaxSelected = (group, product) => {
-    if (!group.maximum) return false;
+    if (!group.maximum) {
+      return false;
+    }
     const selectedGroup = selectedItems[group.id] || [];
     return (
       selectedGroup.filter(item => item.selected).length >= group.maximum &&
@@ -259,7 +265,7 @@ const CustomizeScreen = () => {
         style={[
           globalStyles.button,
           styles.customizeProduct?.Button,
-          {marginTop: 16},
+          {marginTop: 16, maxHeight: '10%'},
         ]}>
         <Text style={styles.customizeProduct?.ButtonText}>ADICIONAR</Text>
       </TouchableOpacity>
