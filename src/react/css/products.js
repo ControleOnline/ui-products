@@ -86,6 +86,7 @@ const css = () => {
       cardContainer: {
         borderRadius: 10,
         marginBottom: 10,
+        marginHorizontal: 5,
         overflow: 'hidden',
         backgroundColor: '#fff',
         borderWidth: 1,
@@ -95,7 +96,8 @@ const css = () => {
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
-        marginHorizontal: 0,
+        flex: 1,
+        alignItems: 'center',
       },
       rowContainer: {
         flexDirection: 'row',
@@ -174,7 +176,7 @@ const css = () => {
       customizeButton: {
         paddingVertical: 8,
         paddingHorizontal: 16,
-        backgroundColor: colors['primary'], 
+        backgroundColor: colors.primary,
         borderRadius: 5,
       },
       customizeButtonText: {

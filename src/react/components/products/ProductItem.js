@@ -1,6 +1,6 @@
-import {React, useCallback} from 'react';
+import {React} from 'react';
 import {TouchableOpacity, Text, View} from 'react-native';
-import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import css from '@controleonline/ui-products/src/react/css/products';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
@@ -35,26 +35,25 @@ const ProductItem = ({product, category}) => {
               ]}>
               {product.description}
             </Text>
+            <View style={styles.productItem.imageContainer}>
+              <Carousel images={product.productFiles} />
+            </View>
+            <View style={styles.productItem.priceContainer}>
+              <Text style={styles.productItem.priceText}>
+                {product.quantity > 0 ? product.quantity + ' X ' : ''}
+                {Formatter.formatMoney(product.price)}
+              </Text>
+              {product.quantity > 0 && (
+                <Text style={styles.productItem.priceTotalText}>
+                  {Formatter.formatMoney(product.quantity * product.price)}
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
-
-        <View style={styles.productItem.imageContainer}>
-          <Carousel images={product.productFiles} />
         </View>
       </View>
 
       <View style={styles.productItem.priceRow}>
-        <View style={styles.productItem.priceContainer}>
-          <Text style={styles.productItem.priceText}>
-            {product.quantity > 0 ? product.quantity + ' X ' : ''}
-            {Formatter.formatMoney(product.price)}
-          </Text>
-          {product.quantity > 0 && (
-            <Text style={styles.productItem.priceTotalText}>
-              {Formatter.formatMoney(product.quantity * product.price)}
-            </Text>
-          )}
-        </View>
         <View style={styles.productItem.actionContainer}>
           {product.type === 'custom' ? (
             <TouchableOpacity
@@ -65,10 +64,7 @@ const ProductItem = ({product, category}) => {
               </Text>
             </TouchableOpacity>
           ) : (
-            <ProductQuantity
-              product={product}
-              category={category}
-            />
+            <ProductQuantity product={product} category={category} />
           )}
         </View>
       </View>
