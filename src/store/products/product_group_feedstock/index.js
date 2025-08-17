@@ -1,7 +1,7 @@
-import * as actions from "@controleonline/ui-default/src/store/default/actions";
-import * as getters from "@controleonline/ui-default/src/store/default/getters";
-import mutations from "@controleonline/ui-default/src/store/default/mutations";
-import Formatter from "@controleonline/ui-common/src/utils/formatter.js";
+import * as actions from '@controleonline/ui-default/src/store/default/actions';
+import * as getters from '@controleonline/ui-default/src/store/default/getters';
+import mutations from '@controleonline/ui-default/src/store/default/mutations';
+import Formatter from '@controleonline/ui-common/src/utils/formatter.js';
 
 export default {
   namespaced: true,
@@ -9,35 +9,37 @@ export default {
     offline: true,
     item: {},
     items: [],
-    resourceEndpoint: "product_group_products",
+    resourceEndpoint: 'product_group_products',
     isLoading: false,
-    error: "",
-    
-    totalItems: 0,messages:[], message:{},
+    error: '',
+
+    totalItems: 0,
+    messages: [],
+    message: {},
     filters: {},
     columns: [
       {
         sortable: true,
         editable: false,
-        name: "id",
-        align: "left",
-        label: "id",
+        name: 'id',
+        align: 'left',
+        label: 'id',
         sum: false,
         isIdentity: true,
         format: function (value) {
-          return "#" + value;
+          return '#' + value;
         },
       },
       {
         sortable: true,
-        name: "sku",
+        name: 'sku',
         externalFilter: false,
         editable: false,
-        align: "left",
-        label: "sku",
+        align: 'left',
+        label: 'sku',
         sum: false,
         saveFormat(value) {
-          return value + "";
+          return value + '';
         },
         format: function (value) {
           return value;
@@ -45,17 +47,17 @@ export default {
       },
       {
         sortable: true,
-        name: "productChild",
+        name: 'productChild',
         externalFilter: false,
         editable: false,
-        align: "left",
-        label: "productChild",
-        list: "products/getItems",
+        align: 'left',
+        label: 'productChild',
+        list: 'products/getItems',
         saveFormat(value, column, row) {
-          return "/products/" + value.value;
+          return '/products/' + value.value;
         },
         formatList(value, column, row) {
-          return { value: value["@id"].split("/").pop(), label: value.product };
+          return {value: value['@id'].split('/').pop(), label: value.product};
         },
 
         format: function (value) {
@@ -65,9 +67,9 @@ export default {
 
       {
         sortable: true,
-        name: "quantity",
-        align: "right",
-        label: "quantity",
+        name: 'quantity',
+        align: 'right',
+        label: 'quantity',
         sum: false,
         editFormat(value) {
           return Formatter.formatMoney(value);

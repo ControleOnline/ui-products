@@ -1,8 +1,8 @@
-import * as actions from "@controleonline/ui-default/src/store/default/actions";
-import * as getters from "@controleonline/ui-default/src/store/default/getters";
-import mutations from "@controleonline/ui-default/src/store/default/mutations";
-import Formatter from "@controleonline/ui-common/src/utils/formatter.js";
-import * as customActions from "./customActions";
+import * as actions from '@controleonline/ui-default/src/store/default/actions';
+import * as getters from '@controleonline/ui-default/src/store/default/getters';
+import mutations from '@controleonline/ui-default/src/store/default/mutations';
+import Formatter from '@controleonline/ui-common/src/utils/formatter.js';
+import * as customActions from './customActions';
 
 export default {
   namespaced: true,
@@ -10,136 +10,138 @@ export default {
     offline: true,
     item: {},
     items: [],
-    resourceEndpoint: "products",
+    resourceEndpoint: 'products',
     isLoading: false,
-    error: "",
-    totalItems: 0,messages:[], message:{},
+    error: '',
+    totalItems: 0,
+    messages: [],
+    message: {},
     filters: {},
     columns: [
       {
         sortable: true,
-        name: "id",
-        align: "left",
-        label: "id",
+        name: 'id',
+        align: 'left',
+        label: 'id',
         sum: false,
         isIdentity: true,
         to: function (value) {
           return {
-            name: "ProductDetails",
-            params: { id: value },
+            name: 'ProductDetails',
+            params: {id: value},
           };
         },
         format: function (value) {
-          return "#" + value;
+          return '#' + value;
         },
       },
       {
         sortable: true,
-        name: "sku",
+        name: 'sku',
         externalFilter: false,
-        align: "left",
-        label: "sku",
+        align: 'left',
+        label: 'sku',
         sum: false,
         format: function (value) {
-          return value || "";
+          return value || '';
         },
         saveFormat: function (value) {
-          return value || "";
+          return value || '';
         },
       },
       {
         sortable: true,
-        name: "product",
+        name: 'product',
         externalFilter: false,
-        align: "left",
-        label: "product",
+        align: 'left',
+        label: 'product',
         format: function (value) {
           return value;
         },
       },
       {
         sortable: true,
-        name: "description",
+        name: 'description',
         externalFilter: false,
-        align: "left",
-        label: "description",
+        align: 'left',
+        label: 'description',
         format: function (value) {
-          return value || "";
+          return value || '';
         },
         saveFormat: function (value) {
-          return value || "";
+          return value || '';
         },
       },
       {
         sortable: true,
         externalFilter: false,
-        name: "productUnit",
-        align: "left",
-        list: "product_unit/getItems",
-        label: "productUnit",
+        name: 'productUnit',
+        align: 'left',
+        list: 'product_unit/getItems',
+        label: 'productUnit',
         format: function (value) {
           return value?.productUnit;
         },
 
         saveFormat: function (value) {
-          return value ? "/product_unities/" + (value.value || value) : null;
+          return value ? '/product_unities/' + (value.value || value) : null;
         },
       },
       {
         sortable: true,
         externalFilter: false,
         editable: true,
-        name: "queue",
-        align: "left",
-        list: "queues/getItems",
-        label: "queue",
+        name: 'queue',
+        align: 'left',
+        list: 'queues/getItems',
+        label: 'queue',
         format: function (value) {
           return value?.queue;
         },
 
         saveFormat: function (value) {
-          return value ? "/queues/" + (value.value || value) : null;
+          return value ? '/queues/' + (value.value || value) : null;
         },
       },
       {
         sortable: true,
         externalFilter: false,
-        name: "type",
-        align: "left",
+        name: 'type',
+        align: 'left',
         list: [
-          { value: "custom", label: "Produto Customizado" },
-          { value: "manufactured", label: "Produto Manufaturado" },
-          { value: "product", label: "Produto" },
-          { value: "service", label: "Serviço" },
-          { value: "component", label: "Componente" },
-          { value: "feedstock", label: "Matéria Prima" },
-          { value: "package", label: "Embalagem" },
+          {value: 'custom', label: 'Produto Customizado'},
+          {value: 'manufactured', label: 'Produto Manufaturado'},
+          {value: 'product', label: 'Produto'},
+          {value: 'service', label: 'Serviço'},
+          {value: 'component', label: 'Componente'},
+          {value: 'feedstock', label: 'Matéria Prima'},
+          {value: 'package', label: 'Embalagem'},
         ],
-        label: "type",
+        label: 'type',
         format: function (value) {
           return value;
         },
       },
       {
         sortable: true,
-        name: "productCondition",
+        name: 'productCondition',
         externalFilter: false,
         list: [
-          { value: "new", label: "Novo" },
-          { value: "used", label: "Usado" },
-          { value: "recondicioned", label: "Recondicionado" },
+          {value: 'new', label: 'Novo'},
+          {value: 'used', label: 'Usado'},
+          {value: 'recondicioned', label: 'Recondicionado'},
         ],
-        align: "left",
-        label: "productCondition",
+        align: 'left',
+        label: 'productCondition',
         format: function (value) {
           return value;
         },
       },
       {
         sortable: true,
-        name: "price",
-        align: "right",
-        label: "price",
+        name: 'price',
+        align: 'right',
+        label: 'price',
         sum: true,
         editFormat(value) {
           return Formatter.formatMoney(value);
@@ -153,7 +155,7 @@ export default {
       },
     ],
   },
-  actions: { ...actions, ...customActions },
+  actions: {...actions, ...customActions},
   getters,
   mutations,
 };
