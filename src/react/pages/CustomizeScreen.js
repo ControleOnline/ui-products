@@ -25,7 +25,9 @@ const CustomizeScreen = () => {
   const productGroupsGetters = product_groupStore.getters;
   const productGroupActions = product_groupStore.actions;
   const {items: productGroups} = productGroupsGetters;
-  const {actions: productGroupProductActions} = getStore();
+  const productsStore = useStores(state => state.products);
+  actions = productsStore.actions;
+
   const order_productsStore = useStores(state => state.order_products);
   const orderProductsActions = order_productsStore.actions;
   const {item: order} = ordersGetters;
