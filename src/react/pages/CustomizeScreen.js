@@ -19,8 +19,7 @@ const CustomizeScreen = () => {
   const [saved, setSaved] = useState({});
 
   const {actions: ordersActions, getters: ordersGetters} = getStore('orders');
-  const {getters: productGroupsGetters, actions: productGroupActions} =
-    getStore('product_group');
+  const {getters: productGroupsGetters, actions: productGroupActions} = getStore('product_group');
   const {items: productGroups} = productGroupsGetters;
   const {actions: productGroupProductActions} = getStore(
     'product_group_product',
