@@ -8,7 +8,7 @@ import {
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
 import CustomIngredients from './CustomIngredients';
-import {getStore} from '@store';
+import {useStores} from '@store';
 
 const CustomizeScreen = () => {
   const navigation = useNavigation();
@@ -18,11 +18,16 @@ const CustomizeScreen = () => {
   const [selectedItems, setSelectedItems] = useState({});
   const [saved, setSaved] = useState({});
 
-  const {actions: ordersActions, getters: ordersGetters} = getStore('orders');
-  const {getters: productGroupsGetters, actions: productGroupActions} = getStore('product_group');
+  const ordersStore = useStores(state => state.orders);
+  const ordersActions = ordersStore.actions;
+  const ordersGetters = ordersStore.getters;
+  const product_groupStore = useStores(state => state.product_group);
+  const productGroupsGetters = product_groupStore.getters;
+  const productGroupActions = product_groupStore.actions;
   const {items: productGroups} = productGroupsGetters;
   const {actions: productGroupProductActions} = getStore();
-  const {actions: orderProductsActions} = getStore('order_products');
+  const order_productsStore = useStores(state => state.order_products);
+  const orderProductsActions = order_productsStore.actions;
   const {item: order} = ordersGetters;
 
   useFocusEffect(
