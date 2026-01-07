@@ -5,6 +5,8 @@ import css from '@controleonline/ui-products/src/react/css/products';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
+import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
+import {APP_ENV} from '@controleonline/../../config/env.js';
 
 const ProductItem = ({product, category}) => {
   const navigation = useNavigation();
@@ -64,6 +66,8 @@ const ProductItem = ({product, category}) => {
                 CUSTOMIZAR
               </Text>
             </TouchableOpacity>
+          ) : APP_ENV.APP_TYPE === 'TOTEM' ? (
+            <ProductTotem product={product} category={category} />
           ) : (
             <ProductQuantity product={product} category={category} />
           )}
