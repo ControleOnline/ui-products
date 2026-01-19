@@ -1,9 +1,9 @@
 import {StyleSheet} from 'react-native';
-import {useStores} from '@store';
+import {useStore} from '@store';
 import globalStyles from '@controleonline/ui-layout/src/react/styles/global';
 
 const css = () => {
-  const themeStore = useStores(state => state.theme);
+  const themeStore = useStore('theme');
   const getters = themeStore.getters;
   const {colors} = getters;
 

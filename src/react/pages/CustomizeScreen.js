@@ -8,7 +8,7 @@ import {
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
 import CustomIngredients from './CustomIngredients';
-import {useStores} from '@store';
+import {useStore} from '@store';
 
 const CustomizeScreen = () => {
   const navigation = useNavigation();
@@ -18,17 +18,17 @@ const CustomizeScreen = () => {
   const [selectedItems, setSelectedItems] = useState({});
   const [saved, setSaved] = useState({});
 
-  const ordersStore = useStores(state => state.orders);
+  const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
   const ordersGetters = ordersStore.getters;
-  const product_groupStore = useStores(state => state.product_group);
+  const product_groupStore = useStore('product_group');
   const productGroupsGetters = product_groupStore.getters;
   const productGroupActions = product_groupStore.actions;
   const {items: productGroups} = productGroupsGetters;
-  const productsStore = useStores(state => state.products);
+  const productsStore = useStore('products');
   actions = productsStore.actions;
 
-  const order_productsStore = useStores(state => state.order_products);
+  const order_productsStore = useStore('order_products');
   const orderProductsActions = order_productsStore.actions;
   const {item: order} = ordersGetters;
 
