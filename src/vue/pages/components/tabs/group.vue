@@ -206,7 +206,7 @@ export default {
   },
   created() {
     let filters = {
-      productParent: "/products/" + this.ProductId,
+      parentProduct: "/products/" + this.ProductId,
       people: this.myCompany.id,
     };
     this.$store.commit(this.configs.store + "/SET_FILTERS", filters);
