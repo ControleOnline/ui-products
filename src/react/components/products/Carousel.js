@@ -1,40 +1,47 @@
 import React, { useEffect } from 'react'
-import { View, FlatList, Image } from 'react-native'
+import { View, ScrollView, Image } from 'react-native'
 import css from '@controleonline/ui-orders/src/react/css/orders'
 import { env } from '@env'
+
+const ITEM_SIZE = 100
 
 const Carousel = ({ images }) => {
   const { styles } = css()
 
-  useEffect(() => {
-  }, [images])
-
-  const renderItem = ({ item, index }) => {
-
-    const imageUrl = `${env.API_ENTRYPOINT}/files/${item?.file?.id}/download?app-domain=${env.DOMAIN}`
-
+  if (!images || images.length === 0) {
     return (
-      <View style={[styles.slide, { width: 100, height: 100 }]}>
-        <Image
-          source={{ uri: imageUrl }}
-          style={{ width: 100, height: 100 }}
-          resizeMode="cover"
-        />
-      </View>
+      <View style={{ width: ITEM_SIZE, height: ITEM_SIZE }} />
     )
   }
 
   return (
-    <View style={{ width: '100%' }}>
-      <FlatList
-        data={images || []}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => {
-          return item?.id?.toString() || index.toString()
-        }}
+    <View style={{ width: ITEM_SIZE, height: ITEM_SIZE }}>
+      <ScrollView
         horizontal
-        showsHorizontalScrollIndicator
-      />
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ alignItems: 'center' }}
+      >
+        {images.map((item, index) => {
+          if (!item?.file?.id) {
+            return null
+          }
+
+          const imageUrl = `${env.API_ENTRYPOINT}/files/${item.file.id}/download?app-domain=${env.DOMAIN}`
+
+          return (
+            <View
+              key={item.id || index}
+              style={{ width: ITEM_SIZE, height: ITEM_SIZE }}
+            >
+              <Image
+                source={{ uri: imageUrl }}
+                style={{ width: ITEM_SIZE, height: ITEM_SIZE }}
+                resizeMode="cover"
+              />
+            </View>
+          )
+        })}
+      </ScrollView>
     </View>
   )
 }
