@@ -6,16 +6,14 @@ import { useStore } from '@store';
 
 import React from 'react';
 
-
-
 const ordersRoutes = [
   {
     name: 'ProductsPage',
     component: Products,
     options: {
       headerShown: true,
+      headerBackVisible: false,
       title: 'Escolher Produtos',
-      headerBackButtonMenuEnabled: false,
     },
     initialParams: { store: 'products' },
   },
@@ -24,8 +22,8 @@ const ordersRoutes = [
     component: Categories,
     options: {
       headerShown: true,
+      headerBackVisible: false,
       title: 'Categorias',
-      headerBackButtonMenuEnabled: false,
     },
     initialParams: { store: 'category' },
   },
@@ -34,8 +32,8 @@ const ordersRoutes = [
     component: CustomizeScreen,
     options: {
       headerShown: true,
+      headerBackVisible: false,
       title: 'Customizar',
-      headerBackButtonMenuEnabled: false,
     },
     initialParams: { store: 'products' },
   },
