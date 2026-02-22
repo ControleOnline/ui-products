@@ -12,7 +12,7 @@ const ordersRoutes = [
     component: Products,
     options: {
       headerShown: true,
-      headerBackVisible: false,
+      headerBackVisible: true,
       title: 'Escolher Produtos',
     },
     initialParams: { store: 'products' },
@@ -22,7 +22,7 @@ const ordersRoutes = [
     component: Categories,
     options: {
       headerShown: true,
-      headerBackVisible: false,
+      headerBackVisible: true,
       title: 'Categorias',
     },
     initialParams: { store: 'category' },
