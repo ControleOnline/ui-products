@@ -2,9 +2,7 @@
 import Products from '@controleonline/ui-products/src/react/pages/Products';
 import Categories from '@controleonline/ui-products/src/react/pages/Categories';
 import CustomizeScreen from '@controleonline/ui-products/src/react/pages/CustomizeScreen';
-import { useStore } from '@store';
-
-import React from 'react';
+import ProductDetails from '@controleonline/ui-products/src/react/pages/ProductDetails';
 
 const ordersRoutes = [
   {
@@ -14,6 +12,16 @@ const ordersRoutes = [
       headerShown: true,
       headerBackVisible: true,
       title: 'Escolher Produtos',
+    },
+    initialParams: { store: 'products' },
+  },
+  {
+    name: 'ProductDetails',
+    component: ProductDetails,
+    options: {
+      headerShown: true,
+      headerBackVisible: true,
+      title: 'Editar Produto',
     },
     initialParams: { store: 'products' },
   },
