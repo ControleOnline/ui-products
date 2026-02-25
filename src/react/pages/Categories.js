@@ -190,7 +190,6 @@ const CategoriesPage = () => {
           >
             <CategoryForm
               category={selectedCategory}
-              company={currentCompany}
               onClose={closeModal}
             />
           </View>
