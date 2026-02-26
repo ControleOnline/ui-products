@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { ScrollView, View, TouchableOpacity } from 'react-native';
+import { ScrollView, View, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import css from '@controleonline/ui-orders/src/react/css/orders';
@@ -100,6 +100,11 @@ const ProductsPage = ({ navigation, route }) => {
     });
   };
 
+  const handleAddProduct = () => {
+    if (!isManager) return;
+    navigation.navigate('ProductDetails');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StateStore store="products" />
@@ -133,6 +138,22 @@ const ProductsPage = ({ navigation, route }) => {
             </View>
           </ScrollView>
         )}
+      {isManager && (
+        <TouchableOpacity
+          onPress={handleAddProduct}
+          style={{
+            position: 'absolute',
+            right: 16,
+            bottom: 40,
+            backgroundColor: '#000',
+            padding: 12,
+            borderRadius: 30,
+            zIndex: 999,
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>+</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   );
 };

@@ -22,6 +22,9 @@ const ProductGroups = ({ ProductId }) => {
   const [expanded, setExpanded] = useState({});
   const [reloadKey, setReloadKey] = useState(0);
 
+  // don't load or allow edits when there's no parent product
+  if (!ProductId) return null;
+
   const loadData = useCallback(() => {
     actions
       .getItems({

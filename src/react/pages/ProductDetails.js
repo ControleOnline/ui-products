@@ -16,17 +16,15 @@ const ProductDetails = ({ route }) => {
         tabBarLabelStyle: { fontWeight: '600' },
       }}
     >
-      <Tab.Screen
-        name="Dados"
-        component={ProductForm}
-        initialParams={{ ProductId }}
-      />
+      <Tab.Screen name="Dados">
+        {props => <ProductForm {...props} ProductId={ProductId} />}
+      </Tab.Screen>
 
-      <Tab.Screen
-        name="Grupos"
-        component={ProductGroups}
-        initialParams={{ ProductId }}
-      />
+      {ProductId && (
+        <Tab.Screen name="Grupos">
+          {props => <ProductGroups {...props} ProductId={ProductId} />}
+        </Tab.Screen>
+      )}
     </Tab.Navigator>
   );
 };

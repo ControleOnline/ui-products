@@ -153,6 +153,89 @@ export default {
           return Formatter.formatMoney(value);
         },
       },
+      {
+        sortable: true,
+        name: 'featured',
+        align: 'left',
+        label: 'featured',
+        list: [
+          {value: true, label: 'Sim'},
+          {value: false, label: 'Não'},
+        ],
+        format: function (value) {
+          return value ? 'Sim' : 'Não';
+        },
+        saveFormat: function (value) {
+          return !!value;
+        },
+      },
+      {
+        sortable: true,
+        name: 'active',
+        align: 'left',
+        label: 'active',
+        list: [
+          {value: true, label: 'Ativo'},
+          {value: false, label: 'Inativo'},
+        ],
+        format: function (value) {
+          return value ? 'Ativo' : 'Inativo';
+        },
+        saveFormat: function (value) {
+          return !!value;
+        },
+      },
+      {
+        sortable: true,
+        name: 'company',
+        align: 'left',
+        label: 'company',
+        list: 'people/getItems',
+        format: function (value) {
+          return value?.name || '';
+        },
+        saveFormat: function (value) {
+          return value ? '/people/' + (value.value || value) : null;
+        },
+      },
+      {
+        sortable: true,
+        name: 'defaultOutInventory',
+        align: 'left',
+        label: 'defaultOutInventory',
+        list: 'inventories/getItems',
+        format: function (value) {
+          return value?.name || '';
+        },
+        saveFormat: function (value) {
+          return value ? '/inventories/' + (value.value || value) : null;
+        },
+      },
+      {
+        sortable: true,
+        name: 'defaultInInventory',
+        align: 'left',
+        label: 'defaultInInventory',
+        list: 'inventories/getItems',
+        format: function (value) {
+          return value?.name || '';
+        },
+        saveFormat: function (value) {
+          return value ? '/inventories/' + (value.value || value) : null;
+        },
+      },
+      {
+        sortable: false,
+        name: 'extraData',
+        align: 'left',
+        label: 'extraData',
+        format: function (value) {
+          return value ? JSON.stringify(value) : '';
+        },
+        saveFormat: function (value) {
+          return value || null;
+        },
+      },
     ],
   },
   actions: {...actions, ...customActions},
