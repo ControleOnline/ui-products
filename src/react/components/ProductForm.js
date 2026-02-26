@@ -373,21 +373,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
               </View>
             </View>
 
-            <View style={{ width: isDesktop ? '100%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>extraData (json)</Text>
-              <TextInput
-                value={product.extraData ? JSON.stringify(product.extraData) : ''}
-                onChangeText={val => {
-                  try {
-                    handleChange('extraData', JSON.parse(val));
-                  } catch (e) {
-                    handleChange('extraData', val);
-                  }
-                }}
-                multiline
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, minHeight: 60 }}
-              />
-            </View>
+            {/* extraData removed as requested */}
             <View style={{ width: isDesktop ? '33%' : '100%', marginTop: 8 }}>
               <TouchableOpacity
                 onPress={handleSave}
