@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { useStore } from '@store';
+import ProductFeedStock from './ProductFeedStock';
 
 const ProductGroupProducts = ({ productGroup, ProductId }) => {
   const store = useStore('product_group_product');
@@ -39,6 +40,7 @@ const ProductGroupProducts = ({ productGroup, ProductId }) => {
           <Text style={{ flex: 1 }}>ID</Text>
           <Text style={{ flex: 2 }}>Produto</Text>
           <Text style={{ flex: 1 }}>Tipo</Text>
+          <Text style={{ width: 80, textAlign: 'center' }}>Ações</Text>
         </View>
 
         {store.items?.map((item) => (
@@ -57,9 +59,10 @@ const ProductGroupProducts = ({ productGroup, ProductId }) => {
                 String(item.productChild?.id || item.productChild?.['@id'] || '')
               )}
             </Text>
-            <Text style={{ flex: 1 }}>
-              {item.productChild?.type}
-            </Text>
+            <Text style={{ flex: 1 }}>{item.productChild?.type}</Text>
+            <View style={{ width: 80, alignItems: 'center', justifyContent: 'center' }}>
+              <ProductFeedStock row={item} componentProps={{ productGroup }} />
+            </View>
           </View>
         ))}
       </View>
