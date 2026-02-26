@@ -29,7 +29,7 @@ const Carousel = ({ images = [], style = {} }) => {
         {images.map((item, index) => {
           if (!item?.file?.id) return null
 
-          const imageUrl = `${env.API_ENTRYPOINT}/files/${item.file.id}/download?app-domain=${env.DOMAIN}`
+          const imageUrl = `${env.API_ENTRYPOINT}/files/${item.file.id}/download?app-domain=${env.DOMAIN || location?.host}`
 
           return (
             <View
@@ -49,8 +49,8 @@ const Carousel = ({ images = [], style = {} }) => {
                   height: '100%',
                 }}
                 resizeMode="cover"
-                // Para debug: descomente se quiser ver erros
-                // onError={(e) => console.log('Erro ao carregar imagem:', imageUrl, e.nativeEvent.error)}
+              // Para debug: descomente se quiser ver erros
+              // onError={(e) => console.log('Erro ao carregar imagem:', imageUrl, e.nativeEvent.error)}
               />
             </View>
           )
