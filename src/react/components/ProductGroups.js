@@ -32,7 +32,17 @@ const ProductGroups = ({ ProductId }) => {
         people: currentCompany?.id,
       })
       .then(response => {
-        setGroups(response || []);
+        const items = response || [];
+        setGroups(items);
+        // preserve expanded state by group id when possible
+        setExpanded(prev => {
+          const next = {};
+          items.forEach((g, i) => {
+            const id = g['@id'] || g.id || String(i);
+            next[id] = !!prev[id];
+          });
+          return next;
+        });
         setReloadKey(prev => prev + 1);
       });
   }, [ProductId, currentCompany]);
@@ -72,8 +82,8 @@ const ProductGroups = ({ ProductId }) => {
     if (currentCompany?.id) loadData();
   }, [currentCompany]);
 
-  const toggleExpand = index => {
-    setExpanded(prev => ({ ...prev, [index]: !prev[index] }));
+  const toggleExpand = id => {
+    setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   return (
@@ -94,16 +104,18 @@ const ProductGroups = ({ ProductId }) => {
         </Text>
       </TouchableOpacity>
 
-      {groups.map((group, index) => (
-        <View key={index} style={{ marginBottom: 20 }}>
-          <TouchableOpacity onPress={() => toggleExpand(index)}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-              {group.productGroup}
-            </Text>
-          </TouchableOpacity>
+      {groups.map((group, index) => {
+        const gid = group['@id'] || group.id || String(index);
+        return (
+          <View key={gid} style={{ marginBottom: 20 }}>
+            <TouchableOpacity onPress={() => toggleExpand(gid)}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
+                {group.productGroup}
+              </Text>
+            </TouchableOpacity>
 
-          {expanded[index] && (
-            <View style={{ marginTop: 12 }}>
+            {expanded[gid] && (
+              <View style={{ marginTop: 12 }}>
               <TextInput
                 value={group.productGroup}
                 onChangeText={text =>
@@ -167,15 +179,16 @@ const ProductGroups = ({ ProductId }) => {
               />
 
               <ProductGroupProducts
-                key={reloadKey}
+                key={group['@id'] || group.id || reloadKey}
                 products={group.products}
-                productGroup={group['@id']}
+                productGroup={group['@id'] || group.id}
                 ProductId={ProductId}
               />
             </View>
           )}
-        </View>
-      ))}
+          </View>
+        );
+      })}
     </ScrollView>
   );
 };

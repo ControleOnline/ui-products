@@ -7,16 +7,28 @@ const ProductGroupProducts = ({ productGroup, ProductId }) => {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    store.actions.setFilters({
-      product: `/products/${ProductId}`,
-      productGroup,
-      productType: 'component',
-    });
+    let mounted = true;
 
-    store.actions.fetch().finally(() => {
-      setLoaded(true);
-    });
-  }, []);
+    if (!ProductId) {
+      // nothing to load yet
+      setLoaded(false);
+      return () => { mounted = false; };
+    }
+
+    setLoaded(false);
+
+    // fetch items for this filter set using getItems
+    store.actions
+      .getItems({ product: `/products/${ProductId}`, productGroup, productType: 'component' })
+      .then(() => {
+        if (mounted) setLoaded(true);
+      })
+      .catch(() => {
+        if (mounted) setLoaded(true);
+      });
+
+    return () => { mounted = false; };
+  }, [ProductId, productGroup]);
 
   if (!loaded) return null;
 
@@ -36,7 +48,14 @@ const ProductGroupProducts = ({ productGroup, ProductId }) => {
           >
             <Text style={{ flex: 1 }}>{item.id}</Text>
             <Text style={{ flex: 2 }}>
-              {item.productChild?.name}
+              {(
+                item.productChild?.name ||
+                item.productChild?.product ||
+                item.productChild?.title ||
+                item.productChild?.label ||
+                (item.productChild && (item.productChild.name || item.productChild.product)) ||
+                String(item.productChild?.id || item.productChild?.['@id'] || '')
+              )}
             </Text>
             <Text style={{ flex: 1 }}>
               {item.productChild?.type}
