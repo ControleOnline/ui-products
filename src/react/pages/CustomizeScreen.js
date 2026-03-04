@@ -9,6 +9,7 @@ import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
 import CustomIngredients from './CustomIngredients';
 import {useStore} from '@store';
+import {env} from '@env';
 
 const CustomizeScreen = () => {
   const navigation = useNavigation();
@@ -33,6 +34,26 @@ const CustomizeScreen = () => {
   const order_productsStore = useStore('order_products');
   const orderProductsActions = order_productsStore.actions;
   const {item: order} = ordersGetters;
+  const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
+
+  const parseCsv = value =>
+    String(value || '')
+      .split(',')
+      .map(v => v.trim())
+      .filter(Boolean);
+
+  const timeNow = () => {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+  };
+
+  const isBetweenTime = (current, from, to) => {
+    if (!from && !to) return true;
+    if (!from || !to) return true;
+    return current >= from && current <= to;
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -102,10 +123,57 @@ const CustomizeScreen = () => {
       options = options.filter(option => isSelected(group.id, option.value));
     }
 
+    const now = timeNow();
     return options.map(option => ({
       ...option,
-      disable: isMaxSelected(group, option.value),
+      disable:
+        isMaxSelected(group, option.value) ||
+        isOptionDisabledByRules(group.id, option.value, now),
     }));
+  };
+
+  const isOptionDisabledByRules = (groupId, optionValue, now) => {
+    const extra = optionValue?.extraData || {};
+
+    // Channel rule
+    const channels = parseCsv(extra.channels || '');
+    if (channels.length > 0) {
+      const normalized = channels.map(c => c.toLowerCase());
+      if (!normalized.includes(activeChannel)) return true;
+    }
+
+    // Availability time window rule (HH:mm)
+    const from = extra.availableFrom || '';
+    const to = extra.availableTo || '';
+    if (!isBetweenTime(now, from, to)) return true;
+
+    // Incompatibility rule with selected options by id
+    const incompatibleIds = parseCsv(extra.incompatibleWith || '').map(v =>
+      String(v).replace(/\D/g, ''),
+    );
+    if (incompatibleIds.length > 0) {
+      const selectedIds = Object.values(selectedItems)
+        .flat()
+        .filter(item => item.selected)
+        .map(item => String(item?.productChild?.id || item?.productChild?.['@id'] || '').replace(/\D/g, ''))
+        .filter(Boolean);
+      if (incompatibleIds.some(id => selectedIds.includes(id))) return true;
+    }
+
+    // Substitution rule: if substituteFor is set and target is already selected, block this option
+    const substituteFor = String(extra.substituteFor || '').replace(/\D/g, '');
+    if (substituteFor) {
+      const targetSelected = Object.values(selectedItems)
+        .flat()
+        .filter(item => item.selected)
+        .some(item => {
+          const id = String(item?.productChild?.id || item?.productChild?.['@id'] || '').replace(/\D/g, '');
+          return id === substituteFor;
+        });
+      if (targetSelected) return true;
+    }
+
+    return false;
   };
 
   const getProductOptions = group => {
@@ -176,7 +244,7 @@ const CustomizeScreen = () => {
           subProducts.push({
             product: item.productChild['@id'].replace(/\D/g, ''),
             productGroup: parseInt(groupId),
-            quantity: 1,
+            quantity: parseFloat(String(item.quantity || 1).replace(',', '.')) || 1,
           });
         }
       });
