@@ -15,6 +15,7 @@ import StateStore from '@controleonline/ui-layout/src/react/components/StateStor
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { env } from '@env'
 import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'
+import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager';
 
 const CategoriesPage = () => {
   const navigation = useNavigation()
@@ -67,6 +68,31 @@ const CategoriesPage = () => {
     setModalVisible(false)
     setSelectedCategory(null)
   }
+
+  const reloadCategories = useCallback(async () => {
+    if (!currentCompany?.id) return [];
+    const data = await categoryActions.getItems({
+      context: 'products',
+      'order[name]': 'ASC',
+      company: currentCompany.id,
+    });
+    localStorage.setItem('categories', JSON.stringify(data || []));
+    return data || [];
+  }, [currentCompany?.id, categoryActions]);
+
+  const saveCategoryCover = async relation => {
+    if (!selectedCategory?.id || !relation?.id) return;
+    await categoryActions.save({
+      id: selectedCategory.id,
+      extraData: {
+        ...(selectedCategory.extraData || {}),
+        imageCoverRelationId: relation.id,
+      },
+    });
+    const refreshed = await reloadCategories();
+    const fresh = refreshed.find(c => c.id === selectedCategory.id);
+    if (fresh) setSelectedCategory(fresh);
+  };
 
   const getColumns = () => {
     if (width < 640) return 2
@@ -191,7 +217,27 @@ const CategoriesPage = () => {
             <CategoryForm
               category={selectedCategory}
               onClose={closeModal}
+              onSaved={saved => setSelectedCategory(saved || null)}
             />
+
+            {selectedCategory?.id && (
+              <View style={{ marginTop: 18 }}>
+                <AttachmentManager
+                  entityType="category"
+                  entityId={selectedCategory.id}
+                  attachments={selectedCategory.categoryFiles || []}
+                  companyId={currentCompany?.id}
+                  context="products"
+                  coverRelationId={selectedCategory?.extraData?.imageCoverRelationId}
+                  onCoverChanged={saveCategoryCover}
+                  onChanged={async () => {
+                    const refreshed = await reloadCategories();
+                    const fresh = refreshed.find(c => c.id === selectedCategory.id);
+                    if (fresh) setSelectedCategory(fresh);
+                  }}
+                />
+              </View>
+            )}
           </View>
         </View>
       </Modal>

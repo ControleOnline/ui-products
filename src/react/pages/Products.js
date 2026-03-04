@@ -41,7 +41,7 @@ const ProductsPage = ({ navigation, route }) => {
     categoryActions.setItems(c);
 
     if (changeStorage)
-      localStorage.setItem('categories', JSON.stringify(categories));
+      localStorage.setItem('categories', JSON.stringify(c));
   };
 
   useEffect(() => {
@@ -97,12 +97,13 @@ const ProductsPage = ({ navigation, route }) => {
 
     navigation.navigate('ProductDetails', {
       ProductId: product.id,
+      category,
     });
   };
 
   const handleAddProduct = () => {
     if (!isManager) return;
-    navigation.navigate('ProductDetails');
+    navigation.navigate('ProductDetails', { category });
   };
 
   return (
