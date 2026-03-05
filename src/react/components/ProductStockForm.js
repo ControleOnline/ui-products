@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {ScrollView, Text, TextInput, TouchableOpacity, View, Switch} from 'react-native';
 import {useStore} from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
@@ -31,11 +31,12 @@ const ProductStockForm = ({ProductId}) => {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const inventoriesRequestCompanyRef = useRef(null);
 
   useEffect(() => {
     if (!ProductId) return;
     productActions.get(ProductId).then(data => setProduct(data));
-  }, [ProductId, productActions]);
+  }, [ProductId]);
 
   useEffect(() => {
     if (!currentCompany?.id || !ProductId) return;
@@ -51,10 +52,18 @@ const ProductStockForm = ({ProductId}) => {
 
   useEffect(() => {
     if (!currentCompany?.id) return;
+    const companyId = String(currentCompany.id);
     const hasLoaded = Array.isArray(inventoriesGetters.items) && inventoriesGetters.items.length > 0;
     if (hasLoaded) return;
-    inventoriesActions.getItems({company: currentCompany.id}).catch(() => {});
-  }, [currentCompany?.id, inventoriesActions, inventoriesGetters.items]);
+    if (inventoriesRequestCompanyRef.current === companyId) return;
+    inventoriesRequestCompanyRef.current = companyId;
+    inventoriesActions
+      .getItems({company: currentCompany.id})
+      .catch(() => {
+        // Allow retry after a failed request.
+        inventoriesRequestCompanyRef.current = null;
+      });
+  }, [currentCompany?.id, inventoriesGetters.items?.length]);
 
   const stock = useMemo(() => {
     const extraData = product?.extraData || {};

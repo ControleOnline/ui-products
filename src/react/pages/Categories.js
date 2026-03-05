@@ -36,7 +36,8 @@ const CategoriesPage = () => {
       const cached = JSON.parse(localStorage.getItem('categories') || '[]')
       if (cached.length > 0) {
         categoryActions.setItems(cached)
-      } else if (currentCompany?.id) {
+      }
+      if (currentCompany?.id) {
         categoryActions
           .getItems({
             context: 'products',
@@ -44,7 +45,8 @@ const CategoriesPage = () => {
             company: currentCompany.id,
           })
           .then(data => {
-            localStorage.setItem('categories', JSON.stringify(data))
+            categoryActions.setItems(data || [])
+            localStorage.setItem('categories', JSON.stringify(data || []))
           })
       }
     }, [currentCompany?.id, categoryActions])

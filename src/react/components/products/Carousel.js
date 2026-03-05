@@ -1,35 +1,54 @@
-import React from 'react'
-import { View, ScrollView, Image } from 'react-native'
+import React, {useMemo, useState} from 'react'
+import { View, ScrollView, Image, Text } from 'react-native'
 import { env } from '@env'
 
 const Carousel = ({ images = [], style = {} }) => {
-  // Se não tiver imagens válidas, retorna um placeholder vazio ou com cor de fundo
-  const hasValidImages = images.some(item => item?.file?.id)
+  const validImages = useMemo(
+    () => (images || []).filter(item => item?.file?.id),
+    [images],
+  )
+  const [failedImageIds, setFailedImageIds] = useState({})
 
-  if (!hasValidImages) {
-    return (
-      <View style={[{ flex: 1, backgroundColor: '#f5f5f5' }, style]}>
-        {/* Opcional: texto de fallback */}
-        {/* <Text style={{ color: '#aaa', textAlign: 'center', marginTop: 40 }}>Sem imagem</Text> */}
-      </View>
-    )
-  }
+  const renderPlaceholder = (label = 'Sem imagem') => (
+    <View
+      style={[
+        {
+          flex: 1,
+          backgroundColor: '#f5f5f5',
+          justifyContent: 'center',
+          alignItems: 'center',
+        },
+        style,
+      ]}>
+      <Text style={{ color: '#9e9e9e', fontSize: 13, fontWeight: '500' }}>{label}</Text>
+    </View>
+  )
+
+  if (validImages.length === 0) return renderPlaceholder('Sem imagem')
+
+  const visibleImages = validImages.filter(item => {
+    const imageId = String(item?.id || item?.file?.id || '')
+    return !failedImageIds[imageId]
+  })
+
+  if (visibleImages.length === 0) return renderPlaceholder('Imagem indisponível')
 
   return (
     <View style={[{ flex: 1, width: '100%' }, style]}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        pagingEnabled={images.length > 1} // snap em cada imagem se tiver várias
+        pagingEnabled={visibleImages.length > 1} // snap em cada imagem se tiver várias
         contentContainerStyle={{
           flexGrow: 1,
           alignItems: 'stretch', // força as views filhas a ocuparem a altura
         }}
       >
-        {images.map((item, index) => {
+        {visibleImages.map((item, index) => {
           if (!item?.file?.id) return null
 
           const imageUrl = `${env.API_ENTRYPOINT}/files/${item.file.id}/download?app-domain=${env.DOMAIN || location?.host}`
+          const imageId = String(item?.id || item?.file?.id || index)
 
           return (
             <View
@@ -49,8 +68,17 @@ const Carousel = ({ images = [], style = {} }) => {
                   height: '100%',
                 }}
                 resizeMode="cover"
-              // Para debug: descomente se quiser ver erros
-              // onError={(e) => console.log('Erro ao carregar imagem:', imageUrl, e.nativeEvent.error)}
+                onError={e => {
+                  if (typeof __DEV__ !== 'undefined' && __DEV__) {
+                    console.warn('[Carousel] Erro ao carregar imagem', {
+                      relationId: item?.id,
+                      fileId: item?.file?.id,
+                      imageUrl,
+                      error: e?.nativeEvent?.error,
+                    })
+                  }
+                  setFailedImageIds(prev => ({...prev, [imageId]: true}))
+                }}
               />
             </View>
           )
