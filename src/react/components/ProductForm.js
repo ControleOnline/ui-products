@@ -208,7 +208,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
           description: '',
           productUnit: '',
           type: 'product',
-          productCondition: '',
+          productCondition: 'new',
           price: 0,
           // initialize company as id to match Picker options
           company: currentCompany?.id || '',
@@ -405,6 +405,10 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
         payload.active = Boolean(payload.active);
       }
     }
+
+    // backend expects known condition values, empty string may break persistence
+    const normalizedCondition = String(payload.productCondition || '').trim().toLowerCase();
+    payload.productCondition = normalizedCondition || 'new';
 
     // ensure numeric fields have correct types
     if (payload.price !== undefined) {
