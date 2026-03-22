@@ -32,6 +32,8 @@ const ordersRoutes = [
       headerShown: true,
       headerBackVisible: true,
       title: 'Categorias',
+      showCompanyFilter: true,
+      companyFilterMode: 'icon',
     },
     initialParams: { store: 'category' },
   },

@@ -1,15 +1,42 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { ScrollView, View, TouchableOpacity, Text } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import {
+  ScrollView,
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
-import css from '@controleonline/ui-orders/src/react/css/orders';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import ProductItem from '@controleonline/ui-products/src/react/components/products/ProductItem';
 import { useFocusEffect } from '@react-navigation/native';
 import { env } from '@env';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
+import { colors } from '@controleonline/../../src/styles/colors';
+
+const SkeletonProductCard = () => (
+  <View style={skeletonStyles.card}>
+    <View style={skeletonStyles.imageBlock} />
+    <View style={skeletonStyles.body}>
+      <View style={[skeletonStyles.line, { width: '60%', height: 14, marginBottom: 8 }]} />
+      <View style={[skeletonStyles.line, { width: '85%', height: 11, marginBottom: 6 }]} />
+      <View style={[skeletonStyles.line, { width: '40%', height: 11 }]} />
+      <View style={skeletonStyles.priceRow}>
+        <View style={[skeletonStyles.line, { width: 72, height: 20 }]} />
+        <View style={[skeletonStyles.line, { width: 48, height: 32, borderRadius: 8 }]} />
+      </View>
+    </View>
+  </View>
+)
 
 const ProductsPage = ({ navigation, route }) => {
   const { category } = route.params;
+  const { width } = useWindowDimensions();
+
   const productsStore = useStore('products');
   const actions = productsStore.actions;
   const isLoading = productsStore.isLoading;
@@ -24,12 +51,21 @@ const ProductsPage = ({ navigation, route }) => {
   const { items: categories } = categoriesGetters;
 
   const peopleStore = useStore('people');
-  const peopleGetters = peopleStore.getters;
-  const { currentCompany } = peopleGetters;
+  const { currentCompany } = peopleStore.getters;
 
-  const { styles } = css();
+  const themeStore = useStore('theme');
+  const { colors: themeColors } = themeStore.getters;
+
+  const brandColors = useMemo(
+    () => resolveThemePalette(
+      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
+      colors,
+    ),
+    [themeColors, currentCompany?.id],
+  );
 
   const [categoryProducts, setCategoryProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const isManager = env.APP_TYPE === 'MANAGER';
 
@@ -61,6 +97,7 @@ const ProductsPage = ({ navigation, route }) => {
         categories[index]['products'].length > 0
       ) {
         setCategoryProducts(categories[index]['products']);
+        setLoading(false);
       } else {
         actions
           .getItems({
@@ -74,8 +111,15 @@ const ProductsPage = ({ navigation, route }) => {
           .then(data => {
             if (data && Object.keys(data).length > 0)
               changeCategoryProduct(data, true);
+            setLoading(false);
           });
       }
+    } else if (categories && categories.length > 0) {
+      setLoading(false);
+    } else {
+      // categories ainda não carregadas — aguarda sem travar na tela
+      const timer = setTimeout(() => setLoading(false), 5000);
+      return () => clearTimeout(timer);
     }
   }, [category, categories, categoryProducts]);
 
@@ -83,22 +127,17 @@ const ProductsPage = ({ navigation, route }) => {
     useCallback(() => {
       return () => {
         ordersActions.initQueue();
-        const categories = JSON.parse(
-          localStorage.getItem('categories') || '[]',
-        );
+        const cats = JSON.parse(localStorage.getItem('categories') || '[]');
         setCategoryProducts([]);
-        if (categories.length > 0) categoryActions.setItems(categories);
+        setLoading(true);
+        if (cats.length > 0) categoryActions.setItems(cats);
       };
     }, []),
   );
 
   const handleProductPress = product => {
     if (!isManager) return;
-
-    navigation.navigate('ProductDetails', {
-      ProductId: product.id,
-      category,
-    });
+    navigation.navigate('ProductDetails', { ProductId: product.id, category });
   };
 
   const handleAddProduct = () => {
@@ -106,57 +145,198 @@ const ProductsPage = ({ navigation, route }) => {
     navigation.navigate('ProductDetails', { category });
   };
 
+  const maxContentWidth = 860;
+  const containerWidth = Math.min(width, maxContentWidth);
+
   return (
     <SafeAreaView style={styles.container}>
       <StateStore store="products" />
 
-      {categoryProducts &&
-        categoryProducts.length > 0 &&
-        !error &&
-        !isLoading && (
-          <ScrollView
-            contentContainerStyle={[
-              styles.scrollContent,
-              { paddingBottom: 220 },
-            ]}
-          >
-            <View style={styles.gridContainer}>
-              {categoryProducts.map(product => (
-                <View key={product.id} style={styles.cardWrapper}>
-                  <TouchableOpacity
-                    activeOpacity={isManager ? 0.7 : 1}
-                    onPress={() => handleProductPress(product)}
-                    disabled={!isManager}
-                  >
-                    <ProductItem
-                      key={product.id}
-                      product={product}
-                      category={category}
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </ScrollView>
-        )}
-      {isManager && (
-        <TouchableOpacity
-          onPress={handleAddProduct}
-          style={{
-            position: 'absolute',
-            right: 16,
-            bottom: 40,
-            backgroundColor: '#000',
-            padding: 12,
-            borderRadius: 30,
-            zIndex: 999,
-          }}
+      {/* Skeleton */}
+      {loading && (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, isManager && { paddingBottom: 84 }]}
         >
-          <Text style={{ color: '#fff', fontWeight: '600' }}>+</Text>
-        </TouchableOpacity>
+          <View style={{ width: containerWidth, paddingHorizontal: 16, paddingTop: 12 }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonProductCard key={i} />
+            ))}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Empty state */}
+      {!loading && categoryProducts.length === 0 && !error && (
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconWrap}>
+            <MaterialCommunityIcons name="package-variant-closed" size={48} color="#CBD5E1" />
+          </View>
+          <Text style={styles.emptyTitle}>Nenhum produto</Text>
+          <Text style={styles.emptySubtitle}>
+            {isManager
+              ? 'Adicione o primeiro produto a esta categoria'
+              : 'Nenhum produto disponível nesta categoria'}
+          </Text>
+        </View>
+      )}
+
+      {/* Product list */}
+      {!loading && categoryProducts.length > 0 && !error && (
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[styles.scrollContent, isManager && { paddingBottom: 84 }]}
+        >
+          <View style={{ width: containerWidth, paddingHorizontal: 16, paddingTop: 12 }}>
+            <Text style={styles.countLabel}>
+              {categoryProducts.length} {categoryProducts.length === 1 ? 'produto' : 'produtos'}
+            </Text>
+
+            {categoryProducts.map(product => (
+              <TouchableOpacity
+                key={product.id}
+                activeOpacity={isManager ? 0.75 : 1}
+                onPress={() => handleProductPress(product)}
+                disabled={!isManager}
+              >
+                <ProductItem product={product} category={category} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+
+      {/* Add product bar (MANAGER only) */}
+      {isManager && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}
+            onPress={handleAddProduct}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <Text style={styles.bottomBarButtonText}>Adicionar Produto</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </SafeAreaView>
   );
 };
+
+const skeletonStyles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      web: { boxShadow: '0 1px 6px rgba(0,0,0,0.07)' },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4 },
+      android: { elevation: 2 },
+    }),
+  },
+  imageBlock: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#E2E8F0',
+  },
+  body: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  line: {
+    backgroundColor: '#E2E8F0',
+    borderRadius: 6,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+});
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    alignItems: 'center',
+  },
+
+  countLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginBottom: 12,
+    letterSpacing: 0.3,
+  },
+
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyIconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#334155',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    ...Platform.select({
+      web: { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
+      android: { elevation: 6 },
+    }),
+  },
+  bottomBarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  bottomBarButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+});
 
 export default ProductsPage;
