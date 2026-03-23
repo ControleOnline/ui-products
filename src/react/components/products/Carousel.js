@@ -1,5 +1,6 @@
 import React, {useMemo, useState} from 'react'
-import { View, ScrollView, Image, Text } from 'react-native'
+import { View, ScrollView, Image } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { env } from '@env'
 
 const Carousel = ({ images = [], style = {} }) => {
@@ -9,29 +10,29 @@ const Carousel = ({ images = [], style = {} }) => {
   )
   const [failedImageIds, setFailedImageIds] = useState({})
 
-  const renderPlaceholder = (label = 'Sem imagem') => (
+  const renderPlaceholder = (icon = 'image-outline') => (
     <View
       style={[
         {
           flex: 1,
-          backgroundColor: '#f5f5f5',
+          backgroundColor: '#F1F5F9',
           justifyContent: 'center',
           alignItems: 'center',
         },
         style,
       ]}>
-      <Text style={{ color: '#9e9e9e', fontSize: 13, fontWeight: '500' }}>{label}</Text>
+      <MaterialCommunityIcons name={icon} size={36} color="#CBD5E1" />
     </View>
   )
 
-  if (validImages.length === 0) return renderPlaceholder('Sem imagem')
+  if (validImages.length === 0) return renderPlaceholder('image-outline')
 
   const visibleImages = validImages.filter(item => {
     const imageId = String(item?.id || item?.file?.id || '')
     return !failedImageIds[imageId]
   })
 
-  if (visibleImages.length === 0) return renderPlaceholder('Imagem indisponível')
+  if (visibleImages.length === 0) return renderPlaceholder('image-off-outline')
 
   return (
     <View style={[{ flex: 1, width: '100%' }, style]}>
@@ -70,12 +71,7 @@ const Carousel = ({ images = [], style = {} }) => {
                 resizeMode="cover"
                 onError={e => {
                   if (typeof __DEV__ !== 'undefined' && __DEV__) {
-                    console.warn('[Carousel] Erro ao carregar imagem', {
-                      relationId: item?.id,
-                      fileId: item?.file?.id,
-                      imageUrl,
-                      error: e?.nativeEvent?.error,
-                    })
+                    console.warn('[Carousel] Erro ao carregar imagem', { fileId: item?.file?.id })
                   }
                   setFailedImageIds(prev => ({...prev, [imageId]: true}))
                 }}
