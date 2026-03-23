@@ -113,6 +113,28 @@ const SelectField = ({ label, value, options, onSelect }) => {
   );
 };
 
+const GroupSkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
+  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+)
+
+const GroupTabSkeleton = () => (
+  <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+    {[1, 2].map(i => (
+      <View key={i} style={{
+        backgroundColor: '#fff', borderRadius: 12, marginBottom: 12, padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+      }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <GroupSkeletonLine width="50%" height={14} mb={0} />
+          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#E2E8F0' }} />
+        </View>
+        <GroupSkeletonLine height={40} mb={8} />
+        <GroupSkeletonLine width="70%" height={13} mb={0} />
+      </View>
+    ))}
+  </ScrollView>
+)
+
 const ProductGroups = ({ ProductId }) => {
   const productGroupStore = useStore('product_group');
   const peopleStore = useStore('people');
@@ -123,6 +145,7 @@ const ProductGroups = ({ ProductId }) => {
   const brandColors = useMemo(() => resolveThemePalette(), []);
 
   const [groups, setGroups] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
   const [expanded, setExpanded] = useState({});
   const [groupDrafts, setGroupDrafts] = useState({});
   const [savingByGroup, setSavingByGroup] = useState({});
@@ -131,7 +154,11 @@ const ProductGroups = ({ ProductId }) => {
   const [error, setError] = useState('');
 
   const loadData = useCallback(() => {
-    if (!ProductId || !currentCompany?.id) return Promise.resolve([]);
+    if (!ProductId || !currentCompany?.id) {
+      setLoadingGroups(false);
+      return Promise.resolve([]);
+    }
+    setLoadingGroups(true);
     return actions
       .getItems({
         parentProduct: `/products/${ProductId}`,
@@ -144,6 +171,7 @@ const ProductGroups = ({ ProductId }) => {
             ? response['hydra:member']
             : [];
         setGroups(items);
+        setLoadingGroups(false);
         setGroupDrafts(prev => {
           const next = { ...prev };
           items.forEach((g, i) => {
@@ -324,15 +352,20 @@ const ProductGroups = ({ ProductId }) => {
 
   useEffect(() => {
     if (currentCompany?.id) loadData();
+    else setLoadingGroups(false);
   }, [currentCompany?.id, loadData]);
 
   const toggleExpand = id => {
     setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  if (loadingGroups) return (
+    <View style={styles.container}><GroupTabSkeleton /></View>
+  );
+
   return (
     <View style={styles.container}>
-      <StateStore store="product_group" />
+      {!productGroupStore.getters?.isLoading && <StateStore store="product_group" />}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {!ProductId && (
           <Text style={styles.disabledText}>

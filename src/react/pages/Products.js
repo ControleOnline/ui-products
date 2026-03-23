@@ -40,6 +40,7 @@ const ProductsPage = ({ navigation, route }) => {
   const productsStore = useStore('products');
   const actions = productsStore.actions;
   const isLoading = productsStore.isLoading;
+  const storeLoading = productsStore.getters?.isLoading;
   const error = productsStore.error;
 
   const ordersStore = useStore('orders');
@@ -150,7 +151,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {!loading && <StateStore store="products" />}
+      {!loading && !storeLoading && <StateStore store="products" />}
 
       {/* Skeleton */}
       {loading && (

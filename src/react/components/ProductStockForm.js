@@ -22,6 +22,29 @@ const toInventoryId = row =>
       '',
   ).trim();
 
+const StockSkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
+  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+)
+
+const StockTabSkeleton = () => (
+  <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+    {[1, 2].map(i => (
+      <View key={i} style={{
+        backgroundColor: '#fff', borderRadius: 12, marginBottom: 12, padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+      }}>
+        <StockSkeletonLine width="40%" height={13} mb={14} />
+        {[1, 2, 3].map(j => (
+          <View key={j} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <StockSkeletonLine width="55%" height={13} mb={0} />
+            <View style={{ width: 44, height: 26, borderRadius: 13, backgroundColor: '#E2E8F0' }} />
+          </View>
+        ))}
+      </View>
+    ))}
+  </ScrollView>
+)
+
 const ProductStockForm = ({ProductId}) => {
   const productsStore = useStore('products');
   const peopleStore = useStore('people');
@@ -249,6 +272,10 @@ const ProductStockForm = ({ProductId}) => {
       </View>
     );
   }
+
+  if (!product) return (
+    <View style={styles.container}><StockTabSkeleton /></View>
+  );
 
   return (
     <View style={styles.container}>

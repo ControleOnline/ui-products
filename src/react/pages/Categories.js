@@ -33,7 +33,7 @@ const CategoriesPage = () => {
   const { width } = useWindowDimensions()
 
   const categoriesStore = useStore('categories')
-  const { items } = categoriesStore.getters
+  const { items, isLoading: storeLoading } = categoriesStore.getters
   const categoryActions = categoriesStore.actions
 
   const peopleStore = useStore('people')
@@ -57,6 +57,7 @@ const CategoriesPage = () => {
 
   useFocusEffect(
     useCallback(() => {
+      setLoading(true)
       const cached = JSON.parse(localStorage.getItem('categories') || '[]')
       if (cached.length > 0) {
         categoryActions.setItems(cached)
@@ -143,7 +144,7 @@ const CategoriesPage = () => {
 
   return (
     <SafeAreaView style={[orderStyles.container, styles.container]}>
-      {!loading && <StateStore store="categories" />}
+      {!loading && !storeLoading && <StateStore store="categories" />}
 
       <ScrollView
         style={styles.scroll}

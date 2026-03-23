@@ -199,12 +199,31 @@ const SelectField = ({label, value, options, onChange}) => {
   );
 };
 
+const PricingSkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
+  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+)
+
+const PricingTabSkeleton = () => (
+  <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+    {[1, 2, 3].map(i => (
+      <View key={i} style={{
+        backgroundColor: '#fff', borderRadius: 12, marginBottom: 12, padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+      }}>
+        <PricingSkeletonLine width="45%" height={13} mb={12} />
+        <PricingSkeletonLine height={40} mb={8} />
+        {i < 3 && <PricingSkeletonLine height={40} mb={0} />}
+      </View>
+    ))}
+  </ScrollView>
+)
+
 const ProductPricingForm = ({ProductId}) => {
   const productsStore = useStore('products');
   const productGroupStore = useStore('product_group');
   const productGroupProductStore = useStore('product_group_product');
   const peopleStore = useStore('people');
-  const {actions: productActions} = productsStore;
+  const {actions: productActions, getters: productsGetters} = productsStore;
   const {actions: productGroupActions} = productGroupStore;
   const {actions: groupItemActions} = productGroupProductStore;
   const {currentCompany} = peopleStore.getters;
@@ -658,14 +677,22 @@ const ProductPricingForm = ({ProductId}) => {
     );
   }
 
-  const fmtN = v => (v === '' || v === null || v === undefined) ? '' : String(v).replace('.', ',');
+  if (!product) return (
+    <View style={styles.container}><PricingTabSkeleton /></View>
+  );
+
+  const fmtN = v => {
+    if (v === '' || v === null || v === undefined) return ''
+    if (typeof v === 'number') return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return String(v).replace('.', ',')
+  };
   const fmtBRL = v => { const n = parseFloat(String(v || 0).replace(',', '.')); return isNaN(n) ? '0,00' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 
   const bomBtnDisabled = calculating || source !== 'auto_bom' || !hasBomGroups;
 
   return (
     <View style={styles.container}>
-      <StateStore store="products" />
+      {!productsGetters?.isLoading && <StateStore store="products" />}
       <ScrollView contentContainerStyle={styles.scrollContent}>
 
         {/* Aviso sem BOM */}

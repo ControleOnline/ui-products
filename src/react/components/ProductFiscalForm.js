@@ -41,9 +41,34 @@ const validateFiscalPayload = fiscal => {
   return errors;
 };
 
+const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
+  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+)
+
+const TabSkeleton = () => (
+  <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+    {[1, 2].map(i => (
+      <View key={i} style={{
+        backgroundColor: '#fff', borderRadius: 12, marginBottom: 12, padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+      }}>
+        <SkeletonLine width="40%" height={13} mb={12} />
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+          <View style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: '#F1F5F9' }} />
+          <View style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: '#F1F5F9' }} />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: '#F1F5F9' }} />
+          <View style={{ flex: 1, height: 40, borderRadius: 8, backgroundColor: '#F1F5F9' }} />
+        </View>
+      </View>
+    ))}
+  </ScrollView>
+)
+
 const ProductFiscalForm = ({ ProductId }) => {
   const productsStore = useStore('products');
-  const { actions: productActions } = productsStore;
+  const { actions: productActions, getters: productsGetters } = productsStore;
   const [product, setProduct] = useState(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
@@ -53,7 +78,11 @@ const ProductFiscalForm = ({ ProductId }) => {
 
   const fiscal = useMemo(() => product?.extraData?.fiscal || {}, [product]);
 
-  const fmtN = v => (v === '' || v === null || v === undefined) ? '' : String(v).replace('.', ',');
+  const fmtN = v => {
+    if (v === '' || v === null || v === undefined) return ''
+    if (typeof v === 'number') return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return String(v).replace('.', ',')
+  };
 
   useEffect(() => {
     if (!ProductId) return;
@@ -113,9 +142,13 @@ const ProductFiscalForm = ({ ProductId }) => {
     );
   }
 
+  if (!product) return (
+    <View style={styles.container}><TabSkeleton /></View>
+  );
+
   return (
     <View style={styles.container}>
-      <StateStore store="products" />
+      {!productsGetters?.isLoading && <StateStore store="products" />}
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.card}>
           <View style={styles.sectionHeader}>

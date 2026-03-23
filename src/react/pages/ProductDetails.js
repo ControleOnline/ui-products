@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
@@ -12,6 +13,7 @@ const Tab = createMaterialTopTabNavigator();
 
 const ProductDetails = ({ route }) => {
   const { ProductId } = route.params || {};
+  const { width } = useWindowDimensions();
 
   const themeStore = useStore('theme');
   const brandColors = useMemo(
@@ -21,6 +23,7 @@ const ProductDetails = ({ route }) => {
 
   return (
     <Tab.Navigator
+      initialLayout={{ width }}
       screenOptions={{
         tabBarScrollEnabled: false,
         tabBarActiveTintColor: brandColors.primary,

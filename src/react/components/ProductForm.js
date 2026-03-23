@@ -118,6 +118,31 @@ const getStatusTextStyle = status => {
   return { color: '#92400E' };
 };
 
+const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
+  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+)
+
+const SkeletonTab = () => (
+  <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+    <View style={{ height: 180, borderRadius: 16, backgroundColor: '#E2E8F0', marginBottom: 16 }} />
+    {[1, 2, 3, 4].map(i => (
+      <View key={i} style={{
+        backgroundColor: '#fff', borderRadius: 12, marginBottom: 10,
+        padding: 16,
+        shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#E2E8F0', marginRight: 8 }} />
+          <SkeletonLine width="35%" height={13} mb={0} />
+        </View>
+        <SkeletonLine height={40} mb={8} />
+        {i < 3 && <SkeletonLine height={40} mb={0} />}
+      </View>
+    ))}
+  </ScrollView>
+)
+
 const ProductForm = ({ route, ProductId: propProductId }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
@@ -609,10 +634,18 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
   const [openSection, setOpenSection] = React.useState('identificacao');
   const toggleSection = key => setOpenSection(prev => prev === key ? null : key);
 
-  if (!product) return null;
+  if (!product) return (
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <SkeletonTab />
+    </View>
+  );
 
   // Exibe número com vírgula (padrão BR); backend recebe com ponto (handleSave já converte)
-  const fmtN = v => v === '' || v === null || v === undefined ? '' : String(v).replace('.', ',');
+  const fmtN = v => {
+    if (v === '' || v === null || v === undefined) return ''
+    if (typeof v === 'number') return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return String(v).replace('.', ',')
+  };
 
   const SelectField = ({ label, value, options, onChange, placeholder = 'Selecionar...' }) => {
     const [open, setOpen] = React.useState(false)
@@ -676,11 +709,9 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StateStore store="products" />
-      <StateStore store="categories" />
-      <StateStore store="product_unit" />
-      <StateStore store="queues" />
-      <StateStore store="inventories" />
+      {/* StateStore apenas para erros, nunca durante carregamento */}
+      {!productsStore.getters?.isLoading && <StateStore store="products" />}
+      {!categoriesStore.getters?.isLoading && <StateStore store="categories" />}
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
