@@ -7,10 +7,11 @@ import {
   Text,
   TouchableOpacity,
   Switch,
+  StyleSheet,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
+import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel'
 import { useNavigation } from '@react-navigation/native';
@@ -18,6 +19,8 @@ import AttachmentManager from '@controleonline/ui-products/src/react/components/
 import { validateProductDraft, validateProductForPublish } from '@controleonline/ui-products/src/react/domain/productValidation';
 import { emitProductEvent, PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
 import { ProductLifecycleStatuses } from '@controleonline/ui-products/src/react/domain/productContracts';
+import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 const CODE_TYPES = [
   { value: 'sku', label: 'SKU Interno' },
@@ -101,6 +104,18 @@ const normalizeProductForForm = data => {
     defaultOutInventory: normalizeRelationId(data.defaultOutInventory),
     defaultInInventory: normalizeRelationId(data.defaultInInventory),
   };
+};
+
+const getStatusPillStyle = status => {
+  if (status === 'published') return { backgroundColor: '#DCFCE7' };
+  if (status === 'draft') return { backgroundColor: '#F1F5F9' };
+  return { backgroundColor: '#FEF3C7' };
+};
+
+const getStatusTextStyle = status => {
+  if (status === 'published') return { color: '#166534' };
+  if (status === 'draft') return { color: '#475569' };
+  return { color: '#92400E' };
 };
 
 const ProductForm = ({ route, ProductId: propProductId }) => {
@@ -226,7 +241,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
   useEffect(() => {
     getData();
   }, [getData]);
-  
+
   // load related lists from backend when form loads (respect currentCompany)
   const [listsRequested, setListsRequested] = useState({ units: false, queues: false, inventories: false });
   useEffect(() => {
@@ -590,431 +605,496 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
     }
   };
 
+  const brandColors = useMemo(() => resolveThemePalette(), []);
+  const [openSection, setOpenSection] = React.useState('identificacao');
+  const toggleSection = key => setOpenSection(prev => prev === key ? null : key);
+
   if (!product) return null;
 
-  // Campos estáticos: TextInput para textos e Picker para listas
+  // Exibe número com vírgula (padrão BR); backend recebe com ponto (handleSave já converte)
+  const fmtN = v => v === '' || v === null || v === undefined ? '' : String(v).replace('.', ',');
+
+  const SelectField = ({ label, value, options, onChange, placeholder = 'Selecionar...' }) => {
+    const [open, setOpen] = React.useState(false)
+    const selectedOption = options.find(o => String(o.value) === String(value))
+    return (
+      <View style={styles.fieldWrap}>
+        <Text style={styles.fieldLabel}>{label}</Text>
+        <TouchableOpacity style={styles.selectButton} onPress={() => setOpen(true)} activeOpacity={0.7}>
+          <Text style={selectedOption ? styles.selectText : styles.selectPlaceholder} numberOfLines={1}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </Text>
+          <MaterialCommunityIcons name="chevron-down" size={18} color="#94A3B8" />
+        </TouchableOpacity>
+        <AnimatedModal visible={open} onRequestClose={() => setOpen(false)}>
+          <View style={styles.pickerModalContainer}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>{label}</Text>
+              <TouchableOpacity onPress={() => setOpen(false)} style={styles.pickerModalClose}>
+                <MaterialCommunityIcons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+              {options.map(opt => {
+                const isSelected = String(opt.value) === String(value)
+                return (
+                  <TouchableOpacity
+                    key={String(opt.value)}
+                    style={[styles.pickerOption, isSelected && styles.pickerOptionActive]}
+                    onPress={() => { onChange(opt.value); setOpen(false) }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.pickerOptionText, isSelected && { color: brandColors.primary, fontWeight: '700' }]}>
+                      {opt.label}
+                    </Text>
+                    {isSelected && <MaterialCommunityIcons name="check-circle" size={20} color={brandColors.primary} />}
+                  </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
+          </View>
+        </AnimatedModal>
+      </View>
+    )
+  }
+
+  const SectionCard = ({ title, icon, sectionKey, children }) => {
+    const isOpen = openSection === sectionKey
+    return (
+      <View style={styles.sectionCard}>
+        <TouchableOpacity style={styles.sectionCardHeader} onPress={() => toggleSection(sectionKey)} activeOpacity={0.7}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            {icon && <MaterialCommunityIcons name={icon} size={16} color="#94A3B8" style={{ marginRight: 6 }} />}
+            <Text style={styles.sectionCardTitle}>{title}</Text>
+          </View>
+          <MaterialCommunityIcons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color="#94A3B8" />
+        </TouchableOpacity>
+        {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
+      </View>
+    )
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={styles.safeArea}>
       <StateStore store="products" />
+      <StateStore store="categories" />
+      <StateStore store="product_unit" />
+      <StateStore store="queues" />
+      <StateStore store="inventories" />
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
-        <View
-          style={{
-            flexDirection: isDesktop ? 'row' : 'column',
-            gap: 16,
-          }}
-        >
-          {product?.id && (
-            <View
-              style={{
-                width: isDesktop ? '20%' : '100%',
-              }}
-            >
-              <Carousel
-                images={product.productFiles || []}
-                style={{ flex: 1 }}
-              />
-            </View>
-          )}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-          <View
-            style={{
-              width: product?.id
-                ? isDesktop
-                  ? '80%'
-                  : '100%'
-                : '100%',
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: 16,
-            }}
-          >
-            {/* Explicit form fields (do not read columns from store) */}
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>sku</Text>
+        {/* Imagem do produto (só quando já existe id) */}
+        {!!product?.id && (
+          <View style={styles.imageSection}>
+            <Carousel images={product.productFiles || []} style={styles.carouselBox} />
+          </View>
+        )}
+
+        {/* Erros de validação */}
+        {validationErrors.length > 0 && (
+          <View style={styles.errorBanner}>
+            {validationErrors.map((err, idx) => (
+              <Text key={`${err.field}-${idx}`} style={styles.errorText}>• {err.message}</Text>
+            ))}
+          </View>
+        )}
+        {publishErrors.length > 0 && (
+          <View style={styles.warningBanner}>
+            <Text style={styles.warningTitle}>Regras para publicar</Text>
+            {publishErrors.map((err, idx) => (
+              <Text key={`publish-${err.field}-${idx}`} style={styles.warningText}>• {err.message}</Text>
+            ))}
+          </View>
+        )}
+        {!!actionStatus && (
+          <View style={styles.successBanner}>
+            <MaterialCommunityIcons name="check-circle-outline" size={16} color="#166534" />
+            <Text style={styles.successText}>{actionStatus}</Text>
+          </View>
+        )}
+
+        {/* Seção: Identificação */}
+        <SectionCard title="Identificação" icon="tag-outline" sectionKey="identificacao">
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>Nome</Text>
+            <TextInput
+              value={String(product.product || '')}
+              onChangeText={val => handleChange('product', val)}
+              style={styles.textInput}
+              placeholder="Nome do produto"
+              placeholderTextColor="#CBD5E1"
+            />
+          </View>
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>Descrição</Text>
+            <TextInput
+              value={String(product.description || '')}
+              onChangeText={val => handleChange('description', val)}
+              multiline
+              style={styles.textInputMultiline}
+              placeholder="Descreva o produto..."
+              placeholderTextColor="#CBD5E1"
+            />
+          </View>
+          <View style={styles.row}>
+            <View style={styles.halfField}>
+              <Text style={styles.fieldLabel}>SKU</Text>
               <TextInput
                 value={String(product.sku || '')}
                 onChangeText={val => handleChange('sku', val)}
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12 }}
+                style={styles.textInput}
+                placeholder="SKU"
+                placeholderTextColor="#CBD5E1"
               />
             </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>product</Text>
-              <TextInput
-                value={String(product.product || '')}
-                onChangeText={val => handleChange('product', val)}
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12 }}
-              />
-            </View>
-
-            <View style={{ width: isDesktop ? '100%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>description</Text>
-              <TextInput
-                value={String(product.description || '')}
-                onChangeText={val => handleChange('description', val)}
-                multiline
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12, minHeight: 80 }}
-              />
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>internalCode</Text>
+            <View style={styles.halfField}>
+              <Text style={styles.fieldLabel}>Código Interno</Text>
               <TextInput
                 value={String(product?.extraData?.internalCode || '')}
                 onChangeText={val => handleExtraDataChange('internalCode', val)}
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12 }}
+                style={styles.textInput}
+                placeholder="Código"
+                placeholderTextColor="#CBD5E1"
               />
             </View>
+          </View>
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>Slug</Text>
+            <TextInput
+              value={String(product?.extraData?.slug || '')}
+              onChangeText={val => handleExtraDataChange('slug', val)}
+              style={styles.textInput}
+              placeholder="slug-do-produto"
+              placeholderTextColor="#CBD5E1"
+            />
+          </View>
+        </SectionCard>
 
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>slug</Text>
-              <TextInput
-                value={String(product?.extraData?.slug || '')}
-                onChangeText={val => handleExtraDataChange('slug', val)}
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12 }}
-              />
+        {/* Seção: Preço e Classificação */}
+        <SectionCard title="Preço e Classificação" icon="currency-usd" sectionKey="preco">
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>Preço (R$)</Text>
+            <TextInput
+              value={fmtN(product.price)}
+              onChangeText={val => handleChange('price', val)}
+              keyboardType="numeric"
+              style={styles.textInput}
+              placeholder="0,00"
+              placeholderTextColor="#CBD5E1"
+            />
+          </View>
+          <SelectField
+            label="Categoria"
+            value={selectedCategoryId || ''}
+            onChange={val => setSelectedCategoryId(String(val || ''))}
+            options={[
+              { value: '', label: 'Sem categoria' },
+              ...(categoryGetters.items || []).map(opt => ({ value: String(opt.id), label: opt.name || String(opt.id) }))
+            ]}
+          />
+          <SelectField
+            label="Tipo"
+            value={product.type || 'product'}
+            onChange={val => handleChange('type', val)}
+            options={[
+              { value: 'product', label: 'Produto' },
+              { value: 'service', label: 'Serviço' },
+              { value: 'component', label: 'Componente' },
+              { value: 'feedstock', label: 'Matéria Prima' },
+              { value: 'package', label: 'Embalagem' },
+              { value: 'custom', label: 'Custom' },
+              { value: 'manufactured', label: 'Manufactured' },
+            ]}
+          />
+          <SelectField
+            label="Condição"
+            value={product.productCondition || 'new'}
+            onChange={val => handleChange('productCondition', val)}
+            options={[
+              { value: 'new', label: 'Novo' },
+              { value: 'used', label: 'Usado' },
+              { value: 'recondicioned', label: 'Recondicionado' },
+            ]}
+          />
+          <SelectField
+            label="Unidade de Medida"
+            value={product.productUnit || ''}
+            onChange={val => handleChange('productUnit', val)}
+            options={[
+              { value: '', label: 'Selecionar...' },
+              ...(productUnitGetters.items || []).map(opt => ({ value: opt.id, label: opt.productUnit || opt.name || String(opt) }))
+            ]}
+          />
+        </SectionCard>
+
+        {/* Seção: Configurações */}
+        <SectionCard title="Configurações" icon="cog-outline" sectionKey="config">
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Ativo</Text>
+            <Switch value={Boolean(product.active)} onValueChange={val => handleChange('active', val)} />
+          </View>
+          <View style={styles.switchRow}>
+            <Text style={styles.switchLabel}>Destaque</Text>
+            <Switch value={Boolean(product.featured)} onValueChange={val => handleChange('featured', val)} />
+          </View>
+          <View style={[styles.switchRow, styles.switchRowLast]}>
+            <Text style={styles.switchLabel}>Bloqueado para Venda</Text>
+            <Switch value={Boolean(product?.extraData?.blockedForSale)} onValueChange={val => handleExtraDataChange('blockedForSale', val)} />
+          </View>
+          <SelectField
+            label="Fila"
+            value={product.queue || ''}
+            onChange={val => handleChange('queue', val)}
+            options={[
+              { value: '', label: 'Sem fila' },
+              ...(queuesGetters.items || []).map(opt => ({ value: opt.id, label: opt.queue || opt.name || String(opt) }))
+            ]}
+          />
+          <SelectField
+            label="Estoque de Saída"
+            value={product.defaultOutInventory || ''}
+            onChange={val => handleChange('defaultOutInventory', val)}
+            options={[
+              { value: '', label: 'Padrão' },
+              ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt) }))
+            ]}
+          />
+          <SelectField
+            label="Estoque de Entrada"
+            value={product.defaultInInventory || ''}
+            onChange={val => handleChange('defaultInInventory', val)}
+            options={[
+              { value: '', label: 'Padrão' },
+              ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt) }))
+            ]}
+          />
+          <View style={styles.fieldWrap}>
+            <Text style={styles.fieldLabel}>Empresa</Text>
+            <View style={styles.displayField}>
+              <Text style={styles.displayFieldText}>{currentCompany?.name || (product.company ? String(product.company) : '—')}</Text>
             </View>
+          </View>
+        </SectionCard>
 
-            <View style={{ width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10 }}>
-              <Text style={{ fontWeight: '600', marginBottom: 8 }}>Códigos</Text>
-              {(productCodes || []).length === 0 && (
-                <Text style={{ color: '#666', marginBottom: 8 }}>
-                  Nenhum código cadastrado. Adicione SKU, EAN e códigos de canais.
-                </Text>
-              )}
-              {(productCodes || []).map(code => (
-                <View key={code.id} style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 8, marginBottom: 8 }}>
-                  <View style={{ flex: 2, borderWidth: 1, borderColor: '#ccc', borderRadius: 6 }}>
-                    <Picker
-                      selectedValue={code.type}
-                      onValueChange={val => updateCodeRow(code.id, 'type', String(val || 'custom'))}
-                    >
-                      {CODE_TYPES.map(opt => (
-                        <Picker.Item key={opt.value} label={opt.label} value={opt.value} />
-                      ))}
-                    </Picker>
-                  </View>
+        {/* Seção: Códigos */}
+        <SectionCard title="Códigos" icon="barcode" sectionKey="codigos">
+          {(productCodes || []).length === 0 && (
+            <Text style={styles.emptyHint}>Nenhum código cadastrado. Adicione SKU, EAN e códigos de canais.</Text>
+          )}
+          {(productCodes || []).map(code => (
+            <View key={code.id} style={styles.codeRow}>
+              <SelectField
+                label="Tipo"
+                value={code.type}
+                onChange={val => updateCodeRow(code.id, 'type', String(val || 'custom'))}
+                options={CODE_TYPES.map(opt => ({ value: opt.value, label: opt.label }))}
+              />
+              <View style={styles.row}>
+                <View style={styles.halfField}>
+                  <Text style={styles.fieldLabel}>Código</Text>
                   <TextInput
                     value={String(code.value || '')}
                     onChangeText={val => updateCodeRow(code.id, 'value', val)}
                     placeholder="Código"
-                    style={{ flex: 3, borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10 }}
+                    placeholderTextColor="#CBD5E1"
+                    style={styles.textInput}
                   />
+                </View>
+                <View style={styles.halfField}>
+                  <Text style={styles.fieldLabel}>Canal</Text>
                   <TextInput
                     value={String(code.channel || '')}
                     onChangeText={val => updateCodeRow(code.id, 'channel', val)}
-                    placeholder="Canal (opcional)"
-                    style={{ flex: 2, borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10 }}
+                    placeholder="Opcional"
+                    placeholderTextColor="#CBD5E1"
+                    style={styles.textInput}
                   />
-                  <View style={{ flexDirection: 'row', alignItems: 'center', flex: 2 }}>
-                    <Text style={{ marginRight: 6 }}>Principal</Text>
-                    <Switch value={Boolean(code.isPrimary)} onValueChange={val => updateCodeRow(code.id, 'isPrimary', val)} />
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => removeCodeRow(code.id)}
-                    style={{ backgroundColor: '#b00020', borderRadius: 6, paddingHorizontal: 10, justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: '#fff' }}>Remover</Text>
-                  </TouchableOpacity>
                 </View>
-              ))}
-              <TouchableOpacity
-                onPress={addCodeRow}
-                style={{ backgroundColor: '#000', borderRadius: 6, padding: 10, alignItems: 'center', marginTop: 4 }}
-              >
-                <Text style={{ color: '#fff' }}>Adicionar Código</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>price</Text>
-              <TextInput
-                value={String(product.price || '')}
-                onChangeText={val => handleChange('price', val)}
-                keyboardType="numeric"
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12 }}
-              />
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>productUnit</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker selectedValue={product.productUnit || ''} onValueChange={val => handleChange('productUnit', val)}>
-                  <Picker.Item label="" value="" />
-                  {(productUnitGetters.items || []).map(opt => (
-                    <Picker.Item key={opt.id} label={opt.productUnit || opt.name || String(opt)} value={opt.id} />
-                  ))}
-                </Picker>
               </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>queue</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker selectedValue={product.queue || ''} onValueChange={val => handleChange('queue', val)}>
-                  <Picker.Item label="" value="" />
-                  {(queuesGetters.items || []).map(opt => (
-                    <Picker.Item key={opt.id} label={opt.queue || opt.name || String(opt)} value={opt.id} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>category</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker
-                  selectedValue={selectedCategoryId || ''}
-                  onValueChange={val => setSelectedCategoryId(String(val || ''))}
-                >
-                  <Picker.Item label="" value="" />
-                  {(categoryGetters.items || []).map(opt => (
-                    <Picker.Item
-                      key={opt.id}
-                      label={opt.name || String(opt.id)}
-                      value={String(opt.id)}
-                    />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>type</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker selectedValue={product.type || 'product'} onValueChange={val => handleChange('type', val)}>
-                  <Picker.Item label="Produto" value="product" />
-                  <Picker.Item label="Serviço" value="service" />
-                  <Picker.Item label="Componente" value="component" />
-                  <Picker.Item label="Matéria Prima" value="feedstock" />
-                  <Picker.Item label="Embalagem" value="package" />
-                  <Picker.Item label="Custom" value="custom" />
-                  <Picker.Item label="Manufactured" value="manufactured" />
-                </Picker>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>productCondition</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker selectedValue={product.productCondition || 'new'} onValueChange={val => handleChange('productCondition', val)}>
-                  <Picker.Item label="Novo" value="new" />
-                  <Picker.Item label="Usado" value="used" />
-                  <Picker.Item label="Recondicionado" value="recondicioned" />
-                </Picker>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%', flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ flex: 1 }}>featured</Text>
-              <Switch value={Boolean(product.featured)} onValueChange={val => handleChange('featured', val)} />
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%', flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ flex: 1 }}>active</Text>
-              <Switch value={Boolean(product.active)} onValueChange={val => handleChange('active', val)} />
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>company</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, padding: 10, marginBottom: 12 }}>
-                <Text>{currentCompany?.name || (product.company ? String(product.company) : '')}</Text>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>defaultOutInventory</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker selectedValue={product.defaultOutInventory || ''} onValueChange={val => handleChange('defaultOutInventory', val)}>
-                  <Picker.Item label="" value="" />
-                  {(inventoriesGetters.items || []).map(opt => (
-                    <Picker.Item key={opt.id} label={opt.inventory || String(opt)} value={opt.id} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%' }}>
-              <Text style={{ marginBottom: 4 }}>defaultInInventory</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12 }}>
-                <Picker selectedValue={product.defaultInInventory || ''} onValueChange={val => handleChange('defaultInInventory', val)}>
-                  <Picker.Item label="" value="" />
-                  {(inventoriesGetters.items || []).map(opt => (
-                    <Picker.Item key={opt.id} label={opt.inventory || String(opt)} value={opt.id} />
-                  ))}
-                </Picker>
-              </View>
-            </View>
-
-            <View style={{ width: isDesktop ? '33%' : '100%', flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-              <Text style={{ flex: 1 }}>blockedForSale</Text>
-              <Switch
-                value={Boolean(product?.extraData?.blockedForSale)}
-                onValueChange={val => handleExtraDataChange('blockedForSale', val)}
-              />
-            </View>
-
-            <View
-              style={{
-                width: isDesktop ? '33%' : '100%',
-                borderWidth: 1,
-                borderColor: '#ddd',
-                borderRadius: 6,
-                padding: 10,
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ marginBottom: 4, color: '#666' }}>status</Text>
-              <Text style={{ fontWeight: '600' }}>{lifecycleStatus}</Text>
-            </View>
-
-            {/* extraData removed as requested */}
-            {validationErrors.length > 0 && (
-              <View
-                style={{
-                  width: '100%',
-                  borderWidth: 1,
-                  borderColor: '#f3b3b3',
-                  backgroundColor: '#fff3f3',
-                  borderRadius: 6,
-                  padding: 10,
-                  marginBottom: 8,
-                }}
-              >
-                {validationErrors.map((err, idx) => (
-                  <Text key={`${err.field}-${idx}`} style={{ color: '#9e1b1b', marginBottom: 4 }}>
-                    {`- ${err.message}`}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-            {publishErrors.length > 0 && (
-              <View
-                style={{
-                  width: '100%',
-                  borderWidth: 1,
-                  borderColor: '#f2d08b',
-                  backgroundColor: '#fff8e8',
-                  borderRadius: 6,
-                  padding: 10,
-                  marginBottom: 8,
-                }}
-              >
-                <Text style={{ color: '#6a4f00', marginBottom: 4, fontWeight: '600' }}>
-                  Regras para publicar
-                </Text>
-                {publishErrors.map((err, idx) => (
-                  <Text key={`publish-${err.field}-${idx}`} style={{ color: '#6a4f00', marginBottom: 4 }}>
-                    {`- ${err.message}`}
-                  </Text>
-                ))}
-              </View>
-            )}
-
-            {!!actionStatus && (
-              <View style={{ width: '100%' }}>
-                <Text style={{ color: '#1b7f34', marginBottom: 8 }}>{actionStatus}</Text>
-              </View>
-            )}
-
-            {!!product?.id && (
-              <View style={{ width: isDesktop ? '33%' : '100%', marginTop: 8 }}>
+              <View style={styles.codeRowFooter}>
+                <View style={styles.switchRowInline}>
+                  <Text style={styles.switchLabel}>Principal</Text>
+                  <Switch value={Boolean(code.isPrimary)} onValueChange={val => updateCodeRow(code.id, 'isPrimary', val)} />
+                </View>
                 <TouchableOpacity
-                  onPress={handleValidatePublish}
-                  style={{
-                    backgroundColor: '#1b5e20',
-                    padding: 12,
-                    borderRadius: 6,
-                    alignItems: 'center',
-                  }}
+                  onPress={() => removeCodeRow(code.id)}
+                  style={styles.removeCodeButton}
                 >
-                  <Text style={{ color: '#fff' }}>Validar Publicacao</Text>
+                  <MaterialCommunityIcons name="trash-can-outline" size={16} color="#fff" />
+                  <Text style={styles.removeCodeText}>Remover</Text>
                 </TouchableOpacity>
               </View>
-            )}
+              <View style={styles.codeDivider} />
+            </View>
+          ))}
+          <TouchableOpacity
+            onPress={addCodeRow}
+            style={[styles.addCodeButton, { backgroundColor: brandColors.primary }]}
+          >
+            <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+            <Text style={styles.addCodeText}>Adicionar Código</Text>
+          </TouchableOpacity>
+        </SectionCard>
 
-            {!!product?.id && lifecycleStatus !== 'published' && (
-              <View style={{ width: isDesktop ? '33%' : '100%', marginTop: 8 }}>
+        {/* Seção: Status e Publicação (só quando já existe produto) */}
+        {!!product?.id && (
+          <SectionCard title="Status e Publicação" icon="rocket-launch-outline" sectionKey="status">
+            <View style={styles.fieldWrap}>
+              <Text style={styles.fieldLabel}>Status atual</Text>
+              <View style={[styles.statusPill, getStatusPillStyle(lifecycleStatus)]}>
+                <Text style={[styles.statusPillText, getStatusTextStyle(lifecycleStatus)]}>{lifecycleStatus}</Text>
+              </View>
+            </View>
+            <View style={styles.row}>
+              <TouchableOpacity
+                onPress={handleValidatePublish}
+                style={[styles.actionButton, { backgroundColor: '#1b5e20', flex: 1, marginRight: 6 }]}
+              >
+                <MaterialCommunityIcons name="check-decagram-outline" size={16} color="#fff" />
+                <Text style={styles.actionButtonText}>Validar</Text>
+              </TouchableOpacity>
+              {lifecycleStatus !== 'published' ? (
                 <TouchableOpacity
                   onPress={() => updateLifecycleStatus('published')}
-                  style={{
-                    backgroundColor: '#0d5f2a',
-                    padding: 12,
-                    borderRadius: 6,
-                    alignItems: 'center',
-                  }}
+                  style={[styles.actionButton, { backgroundColor: '#0d5f2a', flex: 1, marginLeft: 6 }]}
                 >
-                  <Text style={{ color: '#fff' }}>Publicar</Text>
+                  <MaterialCommunityIcons name="send-check-outline" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Publicar</Text>
                 </TouchableOpacity>
-              </View>
-            )}
-
-            {!!product?.id && lifecycleStatus === 'published' && (
-              <View style={{ width: isDesktop ? '33%' : '100%', marginTop: 8 }}>
+              ) : (
                 <TouchableOpacity
                   onPress={() => updateLifecycleStatus('draft')}
-                  style={{
-                    backgroundColor: '#6d4c41',
-                    padding: 12,
-                    borderRadius: 6,
-                    alignItems: 'center',
-                  }}
+                  style={[styles.actionButton, { backgroundColor: '#6d4c41', flex: 1, marginLeft: 6 }]}
                 >
-                  <Text style={{ color: '#fff' }}>Voltar para Rascunho</Text>
+                  <MaterialCommunityIcons name="undo-variant" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Rascunho</Text>
                 </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={{ width: isDesktop ? '33%' : '100%', marginTop: 8 }}>
-              <TouchableOpacity
-                onPress={handleSave}
-                style={{
-                  backgroundColor: '#000',
-                  padding: 12,
-                  borderRadius: 6,
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ color: '#fff' }}>Salvar</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ width: '100%' }}>
-              {!!product?.id ? (
-                <AttachmentManager
-                  entityType="product"
-                  entityId={product.id}
-                  attachments={product.productFiles || []}
-                  companyId={currentCompany?.id}
-                  context="products"
-                  coverRelationId={product?.extraData?.imageCoverRelationId}
-                  onCoverChanged={saveCoverRelation}
-                  onChanged={reloadProduct}
-                />
-              ) : (
-                <View
-                  style={{
-                    borderWidth: 1,
-                    borderColor: '#ddd',
-                    borderRadius: 8,
-                    padding: 12,
-                    backgroundColor: '#f8f8f8',
-                  }}
-                >
-                  <Text style={{ color: '#666' }}>
-                    Salve o produto para habilitar anexos de imagem.
-                  </Text>
-                </View>
               )}
             </View>
+          </SectionCard>
+        )}
+
+        {/* Seção: Imagens (AttachmentManager) */}
+        {!!product?.id ? (
+          <SectionCard title="Imagens" icon="image-multiple-outline" sectionKey="imagens">
+            <AttachmentManager
+              entityType="product"
+              entityId={product.id}
+              attachments={product.productFiles || []}
+              companyId={currentCompany?.id}
+              context="products"
+              coverRelationId={product?.extraData?.imageCoverRelationId}
+              onCoverChanged={saveCoverRelation}
+              onChanged={reloadProduct}
+            />
+          </SectionCard>
+        ) : (
+          <View style={styles.infoBox}>
+            <MaterialCommunityIcons name="image-off-outline" size={20} color="#94A3B8" />
+            <Text style={styles.infoBoxText}>Salve o produto para habilitar anexos de imagem.</Text>
           </View>
-        </View>
+        )}
+
       </ScrollView>
+
+      {/* Botão Salvar fixo no bottom */}
+      <View style={styles.saveBar}>
+        <TouchableOpacity
+          onPress={handleSave}
+          style={[styles.saveButton, { backgroundColor: brandColors.primary }]}
+          activeOpacity={0.85}
+        >
+          <MaterialCommunityIcons name="content-save-outline" size={20} color="#fff" />
+          <Text style={styles.saveButtonText}>Salvar Produto</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+  scrollContent: { padding: 16, paddingBottom: 100 },
+
+  // Imagem
+  imageSection: { width: '100%', aspectRatio: 16/9, borderRadius: 16, overflow: 'hidden', marginBottom: 16, backgroundColor: '#F1F5F9' },
+  carouselBox: { flex: 1 },
+
+  // Section Card
+  sectionCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
+  sectionCardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
+  sectionCardBody: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 14 },
+  sectionCardTitle: { fontSize: 13, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6 },
+
+  saveBar: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  saveButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, padding: 16, borderRadius: 14 },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  // Fields
+  fieldWrap: { marginBottom: 12 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  textInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, fontSize: 15, color: '#0F172A' },
+  textInputMultiline: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, fontSize: 15, color: '#0F172A', minHeight: 88, textAlignVertical: 'top' },
+  row: { flexDirection: 'row', gap: 10 },
+  halfField: { flex: 1, marginBottom: 12 },
+
+  // SelectField
+  selectButton: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  selectText: { fontSize: 15, color: '#0F172A', flex: 1 },
+  selectPlaceholder: { fontSize: 15, color: '#CBD5E1', flex: 1 },
+
+  // Picker Modal
+  pickerModalContainer: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, maxHeight: '80%' },
+  pickerModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  pickerModalTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  pickerModalClose: { padding: 4 },
+  pickerModalList: { maxHeight: 360 },
+  pickerOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  pickerOptionActive: { backgroundColor: '#F0FDF4' },
+  pickerOptionText: { fontSize: 15, color: '#334155' },
+
+  // Switch rows
+  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  switchRowLast: { borderBottomWidth: 0, marginBottom: 8 },
+  switchRowInline: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  switchLabel: { fontSize: 15, color: '#334155', fontWeight: '500', flex: 1 },
+
+  // Display field (somente leitura)
+  displayField: { backgroundColor: '#F1F5F9', borderRadius: 10, padding: 13 },
+  displayFieldText: { fontSize: 15, color: '#64748B' },
+
+  // Códigos
+  codeRow: { marginBottom: 4 },
+  codeRowFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  codeDivider: { height: 1, backgroundColor: '#F1F5F9', marginBottom: 12 },
+  removeCodeButton: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  removeCodeText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  addCodeButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6, padding: 13, borderRadius: 10, marginTop: 4 },
+  addCodeText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  emptyHint: { color: '#94A3B8', fontSize: 14, marginBottom: 12 },
+
+  // Status pill
+  statusPill: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  statusPillText: { fontSize: 13, fontWeight: '700', textTransform: 'capitalize' },
+
+  // Botões de ação
+  actionButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, borderRadius: 10 },
+  actionButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+
+  // Banners
+  errorBanner: { backgroundColor: '#FFF3F3', borderWidth: 1, borderColor: '#FECACA', borderRadius: 12, padding: 12, marginBottom: 12 },
+  errorText: { color: '#9e1b1b', fontSize: 13, marginBottom: 2 },
+  warningBanner: { backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12, marginBottom: 12 },
+  warningTitle: { color: '#92400E', fontWeight: '700', fontSize: 13, marginBottom: 4 },
+  warningText: { color: '#92400E', fontSize: 13, marginBottom: 2 },
+  successBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0', borderRadius: 12, padding: 12, marginBottom: 12 },
+  successText: { color: '#166534', fontSize: 13, fontWeight: '600', flex: 1 },
+
+  // Info box
+  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 16 },
+  infoBoxText: { color: '#94A3B8', fontSize: 14, flex: 1 },
+
+})
 
 export default ProductForm;

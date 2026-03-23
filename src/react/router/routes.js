@@ -18,11 +18,11 @@ const ordersRoutes = [
   {
     name: 'ProductDetails',
     component: ProductDetails,
-    options: {
+    options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
-      title: 'Editar Produto',
-    },
+      title: route.params?.ProductId ? 'Editar Produto' : 'Adicionar Produto',
+    }),
     initialParams: { store: 'products' },
   },
   {

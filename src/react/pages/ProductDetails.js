@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
+import { useStore } from '@store';
+import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
 import ProductFiscalForm from '@controleonline/ui-products/src/react/components/ProductFiscalForm';
@@ -11,12 +13,26 @@ const Tab = createMaterialTopTabNavigator();
 const ProductDetails = ({ route }) => {
   const { ProductId } = route.params || {};
 
+  const themeStore = useStore('theme');
+  const brandColors = useMemo(
+    () => resolveThemePalette(themeStore?.getters?.theme),
+    [themeStore?.getters?.theme],
+  );
+
   return (
     <Tab.Navigator
       screenOptions={{
         tabBarScrollEnabled: false,
-        tabBarIndicatorStyle: { height: 3 },
-        tabBarLabelStyle: { fontWeight: '600' },
+        tabBarActiveTintColor: brandColors.primary,
+        tabBarIndicatorStyle: { backgroundColor: brandColors.primary, height: 3 },
+        tabBarLabelStyle: { fontWeight: '600', fontSize: 12, textTransform: 'none' },
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          elevation: 0,
+          shadowOpacity: 0,
+          borderBottomWidth: 1,
+          borderBottomColor: '#F1F5F9',
+        },
       }}
     >
       <Tab.Screen name="Dados">

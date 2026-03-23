@@ -150,7 +150,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StateStore store="products" />
+      {!loading && <StateStore store="products" />}
 
       {/* Skeleton */}
       {loading && (

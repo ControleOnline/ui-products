@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,22 @@ import {
   Switch,
   TouchableOpacity,
   ScrollView,
+  StyleSheet,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
+import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
+import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import ProductGroupProducts from './ProductGroupProducts';
 import { emitProductEvent, PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
+
+const PRICE_CALCULATION_OPTIONS = [
+  { value: 'sum', label: 'Soma' },
+  { value: 'average', label: 'Média' },
+  { value: 'biggest', label: 'Maior' },
+  { value: 'free', label: 'Brinde' },
+];
 
 const parseNumber = value => {
   if (value === null || value === undefined || value === '') return null;
@@ -51,12 +61,66 @@ const normalizeGroupDraft = group => ({
   validTo: String(group?.extraData?.validTo || ''),
 });
 
+const SelectField = ({ label, value, options, onSelect }) => {
+  const [modalVisible, setModalVisible] = useState(false);
+  const selected = options.find(o => o.value === value);
+
+  return (
+    <View style={{ marginBottom: 12 }}>
+      {!!label && <Text style={styles.fieldLabel}>{label}</Text>}
+      <TouchableOpacity
+        style={styles.selectButton}
+        onPress={() => setModalVisible(true)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.selectButtonText}>
+          {selected ? selected.label : 'Selecionar...'}
+        </Text>
+        <MaterialCommunityIcons name="chevron-down" size={20} color="#64748B" />
+      </TouchableOpacity>
+      <AnimatedModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        title={label || 'Selecionar'}
+      >
+        {options.map(opt => (
+          <TouchableOpacity
+            key={opt.value}
+            style={[
+              styles.selectOption,
+              opt.value === value && styles.selectOptionActive,
+            ]}
+            onPress={() => {
+              onSelect(opt.value);
+              setModalVisible(false);
+            }}
+          >
+            <Text
+              style={[
+                styles.selectOptionText,
+                opt.value === value && styles.selectOptionTextActive,
+              ]}
+            >
+              {opt.label}
+            </Text>
+            {opt.value === value && (
+              <MaterialCommunityIcons name="check" size={18} color="#0F172A" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </AnimatedModal>
+    </View>
+  );
+};
+
 const ProductGroups = ({ ProductId }) => {
   const productGroupStore = useStore('product_group');
   const peopleStore = useStore('people');
 
   const { actions } = productGroupStore;
   const { currentCompany } = peopleStore.getters;
+
+  const brandColors = useMemo(() => resolveThemePalette(), []);
 
   const [groups, setGroups] = useState([]);
   const [expanded, setExpanded] = useState({});
@@ -88,7 +152,6 @@ const ProductGroups = ({ ProductId }) => {
           });
           return next;
         });
-        // preserve expanded state by group id when possible
         setExpanded(prev => {
           const next = {};
           items.forEach((g, i) => {
@@ -268,225 +331,370 @@ const ProductGroups = ({ ProductId }) => {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: 16 }}>
+    <View style={styles.container}>
       <StateStore store="product_group" />
-      {!ProductId && (
-        <Text style={{ color: '#666', marginBottom: 8 }}>
-          Salve o produto para habilitar grupos e modificadores.
-        </Text>
-      )}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {!ProductId && (
+          <Text style={styles.disabledText}>
+            Salve o produto para habilitar grupos e modificadores.
+          </Text>
+        )}
 
-      <TouchableOpacity
-        onPress={createGroup}
-        disabled={!ProductId}
-        style={{
-          backgroundColor: ProductId ? '#000' : '#666',
-          padding: 12,
-          borderRadius: 6,
-          marginBottom: 20,
-        }}
-      >
-        <Text style={{ color: '#fff', textAlign: 'center' }}>
-          Adicionar Grupo
-        </Text>
-      </TouchableOpacity>
-      {!!status && <Text style={{ color: '#1b7f34', marginBottom: 8 }}>{status}</Text>}
-      {!!error && <Text style={{ color: '#b00020', marginBottom: 8 }}>{error}</Text>}
-      {groups.length === 0 && (
-        <Text style={{ color: '#666', marginBottom: 8 }}>
-          Nenhum grupo cadastrado ainda.
-        </Text>
-      )}
-
-      {groups.map((group, index) => {
-        const gid = group['@id'] || group.id || String(index);
-        const draft = groupDrafts[String(gid)] || normalizeGroupDraft(group);
-        return (
-          <View key={gid} style={{ marginBottom: 20 }}>
-            <TouchableOpacity onPress={() => toggleExpand(gid)}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold' }}>
-                {group.productGroup}
-              </Text>
-            </TouchableOpacity>
-
-            {expanded[gid] && (
-              <View style={{ marginTop: 12 }}>
-              <TextInput
-                value={draft.productGroup}
-                onChangeText={text => updateDraft(String(gid), 'productGroup', text)}
-                placeholder="Grupo"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  marginBottom: 10,
-                  borderRadius: 6,
-                }}
-              />
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ marginRight: 10 }}>Obrigatório</Text>
-                <Switch
-                  value={Boolean(draft.required)}
-                  onValueChange={val => updateDraft(String(gid), 'required', val)}
-                />
-                <Text style={{ marginLeft: 10, color: '#666' }}>
-                  {draft.required ? 'Sim' : 'Não'}
-                </Text>
-              </View>
-
-              <Text style={{ marginBottom: 4 }}>Mínimo de escolhas</Text>
-              <TextInput
-                value={String(draft.minimum || '')}
-                onChangeText={text => updateDraft(String(gid), 'minimum', text)}
-                placeholder="Mínimo"
-                keyboardType="numeric"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  marginBottom: 10,
-                  borderRadius: 6,
-                }}
-              />
-
-              <Text style={{ marginBottom: 4 }}>Máximo de escolhas</Text>
-              <TextInput
-                value={String(draft.maximum || '')}
-                onChangeText={text => updateDraft(String(gid), 'maximum', text)}
-                placeholder="Máximo"
-                keyboardType="numeric"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  borderRadius: 6,
-                }}
-              />
-
-              <Text style={{ marginBottom: 4 }}>Ordem do grupo no cardápio</Text>
-              <TextInput
-                value={String(draft.groupOrder || '')}
-                onChangeText={text => updateDraft(String(gid), 'groupOrder', text)}
-                placeholder="Ordem do grupo"
-                keyboardType="numeric"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  borderRadius: 6,
-                  marginTop: 10,
-                  marginBottom: 10,
-                }}
-              />
-
-              <Text style={{ marginBottom: 4 }}>Cálculo de preço do grupo</Text>
-              <View style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 10 }}>
-                <Picker
-                  selectedValue={draft.priceCalculation || 'sum'}
-                  onValueChange={val => updateDraft(String(gid), 'priceCalculation', val)}
-                >
-                  <Picker.Item label="Soma" value="sum" />
-                  <Picker.Item label="Média" value="average" />
-                  <Picker.Item label="Maior" value="biggest" />
-                  <Picker.Item label="Brinde" value="free" />
-                </Picker>
-              </View>
-
-              <Text style={{ marginBottom: 4 }}>Versão da BOM</Text>
-              <TextInput
-                value={String(draft.bomVersion || '')}
-                onChangeText={text => updateDraft(String(gid), 'bomVersion', text)}
-                placeholder="Versão BOM"
-                keyboardType="numeric"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  borderRadius: 6,
-                  marginBottom: 10,
-                }}
-              />
-
-              <Text style={{ marginBottom: 4 }}>Vigência início</Text>
-              <TextInput
-                value={String(draft.validFrom || '')}
-                onChangeText={text => updateDraft(String(gid), 'validFrom', text)}
-                placeholder="Vigência início (YYYY-MM-DD)"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  borderRadius: 6,
-                  marginBottom: 10,
-                }}
-              />
-
-              <Text style={{ marginBottom: 4 }}>Vigência fim</Text>
-              <TextInput
-                value={String(draft.validTo || '')}
-                onChangeText={text => updateDraft(String(gid), 'validTo', text)}
-                placeholder="Vigência fim (YYYY-MM-DD)"
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#ccc',
-                  padding: 10,
-                  borderRadius: 6,
-                  marginBottom: 10,
-                }}
-              />
-              <TouchableOpacity
-                onPress={() => saveGroup(group)}
-                disabled={Boolean(savingByGroup[String(gid)])}
-                style={{
-                  backgroundColor: '#000',
-                  padding: 10,
-                  borderRadius: 6,
-                  alignItems: 'center',
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ color: '#fff' }}>
-                  {savingByGroup[String(gid)] ? 'Salvando...' : 'Salvar Grupo'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => removeGroup(group)}
-                disabled={Boolean(removingByGroup[String(group.id || group['@id'] || '').replace(/\D/g, '')])}
-                style={{
-                  backgroundColor: '#b00020',
-                  padding: 10,
-                  borderRadius: 6,
-                  alignItems: 'center',
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ color: '#fff' }}>
-                  {removingByGroup[String(group.id || group['@id'] || '').replace(/\D/g, '')]
-                    ? 'Excluindo...'
-                    : 'Excluir Grupo'}
-                </Text>
-              </TouchableOpacity>
-
-              <ProductGroupProducts
-                key={group['@id'] || group.id}
-                products={group.products}
-                productGroup={group['@id'] || group.id}
-                ProductId={ProductId}
-              />
-            </View>
-          )}
+        {!!status && (
+          <View style={styles.successBox}>
+            <Text style={styles.successText}>{status}</Text>
           </View>
-        );
-      })}
-    </ScrollView>
+        )}
+        {!!error && (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {groups.length === 0 && (
+          <Text style={styles.emptyText}>Nenhum grupo cadastrado ainda.</Text>
+        )}
+
+        {groups.map((group, index) => {
+          const gid = group['@id'] || group.id || String(index);
+          const draft = groupDrafts[String(gid)] || normalizeGroupDraft(group);
+          const isExpanded = !!expanded[gid];
+          const isSaving = Boolean(savingByGroup[String(gid)]);
+          const removeKey = String(group.id || group['@id'] || '').replace(/\D/g, '');
+          const isRemoving = Boolean(removingByGroup[removeKey]);
+
+          return (
+            <View key={gid} style={styles.card}>
+              <TouchableOpacity
+                style={styles.groupHeader}
+                onPress={() => toggleExpand(gid)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.groupTitle} numberOfLines={1}>
+                  {group.productGroup || 'Grupo'}
+                </Text>
+                <MaterialCommunityIcons
+                  name={isExpanded ? 'chevron-down' : 'chevron-right'}
+                  size={22}
+                  color="#64748B"
+                />
+              </TouchableOpacity>
+
+              {isExpanded && (
+                <View style={styles.groupBody}>
+                  <Text style={styles.fieldLabel}>Nome do grupo</Text>
+                  <TextInput
+                    value={draft.productGroup}
+                    onChangeText={text => updateDraft(String(gid), 'productGroup', text)}
+                    placeholder="Grupo"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchLabel}>Obrigatório</Text>
+                    <View style={styles.switchRight}>
+                      <Text style={styles.switchValue}>
+                        {draft.required ? 'Sim' : 'Não'}
+                      </Text>
+                      <Switch
+                        value={Boolean(draft.required)}
+                        onValueChange={val => updateDraft(String(gid), 'required', val)}
+                        trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#0F172A' }}
+                        thumbColor="#fff"
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.fieldLabel}>Mínimo de escolhas</Text>
+                  <TextInput
+                    value={String(draft.minimum || '')}
+                    onChangeText={text => updateDraft(String(gid), 'minimum', text)}
+                    placeholder="Mínimo"
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <Text style={styles.fieldLabel}>Máximo de escolhas</Text>
+                  <TextInput
+                    value={String(draft.maximum || '')}
+                    onChangeText={text => updateDraft(String(gid), 'maximum', text)}
+                    placeholder="Máximo"
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <Text style={styles.fieldLabel}>Ordem do grupo no cardápio</Text>
+                  <TextInput
+                    value={String(draft.groupOrder || '')}
+                    onChangeText={text => updateDraft(String(gid), 'groupOrder', text)}
+                    placeholder="Ordem do grupo"
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <SelectField
+                    label="Cálculo de preço do grupo"
+                    value={draft.priceCalculation || 'sum'}
+                    options={PRICE_CALCULATION_OPTIONS}
+                    onSelect={val => updateDraft(String(gid), 'priceCalculation', val)}
+                  />
+
+                  <Text style={styles.fieldLabel}>Versão da BOM</Text>
+                  <TextInput
+                    value={String(draft.bomVersion || '')}
+                    onChangeText={text => updateDraft(String(gid), 'bomVersion', text)}
+                    placeholder="Versão BOM"
+                    keyboardType="numeric"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <Text style={styles.fieldLabel}>Vigência início</Text>
+                  <TextInput
+                    value={String(draft.validFrom || '')}
+                    onChangeText={text => updateDraft(String(gid), 'validFrom', text)}
+                    placeholder="YYYY-MM-DD"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <Text style={styles.fieldLabel}>Vigência fim</Text>
+                  <TextInput
+                    value={String(draft.validTo || '')}
+                    onChangeText={text => updateDraft(String(gid), 'validTo', text)}
+                    placeholder="YYYY-MM-DD"
+                    style={styles.input}
+                    placeholderTextColor="#94A3B8"
+                  />
+
+                  <TouchableOpacity
+                    onPress={() => saveGroup(group)}
+                    disabled={isSaving}
+                    style={[
+                      styles.btnPrimary,
+                      { backgroundColor: brandColors?.primary || '#0F172A' },
+                      isSaving && styles.btnDisabled,
+                    ]}
+                  >
+                    <Text style={styles.btnText}>
+                      {isSaving ? 'Salvando...' : 'Salvar Grupo'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => removeGroup(group)}
+                    disabled={isRemoving}
+                    style={[styles.btnDestructive, isRemoving && styles.btnDisabled]}
+                  >
+                    <Text style={styles.btnText}>
+                      {isRemoving ? 'Excluindo...' : 'Excluir Grupo'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <ProductGroupProducts
+                    key={group['@id'] || group.id}
+                    products={group.products}
+                    productGroup={group['@id'] || group.id}
+                    ProductId={ProductId}
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <TouchableOpacity
+          onPress={createGroup}
+          disabled={!ProductId}
+          style={[
+            styles.btnPrimary,
+            { backgroundColor: ProductId ? (brandColors?.primary || '#0F172A') : '#94A3B8' },
+            styles.btnFullWidth,
+          ]}
+        >
+          <Text style={styles.btnText}>Adicionar Grupo</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  disabledText: {
+    color: '#64748B',
+    marginBottom: 8,
+    fontSize: 14,
+  },
+  emptyText: {
+    color: '#64748B',
+    marginBottom: 8,
+    fontSize: 14,
+  },
+  successBox: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  successText: {
+    color: '#166534',
+    fontSize: 14,
+  },
+  errorBox: {
+    backgroundColor: '#FFF3F3',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorText: {
+    color: '#9e1b1b',
+    fontSize: 14,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  groupHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  groupTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    flex: 1,
+    marginRight: 8,
+  },
+  groupBody: {
+    marginTop: 16,
+  },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 13,
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+    marginBottom: 12,
+  },
+  switchLabel: {
+    fontSize: 15,
+    color: '#0F172A',
+    fontWeight: '500',
+  },
+  switchRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  switchValue: {
+    fontSize: 13,
+    color: '#64748B',
+    marginRight: 4,
+  },
+  selectButton: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 13,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  selectButtonText: {
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  selectOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  selectOptionActive: {
+    backgroundColor: '#F0FDF4',
+  },
+  selectOptionText: {
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  selectOptionTextActive: {
+    fontWeight: '700',
+  },
+  btnPrimary: {
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnDestructive: {
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  btnDisabled: {
+    opacity: 0.6,
+  },
+  btnFullWidth: {
+    width: '100%',
+  },
+  btnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  bottomBar: {
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+});
 
 export default ProductGroups;

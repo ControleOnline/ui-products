@@ -1,9 +1,11 @@
 import React, {useEffect, useMemo, useState} from 'react';
-import {ScrollView, Text, TextInput, TouchableOpacity, View} from 'react-native';
-import {Picker} from '@react-native-picker/picker';
+import {ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useStore} from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
 import {emitProductEvent, PRODUCT_EVENTS} from '@controleonline/ui-products/src/react/domain/productEvents';
+import {resolveThemePalette} from '@controleonline/../../src/styles/branding';
+import {MaterialCommunityIcons} from '@expo/vector-icons';
+import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 
 const toNumber = value => {
   if (value === null || value === undefined || value === '') return 0;
@@ -82,6 +84,11 @@ const CHANNEL_OPTIONS = [
   {value: 'outro', label: 'Outro'},
 ];
 
+const SOURCE_OPTIONS = [
+  {value: 'auto_bom', label: 'Automático pela BOM'},
+  {value: 'manual', label: 'Manual'},
+];
+
 const SYNC_MODE_OPTIONS = [
   {value: 'manual', label: 'Manual (não sugerir custo)'},
   {value: 'suggest', label: 'Sugerir custo de compra'},
@@ -156,6 +163,42 @@ const buildInventoryCostMap = rows => {
   }, {});
 };
 
+// Componente local de seleção via modal animado
+const SelectField = ({label, value, options, onChange}) => {
+  const [visible, setVisible] = useState(false);
+  const selected = options.find(o => o.value === value);
+  return (
+    <>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity
+        style={[styles.input, styles.selectButton]}
+        onPress={() => setVisible(true)}
+        activeOpacity={0.8}>
+        <Text style={styles.selectButtonText}>{selected?.label || 'Selecionar...'}</Text>
+        <MaterialCommunityIcons name="chevron-down" size={18} color="#94A3B8" />
+      </TouchableOpacity>
+      <AnimatedModal visible={visible} onClose={() => setVisible(false)} title={label}>
+        {options.map(opt => (
+          <TouchableOpacity
+            key={opt.value}
+            style={[styles.modalOption, opt.value === value && styles.modalOptionSelected]}
+            onPress={() => {
+              onChange(opt.value);
+              setVisible(false);
+            }}>
+            <Text style={[styles.modalOptionText, opt.value === value && styles.modalOptionTextSelected]}>
+              {opt.label}
+            </Text>
+            {opt.value === value && (
+              <MaterialCommunityIcons name="check" size={18} color="#2563EB" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </AnimatedModal>
+    </>
+  );
+};
+
 const ProductPricingForm = ({ProductId}) => {
   const productsStore = useStore('products');
   const productGroupStore = useStore('product_group');
@@ -172,6 +215,8 @@ const ProductPricingForm = ({ProductId}) => {
   const [error, setError] = useState('');
   const [hasBomGroups, setHasBomGroups] = useState(false);
   const [suggestedPurchaseCost, setSuggestedPurchaseCost] = useState(null);
+
+  const brandColors = useMemo(() => resolveThemePalette(), []);
 
   useEffect(() => {
     if (!ProductId) return;
@@ -607,314 +652,709 @@ const ProductPricingForm = ({ProductId}) => {
 
   if (!ProductId) {
     return (
-      <View style={{padding: 16}}>
-        <Text>Salve o produto para habilitar a aba de preço e custo.</Text>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Salve o produto para habilitar a aba de preço e custo.</Text>
       </View>
     );
   }
 
-  const inputStyle = {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 12,
-  };
+  const fmtN = v => (v === '' || v === null || v === undefined) ? '' : String(v).replace('.', ',');
+  const fmtBRL = v => { const n = parseFloat(String(v || 0).replace(',', '.')); return isNaN(n) ? '0,00' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+
+  const bomBtnDisabled = calculating || source !== 'auto_bom' || !hasBomGroups;
 
   return (
-    <View style={{flex: 1}}>
+    <View style={styles.container}>
       <StateStore store="products" />
-      <ScrollView contentContainerStyle={{padding: 16}}>
-        <Text style={{marginBottom: 8, fontWeight: '600'}}>Simulador de Preço e Margem</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+
+        {/* Aviso sem BOM */}
         {!hasBomGroups && (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: '#f2d08b',
-              backgroundColor: '#fff8e8',
-              borderRadius: 6,
-              padding: 10,
-              marginBottom: 12,
-            }}>
-            <Text style={{color: '#6a4f00'}}>
+          <View style={styles.alertWarning}>
+            <MaterialCommunityIcons name="information-outline" size={16} color="#92400E" style={{marginRight: 6}} />
+            <Text style={styles.alertWarningText}>
               Produto sem BOM/grupos: use custo manual (compra/atacado) e custos adicionais.
             </Text>
           </View>
         )}
 
-        <Text>Fonte de custo</Text>
-        <View style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12}}>
-          <Picker
-            selectedValue={source}
-            onValueChange={v => updatePricing('source', v)}>
-            <Picker.Item label="Automático pela BOM" value="auto_bom" />
-            <Picker.Item label="Manual" value="manual" />
-          </Picker>
-        </View>
+        {/* Mensagens de status e erro */}
+        {!!status && (
+          <View style={styles.msgSuccess}>
+            <MaterialCommunityIcons name="check-circle-outline" size={16} color="#166534" style={{marginRight: 6}} />
+            <Text style={styles.msgSuccessText}>{status}</Text>
+          </View>
+        )}
+        {!!error && (
+          <View style={styles.msgError}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#9e1b1b" style={{marginRight: 6}} />
+            <Text style={styles.msgErrorText}>{error}</Text>
+          </View>
+        )}
 
-        <Text>Sincronização com custo de compra</Text>
-        <View style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 12}}>
-          <Picker
-            selectedValue={syncMode}
-            onValueChange={v => updatePricing('syncMode', v)}>
-            {SYNC_MODE_OPTIONS.map(opt => (
-              <Picker.Item key={opt.value} label={opt.label} value={opt.value} />
-            ))}
-          </Picker>
-        </View>
+        {/* Card: Configuração de Custo */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Configuração de Custo</Text>
 
-        <Text>Custo manual (quando fonte = manual)</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.costManual || '')}
-          onChangeText={v => updatePricing('costManual', v)}
-          keyboardType="numeric"
-        />
-        <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12}}>
+          <SelectField
+            label="Fonte de custo"
+            value={source}
+            options={SOURCE_OPTIONS}
+            onChange={v => updatePricing('source', v)}
+          />
+
+          <SelectField
+            label="Sincronização com custo de compra"
+            value={syncMode}
+            options={SYNC_MODE_OPTIONS}
+            onChange={v => updatePricing('syncMode', v)}
+          />
+
+          <Text style={styles.label}>Custo manual (quando fonte = manual)</Text>
+          <TextInput
+            style={styles.input}
+            value={fmtN(pricing.costManual)}
+            onChangeText={v => updatePricing('costManual', v)}
+            keyboardType="numeric"
+            placeholder="0,00"
+            placeholderTextColor="#CBD5E1"
+          />
+
           <TouchableOpacity
             onPress={applySuggestedPurchaseCost}
             disabled={suggestedPurchaseCost === null}
-            style={{
-              backgroundColor: suggestedPurchaseCost === null ? '#666' : '#1b5e20',
-              paddingVertical: 10,
-              paddingHorizontal: 12,
-              borderRadius: 6,
-            }}>
-            <Text style={{color: '#fff'}}>Usar preço de compra atual</Text>
+            style={[styles.btnSecondary, suggestedPurchaseCost === null && styles.btnDisabled]}>
+            <MaterialCommunityIcons name="tag-outline" size={15} color="#fff" style={{marginRight: 6}} />
+            <Text style={styles.btnText}>
+              {suggestedPurchaseCost === null
+                ? 'Sem custo de inventário disponível'
+                : `Usar preço de compra atual (R$ ${fmtBRL(suggestedPurchaseCost)})`}
+            </Text>
           </TouchableOpacity>
-          <Text style={{color: '#666'}}>
-            {suggestedPurchaseCost === null
-              ? 'Sem custo de inventário disponível'
-              : `Sugerido: R$ ${round2(suggestedPurchaseCost)}`}
-          </Text>
         </View>
 
-        <Text>Custo embalagem adicional por unidade</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.additionalPackagingCost || '')}
-          onChangeText={v => updatePricing('additionalPackagingCost', v)}
-          keyboardType="numeric"
-        />
+        {/* Card: Simulador de Preço */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Simulador de Preço</Text>
 
-        <Text>Custo descartáveis adicional por unidade</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.additionalDisposableCost || '')}
-          onChangeText={v => updatePricing('additionalDisposableCost', v)}
-          keyboardType="numeric"
-        />
-
-        <Text>Custo operacional adicional por unidade</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.additionalOperationalCost || '')}
-          onChangeText={v => updatePricing('additionalOperationalCost', v)}
-          keyboardType="numeric"
-        />
-
-        <Text>Custo logístico/despacho por unidade</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.additionalLogisticsCost || '')}
-          onChangeText={v => updatePricing('additionalLogisticsCost', v)}
-          keyboardType="numeric"
-        />
-
-        <Text>Perdas (%)</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.lossPct || '')}
-          onChangeText={v => updatePricing('lossPct', v)}
-          keyboardType="numeric"
-        />
-
-        <Text>Markup (%)</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.markup || '')}
-          onChangeText={v => updatePricing('markup', v)}
-          keyboardType="numeric"
-        />
-
-        <Text>Margem alvo (%)</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.marginTarget || '')}
-          onChangeText={v => updatePricing('marginTarget', v)}
-          keyboardType="numeric"
-        />
-        <Text>Margem mínima aceitável (%)</Text>
-        <TextInput
-          style={inputStyle}
-          value={String(pricing.minMarginPct || '')}
-          onChangeText={v => updatePricing('minMarginPct', v)}
-          keyboardType="numeric"
-        />
-
-        <View style={{borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12}}>
-          <Text style={{marginBottom: 4}}>{`Custo total unitário: R$ ${round2(cost)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Insumos/BOM: R$ ${round2(costBreakdown.ingredientCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Embalagens: R$ ${round2(costBreakdown.packagingCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Descartáveis: R$ ${round2(costBreakdown.disposableCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Operacional: R$ ${round2(costBreakdown.operationalCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Logística/Despacho: R$ ${round2(costBreakdown.logisticsCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Perdas: R$ ${round2(costBreakdown.lossCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`- Modificadores obrigatórios (base): R$ ${round2(costBreakdown.mandatoryModifiersCost || 0)}`}</Text>
-          <Text style={{marginBottom: 8}}>{`- Potencial opcional (não incluído no custo base): R$ ${round2(costBreakdown.optionalModifiersPotentialCost || 0)}`}</Text>
-          <Text style={{marginBottom: 4}}>{`Preço sugerido (markup): R$ ${simulatedByMarkup}`}</Text>
-          <Text>{`Preço sugerido (margem): R$ ${simulatedByMargin}`}</Text>
-        </View>
-        {marginBelowGuard && (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: '#b00020',
-              backgroundColor: '#ffebee',
-              borderRadius: 6,
-              padding: 10,
-              marginBottom: 12,
-            }}>
-            <Text style={{color: '#b00020'}}>
-              Margem alvo abaixo da margem mínima aceitável. Ajuste antes de publicar.
-            </Text>
+          <View style={styles.row2col}>
+            <View style={styles.col}>
+              <Text style={styles.label}>Markup (%)</Text>
+              <TextInput
+                style={styles.input}
+                value={fmtN(pricing.markup)}
+                onChangeText={v => updatePricing('markup', v)}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
+            <View style={[styles.col, {marginLeft: 10}]}>
+              <Text style={styles.label}>Margem alvo (%)</Text>
+              <TextInput
+                style={styles.input}
+                value={fmtN(pricing.marginTarget)}
+                onChangeText={v => updatePricing('marginTarget', v)}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
           </View>
-        )}
-        {isCostOutdated && (
-          <View
-            style={{
-              borderWidth: 1,
-              borderColor: '#f2d08b',
-              backgroundColor: '#fff8e8',
-              borderRadius: 6,
-              padding: 10,
-              marginBottom: 12,
-            }}>
-            <Text style={{color: '#6a4f00'}}>
-              {`Custo desatualizado: snapshot atual (R$ ${round2(cost)}) difere do inventário (R$ ${round2(
-                suggestedPurchaseCost,
-              )}).`}
-            </Text>
-          </View>
-        )}
 
-        <View style={{borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 12}}>
-          <Text style={{fontWeight: '600', marginBottom: 8}}>Precificação por canal</Text>
-          {channelPolicies.length === 0 && (
-            <Text style={{color: '#666', marginBottom: 8}}>
-              Nenhuma política por canal cadastrada.
-            </Text>
+          <Text style={styles.label}>Margem mínima aceitável (%)</Text>
+          <TextInput
+            style={styles.input}
+            value={fmtN(pricing.minMarginPct)}
+            onChangeText={v => updatePricing('minMarginPct', v)}
+            keyboardType="numeric"
+            placeholder="0"
+            placeholderTextColor="#CBD5E1"
+          />
+
+          {marginBelowGuard && (
+            <View style={styles.alertDanger}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#B91C1C" style={{marginRight: 6}} />
+              <Text style={styles.alertDangerText}>
+                Margem alvo abaixo da margem mínima aceitável. Ajuste antes de publicar.
+              </Text>
+            </View>
           )}
+        </View>
+
+        {/* Card: Custos Adicionais */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Custos Adicionais</Text>
+
+          <View style={styles.row2col}>
+            <View style={styles.col}>
+              <Text style={styles.label}>Embalagem adicional (R$)</Text>
+              <TextInput
+                style={styles.input}
+                value={fmtN(pricing.additionalPackagingCost)}
+                onChangeText={v => updatePricing('additionalPackagingCost', v)}
+                keyboardType="numeric"
+                placeholder="0,00"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
+            <View style={[styles.col, {marginLeft: 10}]}>
+              <Text style={styles.label}>Descartáveis adicionais (R$)</Text>
+              <TextInput
+                style={styles.input}
+                value={fmtN(pricing.additionalDisposableCost)}
+                onChangeText={v => updatePricing('additionalDisposableCost', v)}
+                keyboardType="numeric"
+                placeholder="0,00"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
+          </View>
+
+          <View style={styles.row2col}>
+            <View style={styles.col}>
+              <Text style={styles.label}>Operacional adicional (R$)</Text>
+              <TextInput
+                style={styles.input}
+                value={fmtN(pricing.additionalOperationalCost)}
+                onChangeText={v => updatePricing('additionalOperationalCost', v)}
+                keyboardType="numeric"
+                placeholder="0,00"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
+            <View style={[styles.col, {marginLeft: 10}]}>
+              <Text style={styles.label}>Logística/despacho (R$)</Text>
+              <TextInput
+                style={styles.input}
+                value={fmtN(pricing.additionalLogisticsCost)}
+                onChangeText={v => updatePricing('additionalLogisticsCost', v)}
+                keyboardType="numeric"
+                placeholder="0,00"
+                placeholderTextColor="#CBD5E1"
+              />
+            </View>
+          </View>
+
+          <Text style={styles.label}>Perdas (%)</Text>
+          <TextInput
+            style={styles.input}
+            value={fmtN(pricing.lossPct)}
+            onChangeText={v => updatePricing('lossPct', v)}
+            keyboardType="numeric"
+            placeholder="0"
+            placeholderTextColor="#CBD5E1"
+          />
+        </View>
+
+        {/* Card: Resumo de Custo */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Resumo de Custo</Text>
+
+          {isCostOutdated && (
+            <View style={styles.alertOutdated}>
+              <MaterialCommunityIcons name="clock-alert-outline" size={15} color="#92400E" style={{marginRight: 6}} />
+              <Text style={styles.alertOutdatedText}>
+                {`Custo desatualizado: snapshot atual (R$ ${fmtBRL(cost)}) difere do inventário (R$ ${fmtBRL(suggestedPurchaseCost)}).`}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.costSummaryCard}>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryLabel}>Custo total unitário</Text>
+              <Text style={styles.costSummaryValueMain}>{`R$ ${fmtBRL(cost)}`}</Text>
+            </View>
+            <View style={styles.costSummaryDivider} />
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Insumos/BOM</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.ingredientCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Embalagens</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.packagingCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Descartáveis</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.disposableCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Operacional</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.operationalCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Logística/Despacho</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.logisticsCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Perdas</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.lossCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Modificadores obrigatórios (base)</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.mandatoryModifiersCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryItem}>Potencial opcional (não no custo base)</Text>
+              <Text style={styles.costSummaryValue}>{`R$ ${fmtBRL(costBreakdown.optionalModifiersPotentialCost || 0)}`}</Text>
+            </View>
+            <View style={styles.costSummaryDivider} />
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryLabel}>Preço sugerido (markup)</Text>
+              <Text style={styles.costSummaryValueMain}>{`R$ ${fmtBRL(simulatedByMarkup)}`}</Text>
+            </View>
+            <View style={styles.costSummaryRow}>
+              <Text style={styles.costSummaryLabel}>Preço sugerido (margem)</Text>
+              <Text style={styles.costSummaryValueMain}>{`R$ ${fmtBRL(simulatedByMargin)}`}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Card: Políticas por Canal */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Políticas por Canal</Text>
+
+          {channelPolicies.length === 0 && (
+            <Text style={styles.emptyCardText}>Nenhuma política por canal cadastrada.</Text>
+          )}
+
           {channelPolicies.map(policy => (
-            <View key={policy.id} style={{borderWidth: 1, borderColor: '#e2e2e2', borderRadius: 6, padding: 8, marginBottom: 8}}>
-              <View style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 6, marginBottom: 8}}>
-                <Picker
-                  selectedValue={policy.channel}
-                  onValueChange={v => updateChannelPolicy(policy.id, 'channel', v)}>
-                  {CHANNEL_OPTIONS.map(opt => (
-                    <Picker.Item key={opt.value} label={opt.label} value={opt.value} />
-                  ))}
-                </Picker>
+            <View key={policy.id} style={styles.channelCard}>
+              <SelectField
+                label="Canal"
+                value={policy.channel}
+                options={CHANNEL_OPTIONS}
+                onChange={v => updateChannelPolicy(policy.id, 'channel', v)}
+              />
+
+              <View style={styles.row2col}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Comissão (%)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={fmtN(policy.commissionPct)}
+                    onChangeText={v => updateChannelPolicy(policy.id, 'commissionPct', v)}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor="#CBD5E1"
+                  />
+                </View>
+                <View style={[styles.col, {marginLeft: 10}]}>
+                  <Text style={styles.label}>Taxa fixa por pedido (R$)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={fmtN(policy.fixedFee)}
+                    onChangeText={v => updateChannelPolicy(policy.id, 'fixedFee', v)}
+                    keyboardType="numeric"
+                    placeholder="0,00"
+                    placeholderTextColor="#CBD5E1"
+                  />
+                </View>
               </View>
-              <Text>Comissão (%)</Text>
-              <TextInput
-                style={inputStyle}
-                value={String(policy.commissionPct || '')}
-                onChangeText={v => updateChannelPolicy(policy.id, 'commissionPct', v)}
-                keyboardType="numeric"
-              />
-              <Text>Taxa fixa por pedido/item (R$)</Text>
-              <TextInput
-                style={inputStyle}
-                value={String(policy.fixedFee || '')}
-                onChangeText={v => updateChannelPolicy(policy.id, 'fixedFee', v)}
-                keyboardType="numeric"
-              />
-              <Text>Embalagem extra deste canal (R$)</Text>
-              <TextInput
-                style={inputStyle}
-                value={String(policy.extraPackagingCost || '')}
-                onChangeText={v => updateChannelPolicy(policy.id, 'extraPackagingCost', v)}
-                keyboardType="numeric"
-              />
-              <Text>Margem alvo do canal (%)</Text>
-              <TextInput
-                style={inputStyle}
-                value={String(policy.targetMarginPct || '')}
-                onChangeText={v => updateChannelPolicy(policy.id, 'targetMarginPct', v)}
-                keyboardType="numeric"
-              />
+
+              <View style={styles.row2col}>
+                <View style={styles.col}>
+                  <Text style={styles.label}>Embalagem extra canal (R$)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={fmtN(policy.extraPackagingCost)}
+                    onChangeText={v => updateChannelPolicy(policy.id, 'extraPackagingCost', v)}
+                    keyboardType="numeric"
+                    placeholder="0,00"
+                    placeholderTextColor="#CBD5E1"
+                  />
+                </View>
+                <View style={[styles.col, {marginLeft: 10}]}>
+                  <Text style={styles.label}>Margem alvo canal (%)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={fmtN(policy.targetMarginPct)}
+                    onChangeText={v => updateChannelPolicy(policy.id, 'targetMarginPct', v)}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor="#CBD5E1"
+                  />
+                </View>
+              </View>
+
               <TouchableOpacity
                 onPress={() => removeChannelPolicy(policy.id)}
-                style={{
-                  backgroundColor: '#b00020',
-                  padding: 10,
-                  borderRadius: 6,
-                  alignItems: 'center',
-                }}>
-                <Text style={{color: '#fff'}}>Remover canal</Text>
+                style={styles.btnDestructive}>
+                <MaterialCommunityIcons name="trash-can-outline" size={15} color="#fff" style={{marginRight: 6}} />
+                <Text style={styles.btnText}>Remover canal</Text>
               </TouchableOpacity>
             </View>
           ))}
-          <TouchableOpacity
-            onPress={addChannelPolicy}
-            style={{
-              backgroundColor: '#000',
-              padding: 10,
-              borderRadius: 6,
-              alignItems: 'center',
-              marginBottom: 10,
-            }}>
-            <Text style={{color: '#fff'}}>Adicionar canal</Text>
+
+          <TouchableOpacity onPress={addChannelPolicy} style={styles.btnAddChannel}>
+            <MaterialCommunityIcons name="plus" size={16} color="#2563EB" style={{marginRight: 6}} />
+            <Text style={styles.btnAddChannelText}>Adicionar canal</Text>
           </TouchableOpacity>
-          {channelSimulations.map((sim, idx) => (
-            <View key={`sim-${sim.channel}-${idx}`} style={{marginBottom: 8}}>
-              <Text>{`Canal: ${sim.channel}`}</Text>
-              <Text>{`Custo total no canal: R$ ${round2(sim.unitCost)}`}</Text>
-              <Text>{`Margem líquida no preço por markup: ${round2(sim.netMarginOnMarkup)}%`}</Text>
-              <Text>
-                {`Preço sugerido (margem com taxas): ${
-                  sim.suggestedByMarginWithFees === null
-                    ? 'inválido (rever comissão/margem)'
-                    : `R$ ${round2(sim.suggestedByMarginWithFees)}`
-                }`}
-              </Text>
+
+          {/* Simulações por canal */}
+          {channelSimulations.length > 0 && (
+            <View style={{marginTop: 8}}>
+              <Text style={[styles.label, {marginBottom: 10}]}>Simulações</Text>
+              {channelSimulations.map((sim, idx) => (
+                <View key={`sim-${sim.channel}-${idx}`} style={styles.simCard}>
+                  <Text style={styles.simChannel}>
+                    {CHANNEL_OPTIONS.find(o => o.value === sim.channel)?.label || sim.channel}
+                  </Text>
+                  <View style={styles.simRow}>
+                    <Text style={styles.simItem}>Custo total no canal</Text>
+                    <Text style={styles.simValue}>{`R$ ${fmtBRL(sim.unitCost)}`}</Text>
+                  </View>
+                  <View style={styles.simRow}>
+                    <Text style={styles.simItem}>Margem líquida (preço por markup)</Text>
+                    <Text style={styles.simValue}>{`${fmtBRL(sim.netMarginOnMarkup)}%`}</Text>
+                  </View>
+                  <View style={styles.simRow}>
+                    <Text style={styles.simItem}>Preço sugerido (margem com taxas)</Text>
+                    <Text style={styles.simValue}>
+                      {sim.suggestedByMarginWithFees === null
+                        ? 'inválido (rever comissão/margem)'
+                        : `R$ ${fmtBRL(sim.suggestedByMarginWithFees)}`}
+                    </Text>
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
+          )}
         </View>
 
-        {!!status && <Text style={{color: '#1b7f34', marginBottom: 8}}>{status}</Text>}
-        {!!error && <Text style={{color: '#b00020', marginBottom: 8}}>{error}</Text>}
+      </ScrollView>
 
+      {/* Footer fixo com botões */}
+      <View style={styles.footer}>
         <TouchableOpacity
           onPress={recalculateFromBom}
-          disabled={calculating || source !== 'auto_bom' || !hasBomGroups}
-          style={{
-            backgroundColor: source === 'auto_bom' && hasBomGroups ? '#1b5e20' : '#666',
-            padding: 12,
-            borderRadius: 6,
-            alignItems: 'center',
-            marginBottom: 12,
-          }}>
-          <Text style={{color: '#fff'}}>
-            {calculating ? 'Recalculando...' : 'Recalcular custo pela BOM'}
+          disabled={bomBtnDisabled}
+          style={[styles.footerBtnSecondary, bomBtnDisabled && styles.btnDisabled]}>
+          <MaterialCommunityIcons name="calculator-variant-outline" size={15} color="#fff" style={{marginRight: 6}} />
+          <Text style={styles.btnText}>
+            {calculating ? 'Recalculando...' : 'Recalcular BOM'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           onPress={persistPricing}
           disabled={saving}
-          style={{
-            backgroundColor: '#000',
-            padding: 12,
-            borderRadius: 6,
-            alignItems: 'center',
-          }}>
-          <Text style={{color: '#fff'}}>{saving ? 'Salvando...' : 'Salvar Snapshot'}</Text>
+          style={[styles.footerBtnPrimary, {backgroundColor: brandColors?.primary || '#2563EB'}, saving && styles.btnDisabled]}>
+          <MaterialCommunityIcons name="content-save-outline" size={15} color="#fff" style={{marginRight: 6}} />
+          <Text style={styles.btnText}>{saving ? 'Salvando...' : 'Salvar Snapshot'}</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  emptyContainer: {
+    padding: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 4,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 13,
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  selectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectButtonText: {
+    fontSize: 15,
+    color: '#0F172A',
+    flex: 1,
+  },
+  row2col: {
+    flexDirection: 'row',
+  },
+  col: {
+    flex: 1,
+  },
+  footer: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    padding: 12,
+    backgroundColor: '#fff',
+    gap: 10,
+  },
+  footerBtnPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  footerBtnSecondary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1b5e20',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  btnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  btnSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1b5e20',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 4,
+  },
+  btnDestructive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginTop: 4,
+  },
+  btnAddChannel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#2563EB',
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    marginTop: 10,
+    backgroundColor: '#EFF6FF',
+  },
+  btnAddChannelText: {
+    color: '#2563EB',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  emptyCardText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    marginBottom: 8,
+  },
+  alertWarning: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  alertWarningText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+  },
+  alertDanger: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF3F3',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 4,
+  },
+  alertDangerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#B91C1C',
+  },
+  alertOutdated: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  alertOutdatedText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400E',
+  },
+  msgSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  msgSuccessText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#166534',
+  },
+  msgError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3F3',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  msgErrorText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#9e1b1b',
+  },
+  costSummaryCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 4,
+  },
+  costSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  costSummaryLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#166534',
+    flex: 1,
+  },
+  costSummaryValueMain: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  costSummaryItem: {
+    fontSize: 12,
+    color: '#475569',
+    flex: 1,
+  },
+  costSummaryValue: {
+    fontSize: 13,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  costSummaryDivider: {
+    height: 1,
+    backgroundColor: '#D1FAE5',
+    marginVertical: 8,
+  },
+  channelCard: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: '#F8FAFC',
+  },
+  simCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  simChannel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#166534',
+    marginBottom: 6,
+  },
+  simRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  simItem: {
+    fontSize: 12,
+    color: '#475569',
+    flex: 1,
+  },
+  simValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  modalOptionSelected: {
+    backgroundColor: '#EFF6FF',
+  },
+  modalOptionText: {
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  modalOptionTextSelected: {
+    color: '#2563EB',
+    fontWeight: '700',
+  },
+});
 
 export default ProductPricingForm;

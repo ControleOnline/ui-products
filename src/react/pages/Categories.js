@@ -143,7 +143,7 @@ const CategoriesPage = () => {
 
   return (
     <SafeAreaView style={[orderStyles.container, styles.container]}>
-      <StateStore store="categories" />
+      {!loading && <StateStore store="categories" />}
 
       <ScrollView
         style={styles.scroll}

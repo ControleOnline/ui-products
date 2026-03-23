@@ -1,13 +1,17 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {ScrollView, Text, TextInput, TouchableOpacity, View, Switch} from 'react-native';
+import {ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {useStore} from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
+import {resolveThemePalette} from '@controleonline/../../src/styles/branding';
+import {MaterialCommunityIcons} from '@expo/vector-icons';
 
 const toInt = value => {
   if (value === null || value === undefined || value === '') return null;
   const n = parseInt(String(value).replace(/\D/g, ''), 10);
   return Number.isNaN(n) ? null : n;
 };
+
+const fmtBRL = v => { const n = parseFloat(String(v || 0).replace(',', '.')); return isNaN(n) ? '0,00' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
 
 const toInventoryId = row =>
   String(
@@ -32,6 +36,8 @@ const ProductStockForm = ({ProductId}) => {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const inventoriesRequestCompanyRef = useRef(null);
+
+  const brandColors = useMemo(() => resolveThemePalette(), []);
 
   useEffect(() => {
     if (!ProductId) return;
@@ -60,7 +66,6 @@ const ProductStockForm = ({ProductId}) => {
     inventoriesActions
       .getItems({company: currentCompany.id})
       .catch(() => {
-        // Allow retry after a failed request.
         inventoriesRequestCompanyRef.current = null;
       });
   }, [currentCompany?.id, inventoriesGetters.items?.length]);
@@ -239,139 +244,432 @@ const ProductStockForm = ({ProductId}) => {
 
   if (!ProductId) {
     return (
-      <View style={{padding: 16}}>
-        <Text>Salve o produto para habilitar a aba Estoque.</Text>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Salve o produto para habilitar a aba Estoque.</Text>
       </View>
     );
   }
 
-  const inputStyle = {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 12,
-  };
-
   return (
-    <View style={{flex: 1}}>
+    <View style={styles.container}>
       <StateStore store="products" />
-      <ScrollView contentContainerStyle={{padding: 16}}>
-        <Text style={{marginBottom: 8, fontWeight: '600'}}>Políticas de Estoque</Text>
-        <Text style={{color: '#666', marginBottom: 8}}>
-          Mínimos e reposição operacionais devem ser configurados por inventário abaixo.
-        </Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
 
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
-          <Text style={{flex: 1}}>Controla estoque</Text>
-          <Switch
-            value={Boolean(stock.controlsStock)}
-            onValueChange={v => updateStock('controlsStock', v)}
-          />
-        </View>
-
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
-          <Text style={{flex: 1}}>Permitir estoque negativo</Text>
-          <Switch
-            value={Boolean(stock.allowNegativeStock)}
-            onValueChange={v => updateStock('allowNegativeStock', v)}
-          />
-        </View>
-
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
-          <Text style={{flex: 1}}>Reservar no pedido</Text>
-          <Switch
-            value={Boolean(stock.reserveOnOrder)}
-            onValueChange={v => updateStock('reserveOnOrder', v)}
-          />
-        </View>
-
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 10}}>
-          <Text style={{flex: 1}}>Baixa automática no confirmado</Text>
-          <Switch
-            value={Boolean(stock.autoDeductOnConfirm)}
-            onValueChange={v => updateStock('autoDeductOnConfirm', v)}
-          />
-        </View>
-
-        <Text style={{color: '#666', marginBottom: 8}}>
-          Os limites mínimos/máximos devem ser definidos por inventário (depósito, geladeira, almoxarifado).
-        </Text>
-
-        <Text style={{fontWeight: '600', marginBottom: 8}}>Parâmetros por Inventário</Text>
-        {inventoryPolicyRows.length === 0 ? (
-          <Text style={{color: '#666', marginBottom: 12}}>Sem inventários disponíveis para configurar.</Text>
-        ) : (
-          inventoryPolicyRows.map((row, idx) => {
-            const inventoryId = String(row.inventoryId || '').trim();
-            if (!inventoryId) return null;
-            const policy = inventoryPolicies[inventoryId] || {};
-            const available = row?.snapshot?.available;
-            const unit = row?.snapshot?.productUnit || '';
-            return (
-              <View key={`policy-${inventoryId}-${idx}`} style={{borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 10}}>
-                <Text style={{fontWeight: '600', marginBottom: 6}}>{row.inventoryName || `Inventário ${inventoryId}`}</Text>
-                <Text style={{color: '#666', marginBottom: 6}}>
-                  {`Disponível atual: ${available === undefined || available === null ? '-' : available} ${unit}`}
-                </Text>
-                <Text>Mínimo neste inventário</Text>
-                <TextInput
-                  style={inputStyle}
-                  value={String(policy.minimum || '')}
-                  onChangeText={v => updateInventoryPolicy(inventoryId, 'minimum', v)}
-                  keyboardType="numeric"
-                />
-                <Text>Máximo neste inventário</Text>
-                <TextInput
-                  style={inputStyle}
-                  value={String(policy.maximum || '')}
-                  onChangeText={v => updateInventoryPolicy(inventoryId, 'maximum', v)}
-                  keyboardType="numeric"
-                />
-                <Text>Ponto de reposição neste inventário</Text>
-                <TextInput
-                  style={inputStyle}
-                  value={String(policy.reorderPoint || '')}
-                  onChangeText={v => updateInventoryPolicy(inventoryId, 'reorderPoint', v)}
-                  keyboardType="numeric"
-                />
-                <Text>Lead time (dias) neste inventário</Text>
-                <TextInput
-                  style={inputStyle}
-                  value={String(policy.leadTimeDays || '')}
-                  onChangeText={v => updateInventoryPolicy(inventoryId, 'leadTimeDays', v)}
-                  keyboardType="numeric"
-                />
-              </View>
-            );
-          })
+        {/* Mensagens de status e erro */}
+        {!!status && (
+          <View style={styles.msgSuccess}>
+            <MaterialCommunityIcons name="check-circle-outline" size={16} color="#166534" style={{marginRight: 6}} />
+            <Text style={styles.msgSuccessText}>{status}</Text>
+          </View>
+        )}
+        {!!error && (
+          <View style={styles.msgError}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#9e1b1b" style={{marginRight: 6}} />
+            <Text style={styles.msgErrorText}>{error}</Text>
+          </View>
         )}
 
-        {!!status && <Text style={{color: '#1b7f34', marginBottom: 8}}>{status}</Text>}
-        {!!error && <Text style={{color: '#b00020', marginBottom: 8}}>{error}</Text>}
+        {/* Card: Configurações de Estoque (switches) */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Configurações de Estoque</Text>
 
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabelBlock}>
+              <MaterialCommunityIcons name="package-variant-closed" size={18} color="#475569" style={{marginRight: 10}} />
+              <Text style={styles.switchLabel}>Controla estoque</Text>
+            </View>
+            <Switch
+              value={Boolean(stock.controlsStock)}
+              onValueChange={v => updateStock('controlsStock', v)}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabelBlock}>
+              <MaterialCommunityIcons name="minus-circle-outline" size={18} color="#475569" style={{marginRight: 10}} />
+              <Text style={styles.switchLabel}>Permitir estoque negativo</Text>
+            </View>
+            <Switch
+              value={Boolean(stock.allowNegativeStock)}
+              onValueChange={v => updateStock('allowNegativeStock', v)}
+            />
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabelBlock}>
+              <MaterialCommunityIcons name="bookmark-outline" size={18} color="#475569" style={{marginRight: 10}} />
+              <Text style={styles.switchLabel}>Reservar no pedido</Text>
+            </View>
+            <Switch
+              value={Boolean(stock.reserveOnOrder)}
+              onValueChange={v => updateStock('reserveOnOrder', v)}
+            />
+          </View>
+
+          <View style={[styles.switchRow, {borderBottomWidth: 0}]}>
+            <View style={styles.switchLabelBlock}>
+              <MaterialCommunityIcons name="check-all" size={18} color="#475569" style={{marginRight: 10}} />
+              <Text style={styles.switchLabel}>Baixa automática no confirmado</Text>
+            </View>
+            <Switch
+              value={Boolean(stock.autoDeductOnConfirm)}
+              onValueChange={v => updateStock('autoDeductOnConfirm', v)}
+            />
+          </View>
+        </View>
+
+        {/* Card: Parâmetros por Inventário */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Parâmetros por Inventário</Text>
+
+          <Text style={styles.cardHint}>
+            Os limites mínimos/máximos devem ser definidos por inventário (depósito, geladeira, almoxarifado).
+          </Text>
+
+          {inventoryPolicyRows.length === 0 ? (
+            <Text style={styles.emptyCardText}>Sem inventários disponíveis para configurar.</Text>
+          ) : (
+            inventoryPolicyRows.map((row, idx) => {
+              const inventoryId = String(row.inventoryId || '').trim();
+              if (!inventoryId) return null;
+              const policy = inventoryPolicies[inventoryId] || {};
+              const available = row?.snapshot?.available;
+              const unit = row?.snapshot?.productUnit || '';
+              const availableText =
+                available === undefined || available === null
+                  ? '-'
+                  : `${fmtBRL(available)}${unit ? ` ${unit}` : ''}`;
+
+              return (
+                <View key={`policy-${inventoryId}-${idx}`} style={styles.inventoryCard}>
+                  <View style={styles.inventoryCardHeader}>
+                    <View style={styles.inventoryCardTitleBlock}>
+                      <MaterialCommunityIcons name="warehouse" size={16} color="#475569" style={{marginRight: 6}} />
+                      <Text style={styles.inventoryCardTitle}>
+                        {row.inventoryName || `Inventário ${inventoryId}`}
+                      </Text>
+                    </View>
+                    <View style={styles.availableBadge}>
+                      <Text style={styles.availableBadgeText}>{availableText}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.row2col}>
+                    <View style={styles.col}>
+                      <Text style={styles.label}>Mínimo</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={String(policy.minimum || '')}
+                        onChangeText={v => updateInventoryPolicy(inventoryId, 'minimum', v)}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#CBD5E1"
+                      />
+                    </View>
+                    <View style={[styles.col, {marginLeft: 10}]}>
+                      <Text style={styles.label}>Máximo</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={String(policy.maximum || '')}
+                        onChangeText={v => updateInventoryPolicy(inventoryId, 'maximum', v)}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#CBD5E1"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={styles.row2col}>
+                    <View style={styles.col}>
+                      <Text style={styles.label}>Ponto de reposição</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={String(policy.reorderPoint || '')}
+                        onChangeText={v => updateInventoryPolicy(inventoryId, 'reorderPoint', v)}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#CBD5E1"
+                      />
+                    </View>
+                    <View style={[styles.col, {marginLeft: 10}]}>
+                      <Text style={styles.label}>Lead time (dias)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={String(policy.leadTimeDays || '')}
+                        onChangeText={v => updateInventoryPolicy(inventoryId, 'leadTimeDays', v)}
+                        keyboardType="numeric"
+                        placeholder="0"
+                        placeholderTextColor="#CBD5E1"
+                      />
+                    </View>
+                  </View>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* Card: Snapshot por Inventário */}
+        <View style={styles.card}>
+          <Text style={styles.sectionHeader}>Snapshot por Inventário</Text>
+
+          {inventoryRows.length === 0 ? (
+            <View style={styles.snapshotEmpty}>
+              <MaterialCommunityIcons name="archive-outline" size={28} color="#CBD5E1" style={{marginBottom: 6}} />
+              <Text style={styles.emptyCardText}>Sem registros de estoque para este produto.</Text>
+            </View>
+          ) : (
+            inventoryRows.map((row, idx) => (
+              <View key={`${row.inventory_name}-${idx}`} style={styles.snapshotCard}>
+                <View style={styles.snapshotCardHeader}>
+                  <MaterialCommunityIcons name="cube-outline" size={16} color="#166534" style={{marginRight: 6}} />
+                  <Text style={styles.snapshotCardTitle}>{row.inventory_name}</Text>
+                </View>
+                <View style={styles.snapshotRow}>
+                  <Text style={styles.snapshotItem}>Disponível</Text>
+                  <Text style={styles.snapshotValue}>
+                    {`${fmtBRL(row.available)} ${row.productUnit || ''}`}
+                  </Text>
+                </View>
+                <View style={styles.snapshotRow}>
+                  <Text style={styles.snapshotItem}>Empresa</Text>
+                  <Text style={styles.snapshotValue}>{row.company_name || '-'}</Text>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+      </ScrollView>
+
+      {/* Footer fixo com botão Salvar */}
+      <View style={styles.footer}>
         <TouchableOpacity
           onPress={saveStock}
           disabled={saving}
-          style={{backgroundColor: '#000', padding: 12, borderRadius: 6, alignItems: 'center', marginBottom: 18}}>
-          <Text style={{color: '#fff'}}>{saving ? 'Salvando...' : 'Salvar Estoque'}</Text>
+          style={[styles.footerBtnPrimary, {backgroundColor: brandColors?.primary || '#2563EB'}, saving && styles.btnDisabled]}>
+          <MaterialCommunityIcons name="content-save-outline" size={15} color="#fff" style={{marginRight: 6}} />
+          <Text style={styles.btnText}>{saving ? 'Salvando...' : 'Salvar Estoque'}</Text>
         </TouchableOpacity>
-
-        <Text style={{fontWeight: '600', marginBottom: 8}}>Snapshot por Inventário</Text>
-        {inventoryRows.length === 0 ? (
-          <Text style={{color: '#666'}}>Sem registros de estoque para este produto.</Text>
-        ) : (
-          inventoryRows.map((row, idx) => (
-            <View key={`${row.inventory_name}-${idx}`} style={{borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, marginBottom: 8}}>
-              <Text style={{fontWeight: '600'}}>{row.inventory_name}</Text>
-              <Text>{`Disponível: ${row.available} ${row.productUnit || ''}`}</Text>
-              <Text>{`Empresa: ${row.company_name || '-'}`}</Text>
-            </View>
-          ))
-        )}
-      </ScrollView>
+      </View>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+  emptyContainer: {
+    padding: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: {width: 0, height: 2},
+    shadowRadius: 4,
+  },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 14,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    padding: 13,
+    fontSize: 15,
+    color: '#0F172A',
+    marginBottom: 12,
+  },
+  row2col: {
+    flexDirection: 'row',
+  },
+  col: {
+    flex: 1,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  switchLabelBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  switchLabel: {
+    fontSize: 14,
+    color: '#334155',
+    fontWeight: '500',
+  },
+  cardHint: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  emptyCardText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  inventoryCard: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    backgroundColor: '#F8FAFC',
+  },
+  inventoryCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  inventoryCardTitleBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  inventoryCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E293B',
+    flex: 1,
+  },
+  availableBadge: {
+    backgroundColor: '#DBEAFE',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginLeft: 8,
+  },
+  availableBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  snapshotEmpty: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  snapshotCard: {
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+  snapshotCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  snapshotCardTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#166534',
+  },
+  snapshotRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  snapshotItem: {
+    fontSize: 12,
+    color: '#475569',
+    flex: 1,
+  },
+  snapshotValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  footer: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  footerBtnPrimary: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  btnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  msgSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  msgSuccessText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#166534',
+  },
+  msgError: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF3F3',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  msgErrorText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#9e1b1b',
+  },
+});
 
 export default ProductStockForm;
