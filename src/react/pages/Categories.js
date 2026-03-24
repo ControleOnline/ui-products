@@ -22,6 +22,18 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
 
+/*
+ * Sentinel para "Sem Categoria".
+ * Não é uma categoria real — é um filtro especial que mostra produtos
+ * sem nenhuma categoria vinculada.
+ */
+export const NO_CATEGORY_SENTINEL = {
+  id: '__no_category__',
+  '@id': '__no_category__',
+  name: 'Sem Categoria',
+  _isNoCategory: true,
+}
+
 const SkeletonCard = ({ width }) => (
   <View style={{ width }}>
     <View style={[skeletonStyles.card, { aspectRatio: 3 / 4 }]} />
@@ -180,13 +192,29 @@ const CategoriesPage = () => {
           )}
 
           {/* Grid */}
-          {!loading && items.length > 0 && (
+          {!loading && (
             <>
-              <Text style={styles.countLabel}>
-                {items.length} {items.length === 1 ? 'categoria' : 'categorias'}
-              </Text>
+              {items.length > 0 && (
+                <Text style={styles.countLabel}>
+                  {items.length} {items.length === 1 ? 'categoria' : 'categorias'}
+                </Text>
+              )}
 
               <View style={[styles.grid, { gap }]}>
+                {/* Card fixo "Sem Categoria" — sempre exibido */}
+                <View style={{ width: cardWidth }}>
+                  <TouchableOpacity
+                    style={styles.cardTouchable}
+                    onPress={() => changeCategory(NO_CATEGORY_SENTINEL)}
+                    activeOpacity={0.88}
+                  >
+                    <View style={[styles.noCategoryCard, { aspectRatio: 3 / 4 }]}>
+                      <MaterialCommunityIcons name="tag-off-outline" size={32} color="#94A3B8" />
+                      <Text style={styles.noCategoryName}>Sem{'\n'}Categoria</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
                 {items.map(category => (
                   <View key={category.id} style={{ width: cardWidth }}>
                     <TouchableOpacity
@@ -390,6 +418,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.40)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  /* ─── card sem categoria ─── */
+  noCategoryCard: {
+    width: '100%',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  noCategoryName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 18,
   },
 
   emptyContainer: {

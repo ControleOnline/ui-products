@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { NO_CATEGORY_SENTINEL } from './Categories';
 import {
   ScrollView,
   View,
@@ -70,8 +71,17 @@ const ProductsPage = ({ navigation, route }) => {
 
   const isManager = env.APP_TYPE === 'MANAGER';
 
+  /* detecta se a "categoria" selecionada é o sentinel de produtos sem categoria */
+  const isNoCategory = category?._isNoCategory === true ||
+    category?.['@id'] === '__no_category__';
+
   const changeCategoryProduct = (p, changeStorage = false) => {
+    /* não persiste o cache para o sentinel "Sem Categoria" */
+    if (isNoCategory) { setCategoryProducts(p); return; }
+
     const index = categories.findIndex(c => c['@id'] === category['@id']);
+    if (index < 0) { setCategoryProducts(p); return; }
+
     let c = [...categories];
     c[index]['products'] = p;
     setCategoryProducts(p);
@@ -82,10 +92,43 @@ const ProductsPage = ({ navigation, route }) => {
   };
 
   useEffect(() => {
+    if (!category) return;
+
+    const baseParams = {
+      active: 1,
+      'order[product]': 'ASC',
+      'order[description]': 'ASC',
+      company: currentCompany?.id,
+      type: ['custom', 'product', 'manufactured', 'service'],
+    };
+
+    if (isNoCategory) {
+      /*
+       * Filtro "Sem Categoria": busca produtos sem nenhuma categoria vinculada.
+       * Usa o ExistsFilter do API Platform: productCategory[exists]=false
+       */
+      if (!categoryProducts || categoryProducts.length === 0) {
+        setLoading(true);
+        actions
+          .getItems({
+            ...baseParams,
+            'productCategory[exists]': false,
+          })
+          .then(data => {
+            setCategoryProducts(data || []);
+            setLoading(false);
+          })
+          .catch(() => setLoading(false));
+      } else {
+        setLoading(false);
+      }
+      return;
+    }
+
+    /* fluxo normal com categoria real */
     if (
       categories &&
       categories.length > 0 &&
-      category &&
       category['@id'] &&
       (!categoryProducts || categoryProducts.length === 0)
     ) {
@@ -93,36 +136,31 @@ const ProductsPage = ({ navigation, route }) => {
 
       if (
         index >= 0 &&
-        categories[index] &&
-        categories[index]['products'] &&
-        categories[index]['products'].length > 0
+        categories[index]?.products?.length > 0
       ) {
         setCategoryProducts(categories[index]['products']);
         setLoading(false);
       } else {
         actions
           .getItems({
+            ...baseParams,
             'productCategory.category': category['@id'],
-            active: 1,
-            'order[product]': 'ASC',
-            'order[description]': 'ASC',
-            company: currentCompany?.id,
-            type: ['custom', 'product', 'manufactured', 'service'],
           })
           .then(data => {
             if (data && Object.keys(data).length > 0)
               changeCategoryProduct(data, true);
             setLoading(false);
-          });
+          })
+          .catch(() => setLoading(false));
       }
     } else if (categories && categories.length > 0) {
       setLoading(false);
     } else {
-      // categories ainda não carregadas — aguarda sem travar na tela
+      /* categories ainda não carregadas — aguarda sem travar na tela */
       const timer = setTimeout(() => setLoading(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [category, categories, categoryProducts]);
+  }, [category, categories, categoryProducts, isNoCategory]);
 
   useFocusEffect(
     useCallback(() => {
@@ -171,13 +209,21 @@ const ProductsPage = ({ navigation, route }) => {
       {!loading && categoryProducts.length === 0 && !error && (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
-            <MaterialCommunityIcons name="package-variant-closed" size={48} color="#CBD5E1" />
+            <MaterialCommunityIcons
+              name={isNoCategory ? 'tag-off-outline' : 'package-variant-closed'}
+              size={48}
+              color="#CBD5E1"
+            />
           </View>
-          <Text style={styles.emptyTitle}>Nenhum produto</Text>
+          <Text style={styles.emptyTitle}>
+            {isNoCategory ? 'Nenhum produto sem categoria' : 'Nenhum produto'}
+          </Text>
           <Text style={styles.emptySubtitle}>
-            {isManager
-              ? 'Adicione o primeiro produto a esta categoria'
-              : 'Nenhum produto disponível nesta categoria'}
+            {isNoCategory
+              ? 'Todos os produtos já estão categorizados.'
+              : isManager
+                ? 'Adicione o primeiro produto a esta categoria'
+                : 'Nenhum produto disponível nesta categoria'}
           </Text>
         </View>
       )}
