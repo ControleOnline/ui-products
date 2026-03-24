@@ -2,6 +2,7 @@ import React, { useCallback, useState, useMemo, useRef } from 'react'
 import {
   Text,
   View,
+  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -11,7 +12,6 @@ import {
 import { useStore } from '@store'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import css from '@controleonline/ui-orders/src/react/css/orders'
-import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel'
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { env } from '@env'
@@ -21,6 +21,13 @@ import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedM
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
+
+const buildCoverUrl = files => {
+  const first = (files || []).find(item => item?.file?.id)
+  if (!first) return null
+  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
+  return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`
+}
 
 /*
  * Sentinel para "Sem Categoria".
@@ -228,7 +235,13 @@ const CategoriesPage = () => {
                           { backgroundColor: category.color || '#CBD5E1' },
                         ]}
                       >
-                        <Carousel images={category.categoryFiles || []} style={{ flex: 1 }} />
+                        {!!buildCoverUrl(category.categoryFiles) ? (
+                          <Image
+                            source={{ uri: buildCoverUrl(category.categoryFiles) }}
+                            style={styles.cardCoverImage}
+                            resizeMode="cover"
+                          />
+                        ) : null}
 
                         <View style={styles.cardOverlay}>
                           <Text style={styles.cardOverlayName} numberOfLines={2}>
@@ -377,6 +390,16 @@ const styles = StyleSheet.create({
       android: { elevation: 4 },
       web: { boxShadow: '0 4px 16px rgba(0,0,0,0.10)' },
     }),
+  },
+
+  cardCoverImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
 
   cardOverlay: {

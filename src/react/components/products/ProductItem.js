@@ -1,15 +1,24 @@
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Platform, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { env } from '@env';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
 import { APP_ENV } from '@controleonline/../../config/env.js';
 
+const buildCoverUrl = files => {
+  const first = (files || []).find(item => item?.file?.id)
+  if (!first) return null
+  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
+  return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`
+}
+
 const ProductItem = ({ product, category }) => {
   const navigation = useNavigation();
-  const hasImage = product.productFiles && product.productFiles.length > 0;
+  const coverUrl = buildCoverUrl(product.productFiles)
+  const hasImage = !!coverUrl
 
   const renderAction = () => {
     if (product.type === 'custom') {
@@ -32,7 +41,16 @@ const ProductItem = ({ product, category }) => {
     <View style={styles.card}>
       {hasImage && (
         <View style={styles.imageWrap}>
-          <Carousel images={product.productFiles} style={{ flex: 1 }} />
+          <Image
+            source={{ uri: coverUrl }}
+            style={styles.coverImage}
+            resizeMode="cover"
+          />
+        </View>
+      )}
+      {!hasImage && (
+        <View style={[styles.imageWrap, styles.imageWrapEmpty]}>
+          <MaterialCommunityIcons name="image-outline" size={28} color="#CBD5E1" />
         </View>
       )}
 
@@ -88,6 +106,15 @@ const styles = StyleSheet.create({
     height: 100,
     backgroundColor: '#F1F5F9',
     flexShrink: 0,
+    overflow: 'hidden',
+  },
+  imageWrapEmpty: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  coverImage: {
+    width: '100%',
+    height: '100%',
   },
 
   body: {
