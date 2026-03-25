@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Modal,
   useWindowDimensions,
 } from 'react-native'
 import { useStore } from '@store'
@@ -21,6 +22,8 @@ import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedM
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
+import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports';
+import Icon from 'react-native-vector-icons/FontAwesome';
 
 const buildCoverUrl = (files, coverRelationId) => {
   const arr = files || []
@@ -53,6 +56,7 @@ const SkeletonCard = ({ width }) => (
 )
 
 const CategoriesPage = () => {
+  const [showImportModal, setShowImportModal] = useState(false);
   const navigation = useNavigation()
   const { width } = useWindowDimensions()
 
@@ -65,7 +69,9 @@ const CategoriesPage = () => {
 
   const themeStore = useStore('theme')
   const { colors: themeColors } = themeStore.getters
-
+  const openImport = () => {
+    setShowImportModal(true);
+  };
   const brandColors = useMemo(
     () => resolveThemePalette(
       { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
@@ -164,7 +170,26 @@ const CategoriesPage = () => {
         ]}
       >
         <View style={{ width: containerWidth, paddingHorizontal: gap / 2, paddingTop: 16, paddingBottom: 0 }}>
-
+          <Modal
+            visible={showImportModal}
+            animationType="slide"
+            transparent={false}
+          >
+            <ImportsPage
+              context={{
+                "context": "products",
+                "title": "Importação de Produtos",
+                "searchPlaceholder": "Buscar importações de produtos..."
+              }}
+              onClose={() => setShowImportModal(false)}
+            />
+          </Modal>
+          <TouchableOpacity
+            style={styles.importButton}
+            onPress={openImport}
+          >
+            <Icon name="file-excel-o" size={18} color="#2E7D32" />
+          </TouchableOpacity>
           {/* Skeleton loading */}
           {loading && (
             <View style={[styles.grid, { gap }]}>
