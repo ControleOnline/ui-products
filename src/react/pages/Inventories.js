@@ -18,6 +18,15 @@ import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
 import InventoryForm from '@controleonline/ui-products/src/react/components/InventoryForm';
 
+/* Sentinel para produtos sem local de estoque */
+export const NO_INVENTORY_SENTINEL = {
+  id: '__no_inventory__',
+  '@id': '__no_inventory__',
+  inventory: 'Sem Local',
+  type: null,
+  _isNoInventory: true,
+};
+
 const TYPE_CONFIG = {
   default:   { label: 'Padrão',   icon: 'home-outline', color: '#3B82F6', bg: '#EFF6FF' },
   warehouse: { label: 'Depósito', icon: 'warehouse',     color: '#D97706', bg: '#FFFBEB' },
@@ -75,7 +84,7 @@ const InventoriesPage = () => {
   useFocusEffect(useCallback(() => { loadInventories(); }, [loadInventories]));
 
   const openCreate = () => { setSelectedInventory(null); setModalVisible(true); };
-  const openEdit = inv => { setSelectedInventory(inv); setModalVisible(true); };
+  const openEdit   = inv => { setSelectedInventory(inv); setModalVisible(true); };
   const closeModal = () => { setModalVisible(false); setSelectedInventory(null); };
 
   const handleSaved = async () => {
@@ -83,16 +92,11 @@ const InventoriesPage = () => {
     await loadInventories();
   };
 
-  const getColumns = () => {
-    if (width < 640) return 2;
-    if (width < 960) return 3;
-    return 4;
-  };
-  const columns = getColumns();
-  const maxContentWidth = 1280;
-  const containerWidth = Math.min(width, maxContentWidth);
-  const gap = 12;
-  const cardWidth = (containerWidth - (columns + 1) * gap) / columns;
+  const getColumns  = () => width < 640 ? 2 : width < 960 ? 3 : 4;
+  const columns     = getColumns();
+  const maxW        = Math.min(width, 1280);
+  const gap         = 12;
+  const cardWidth   = (maxW - (columns + 1) * gap) / columns;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -102,7 +106,7 @@ const InventoriesPage = () => {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 84 }]}
       >
-        <View style={{ width: containerWidth, paddingHorizontal: gap / 2, paddingTop: 16 }}>
+        <View style={{ width: maxW, paddingHorizontal: gap / 2, paddingTop: 16 }}>
 
           {/* Skeleton */}
           {loading && (
@@ -127,12 +131,30 @@ const InventoriesPage = () => {
           )}
 
           {/* Grid */}
-          {!loading && inventories.length > 0 && (
+          {!loading && (
             <>
-              <Text style={styles.countLabel}>
-                {inventories.length} {inventories.length === 1 ? 'local' : 'locais'}
-              </Text>
+              {inventories.length > 0 && (
+                <Text style={styles.countLabel}>
+                  {inventories.length} {inventories.length === 1 ? 'local' : 'locais'}
+                </Text>
+              )}
+
               <View style={[styles.grid, { gap }]}>
+                {/* Card fixo "Sem Local de Estoque" */}
+                <View style={{ width: cardWidth }}>
+                  <TouchableOpacity
+                    style={styles.cardTouchable}
+                    onPress={() => navigation.navigate('InventoryDetail', { inventory: NO_INVENTORY_SENTINEL })}
+                    activeOpacity={0.88}
+                  >
+                    <View style={[styles.noInventoryCard, { aspectRatio: 1 }]}>
+                      <MaterialCommunityIcons name="archive-off-outline" size={28} color="#94A3B8" />
+                      <Text style={styles.noInventoryName}>{'Sem\nLocal'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Cards dos locais */}
                 {inventories.map(inv => {
                   const typeConf = TYPE_CONFIG[inv.type] || TYPE_CONFIG.default;
                   return (
@@ -144,23 +166,14 @@ const InventoriesPage = () => {
                       >
                         <View style={[styles.card, { aspectRatio: 1 }]}>
                           <View style={[styles.cardIconWrap, { backgroundColor: typeConf.bg }]}>
-                            <MaterialCommunityIcons
-                              name={typeConf.icon}
-                              size={28}
-                              color={typeConf.color}
-                            />
+                            <MaterialCommunityIcons name={typeConf.icon} size={28} color={typeConf.color} />
                           </View>
-
-                          <Text style={styles.cardName} numberOfLines={2}>
-                            {inv.inventory}
-                          </Text>
-
+                          <Text style={styles.cardName} numberOfLines={2}>{inv.inventory}</Text>
                           <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
                             <Text style={[styles.typeChipText, { color: typeConf.color }]}>
                               {typeConf.label}
                             </Text>
                           </View>
-
                           <TouchableOpacity
                             onPress={() => openEdit(inv)}
                             style={styles.editOverlay}
@@ -179,7 +192,6 @@ const InventoriesPage = () => {
         </View>
       </ScrollView>
 
-      {/* Botão Adicionar */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}
@@ -191,7 +203,6 @@ const InventoriesPage = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Modal criar/editar */}
       <AnimatedModal
         visible={modalVisible}
         onRequestClose={closeModal}
@@ -206,17 +217,11 @@ const InventoriesPage = () => {
               <MaterialCommunityIcons name="close" size={18} color="#64748B" />
             </TouchableOpacity>
           </View>
-
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
             <View style={styles.modalBody}>
-              <InventoryForm
-                ref={formRef}
-                inventory={selectedInventory}
-                onSaved={handleSaved}
-              />
+              <InventoryForm ref={formRef} inventory={selectedInventory} onSaved={handleSaved} />
             </View>
           </ScrollView>
-
           <View style={styles.modalFooter}>
             <TouchableOpacity style={styles.modalCancelButton} onPress={closeModal}>
               <Text style={styles.modalCancelButtonText}>Cancelar</Text>
@@ -237,44 +242,24 @@ const InventoriesPage = () => {
 };
 
 const skeletonStyles = StyleSheet.create({
-  card: {
-    width: '100%',
-    borderRadius: 20,
-    backgroundColor: '#E2E8F0',
-  },
+  card: { width: '100%', borderRadius: 20, backgroundColor: '#E2E8F0' },
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center' },
 
   countLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginBottom: 14,
-    letterSpacing: 0.3,
+    fontSize: 13, fontWeight: '600', color: '#94A3B8',
+    marginBottom: 14, letterSpacing: 0.3,
   },
-
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-  },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-start' },
 
   cardTouchable: { width: '100%' },
   card: {
-    width: '100%',
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    padding: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    width: '100%', borderRadius: 20, backgroundColor: '#fff',
+    padding: 14, alignItems: 'center', justifyContent: 'center', gap: 8,
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10 },
       android: { elevation: 3 },
@@ -282,81 +267,47 @@ const styles = StyleSheet.create({
     }),
   },
   cardIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 56, height: 56, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
   },
-  cardName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-    textAlign: 'center',
-    lineHeight: 17,
-  },
-  typeChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  typeChipText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
+  cardName: { fontSize: 13, fontWeight: '700', color: '#1E293B', textAlign: 'center', lineHeight: 17 },
+  typeChip: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 8 },
+  typeChipText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   editOverlay: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 10, right: 10,
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center',
+  },
+
+  /* card Sem Local */
+  noInventoryCard: {
+    width: '100%', borderRadius: 20,
+    borderWidth: 2, borderStyle: 'dashed', borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center', justifyContent: 'center', gap: 10,
+  },
+  noInventoryName: {
+    fontSize: 13, fontWeight: '700', color: '#94A3B8',
+    textAlign: 'center', lineHeight: 18,
   },
 
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    paddingHorizontal: 32,
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 80, paddingHorizontal: 32,
   },
   emptyIconWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 96, height: 96, borderRadius: 48,
     backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 20,
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#334155',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#334155', marginBottom: 8, textAlign: 'center' },
+  emptySubtitle: { fontSize: 14, color: '#94A3B8', textAlign: 'center', lineHeight: 20 },
 
   bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
+    borderTopWidth: 1, borderTopColor: '#F1F5F9',
     ...Platform.select({
       web: { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
@@ -364,25 +315,15 @@ const styles = StyleSheet.create({
     }),
   },
   bottomBarButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, borderRadius: 14,
   },
-  bottomBarButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
+  bottomBarButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   modalContainer: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    width: '100%',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '90%', width: '100%',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
       android: { elevation: 10 },
@@ -390,61 +331,29 @@ const styles = StyleSheet.create({
     }),
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 20,
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
   headerCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center',
   },
   modalScroll: { flexShrink: 1 },
   modalBody: { padding: 24 },
   modalFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    flexDirection: 'row', gap: 12,
+    paddingHorizontal: 24, paddingVertical: 16,
+    borderTopWidth: 1, borderTopColor: '#F1F5F9',
   },
   modalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#94A3B8',
-    alignItems: 'center',
+    flex: 1, paddingVertical: 14, borderRadius: 12,
+    borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center',
   },
-  modalCancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  modalSaveButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalSaveButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
+  modalCancelButtonText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  modalSaveButton: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  modalSaveButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
 
 export default InventoriesPage;

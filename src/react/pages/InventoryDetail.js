@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,11 +18,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
 
-/* ─── Configurações visuais ─────────────────────────────────────────── */
+/* ─── helpers ──────────────────────────────────────────────────────── */
 
 const INV_TYPE_CONFIG = {
-  default:      { label: 'Padrão',   icon: 'home-outline', color: '#3B82F6', bg: '#EFF6FF' },
-  warehouse:    { label: 'Depósito', icon: 'warehouse',     color: '#D97706', bg: '#FFFBEB' },
+  default:   { label: 'Padrão',   icon: 'home-outline', color: '#3B82F6', bg: '#EFF6FF' },
+  warehouse: { label: 'Depósito', icon: 'warehouse',     color: '#D97706', bg: '#FFFBEB' },
 };
 
 const PRODUCT_TYPE_CONFIG = {
@@ -35,25 +35,24 @@ const PRODUCT_TYPE_CONFIG = {
   manufactured: { label: 'Fabricado',     color: '#D97706', bg: '#FFFBEB' },
 };
 
+const MOVEMENT_OPS = [
+  { key: 'in',       label: 'Entrada',       icon: 'arrow-down-circle',    color: '#16A34A', bg: '#F0FDF4' },
+  { key: 'out',      label: 'Saída',         icon: 'arrow-up-circle',      color: '#DC2626', bg: '#FEF2F2' },
+  { key: 'transfer', label: 'Transferência', icon: 'swap-horizontal-circle', color: '#7C3AED', bg: '#F5F3FF' },
+];
+
 const fmtN = v => {
   const n = parseFloat(String(v ?? 0).replace(',', '.'));
   return isNaN(n) ? '0' : n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 };
 
-/* extrai dados do campo `product` que pode ser IRI ou objeto */
+/* extrai id/nome/tipo/sku do campo product (IRI ou objeto) */
 const extractProduct = p => {
   if (!p) return { id: null, name: null, type: null, sku: null };
   if (typeof p === 'object') {
-    return {
-      id:   p.id || null,
-      name: p.product || null,
-      type: p.type || null,
-      sku:  p.sku || null,
-    };
+    return { id: p.id || null, name: p.product || null, type: p.type || null, sku: p.sku || null };
   }
-  /* é uma string IRI como "/products/15" */
-  const id = String(p).replace(/\D/g, '') || null;
-  return { id, name: null, type: null, sku: null };
+  return { id: String(p).replace(/\D/g, '') || null, name: null, type: null, sku: null };
 };
 
 /* ─── Skeleton ──────────────────────────────────────────────────────── */
@@ -64,9 +63,371 @@ const SkeletonRow = () => (
       <View style={[skeletonStyles.line, { width: '60%', height: 13 }]} />
       <View style={[skeletonStyles.line, { width: '35%', height: 10 }]} />
     </View>
-    <View style={[skeletonStyles.line, { width: 48, height: 36 }]} />
+    <View style={[skeletonStyles.line, { width: 52, height: 40 }]} />
   </View>
 );
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Modal de Movimentação — definido fora para estabilidade de referência
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const MovementModal = ({
+  visible,
+  row,
+  inventories,
+  brandColors,
+  productInvStore,
+  onClose,
+  onMoved,
+}) => {
+  const [op, setOp]           = useState('in');
+  const [qty, setQty]         = useState('');
+  const [destInv, setDestInv] = useState(null);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState('');
+
+  const resetAndClose = () => {
+    setOp('in'); setQty(''); setDestInv(null); setError(''); setSaving(false);
+    onClose();
+  };
+
+  const productName = row ? (extractProduct(row.product).name || `#${row.id}`) : '';
+
+  const confirm = async () => {
+    const amount = parseFloat(String(qty).replace(',', '.'));
+    if (!amount || amount <= 0) { setError('Informe uma quantidade válida'); return; }
+    if (op === 'transfer' && !destInv) { setError('Selecione o local de destino'); return; }
+
+    setSaving(true);
+    setError('');
+    try {
+      const curAvail = parseFloat(row?.available ?? 0);
+
+      if (op === 'in') {
+        /* Entrada: aumenta disponível */
+        if (row.id) {
+          await productInvStore.actions.save({ id: row.id, available: curAvail + amount });
+        } else {
+          /* ainda não há registro — cria */
+          const { id: prodId } = extractProduct(row.product);
+          await productInvStore.actions.save({
+            inventory: row._inventoryIRI,
+            product:   `/products/${prodId}`,
+            available: amount,
+          });
+        }
+        onMoved({ rowId: row.id, delta: amount, op });
+      } else if (op === 'out') {
+        /* Saída: diminui disponível */
+        if (row.id) {
+          await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
+        }
+        onMoved({ rowId: row.id, delta: -amount, op });
+      } else if (op === 'transfer') {
+        /* Transferência: diminui origem, aumenta destino */
+        if (row.id) {
+          await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
+        }
+
+        /* localiza ou cria PI no destino */
+        const { id: prodId } = extractProduct(row.product);
+        const destPiData = await productInvStore.actions.getItems({
+          'inventory': `/inventories/${destInv.id}`,
+          'product':   `/products/${prodId}`,
+        }).catch(() => []);
+
+        const destPi = (destPiData || [])[0];
+        if (destPi) {
+          await productInvStore.actions.save({
+            id: destPi.id,
+            available: parseFloat(destPi.available ?? 0) + amount,
+          });
+        } else {
+          await productInvStore.actions.save({
+            inventory: `/inventories/${destInv.id}`,
+            product:   `/products/${prodId}`,
+            available: amount,
+          });
+        }
+        onMoved({ rowId: row.id, delta: -amount, op });
+      }
+
+      resetAndClose();
+    } catch (e) {
+      setError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro na movimentação');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatedModal visible={visible} onRequestClose={resetAndClose} style={{ justifyContent: 'flex-end' }}>
+      <View style={movStyles.container}>
+        <View style={movStyles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={movStyles.title}>Movimentação</Text>
+            <Text style={movStyles.subtitle} numberOfLines={1}>{productName}</Text>
+          </View>
+          <TouchableOpacity onPress={resetAndClose} style={movStyles.closeBtn}>
+            <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
+          <View style={movStyles.body}>
+            {!!error && (
+              <View style={movStyles.errorBanner}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#DC2626" />
+                <Text style={movStyles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            {/* Saldo atual */}
+            <View style={movStyles.balanceRow}>
+              <Text style={movStyles.balanceLabel}>Saldo atual</Text>
+              <Text style={movStyles.balanceValue}>{fmtN(row?.available)}</Text>
+            </View>
+
+            {/* Tipo de operação */}
+            <View style={movStyles.opsRow}>
+              {MOVEMENT_OPS.map(opt => {
+                const active = op === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[movStyles.opChip, active && { backgroundColor: opt.bg, borderColor: opt.color }]}
+                    onPress={() => { setOp(opt.key); setError(''); }}
+                    activeOpacity={0.75}
+                  >
+                    <MaterialCommunityIcons
+                      name={opt.icon}
+                      size={18}
+                      color={active ? opt.color : '#94A3B8'}
+                    />
+                    <Text style={[movStyles.opLabel, active && { color: opt.color }]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Quantidade */}
+            <View style={movStyles.field}>
+              <Text style={movStyles.fieldLabel}>Quantidade</Text>
+              <TextInput
+                style={[
+                  movStyles.qtyInput,
+                  op === 'in'  && { borderColor: '#16A34A', color: '#16A34A' },
+                  op === 'out' && { borderColor: '#DC2626', color: '#DC2626' },
+                  op === 'transfer' && { borderColor: '#7C3AED', color: '#7C3AED' },
+                ]}
+                value={qty}
+                onChangeText={v => { setQty(v); setError(''); }}
+                keyboardType="numeric"
+                placeholder="0"
+                placeholderTextColor="#CBD5E1"
+                selectTextOnFocus
+              />
+            </View>
+
+            {/* Destino (transferência) */}
+            {op === 'transfer' && (
+              <View style={movStyles.field}>
+                <Text style={movStyles.fieldLabel}>Local de Destino</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+                  <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+                    {inventories.map(inv => {
+                      const sel = destInv?.id === inv.id;
+                      return (
+                        <TouchableOpacity
+                          key={inv.id}
+                          style={[movStyles.destChip, sel && movStyles.destChipActive]}
+                          onPress={() => { setDestInv(inv); setError(''); }}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[movStyles.destChipText, sel && movStyles.destChipTextActive]}>
+                            {inv.inventory}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Prévia do resultado */}
+            {!!qty && parseFloat(qty) > 0 && (
+              <View style={movStyles.previewBox}>
+                <MaterialCommunityIcons name="calculator-variant-outline" size={14} color="#64748B" />
+                <Text style={movStyles.previewText}>
+                  {op === 'in'
+                    ? `${fmtN(row?.available)} + ${fmtN(qty)} = ${fmtN(parseFloat(row?.available ?? 0) + parseFloat(qty))}`
+                    : op === 'out'
+                      ? `${fmtN(row?.available)} - ${fmtN(qty)} = ${fmtN(Math.max(0, parseFloat(row?.available ?? 0) - parseFloat(qty)))}`
+                      : `Saída: ${fmtN(Math.max(0, parseFloat(row?.available ?? 0) - parseFloat(qty)))} | Entrada no destino: +${fmtN(qty)}`
+                  }
+                </Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        <View style={movStyles.footer}>
+          <TouchableOpacity style={movStyles.cancelBtn} onPress={resetAndClose}>
+            <Text style={movStyles.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              movStyles.confirmBtn,
+              op === 'in'       && { backgroundColor: '#16A34A' },
+              op === 'out'      && { backgroundColor: '#DC2626' },
+              op === 'transfer' && { backgroundColor: '#7C3AED' },
+              saving && { opacity: 0.7 },
+            ]}
+            onPress={confirm}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={movStyles.confirmText}>Confirmar</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    </AnimatedModal>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Modal de Edição Direta dos Saldos (mínimo/máximo/disponível)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const EditStockModal = ({ visible, row, brandColors, productInvStore, onClose, onSaved }) => {
+  const [available, setAvailable] = useState('');
+  const [minimum, setMinimum]     = useState('');
+  const [maximum, setMaximum]     = useState('');
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState('');
+
+  const resetAndOpen = () => {
+    setAvailable(String(row?.available ?? 0));
+    setMinimum(String(row?.minimum ?? 0));
+    setMaximum(String(row?.maximum ?? 0));
+    setError('');
+  };
+
+  /* re-populate ao abrir */
+  useEffect(() => { if (visible && row) resetAndOpen(); }, [visible, row?.id]);
+
+  const save = async () => {
+    setSaving(true); setError('');
+    try {
+      await productInvStore.actions.save({
+        id:        row.id,
+        available: parseFloat(String(available).replace(',', '.')) || 0,
+        minimum:   parseFloat(String(minimum).replace(',', '.'))   || 0,
+        maximum:   parseFloat(String(maximum).replace(',', '.'))   || 0,
+      });
+      onSaved({
+        available: parseFloat(String(available).replace(',', '.')) || 0,
+        minimum:   parseFloat(String(minimum).replace(',', '.'))   || 0,
+        maximum:   parseFloat(String(maximum).replace(',', '.'))   || 0,
+      });
+      onClose();
+    } catch (e) {
+      setError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao salvar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatedModal visible={visible} onRequestClose={onClose} style={{ justifyContent: 'flex-end' }}>
+      <View style={editStyles.container}>
+        <View style={editStyles.header}>
+          <View style={{ flex: 1 }}>
+            <Text style={editStyles.title}>Editar Saldos</Text>
+            <Text style={editStyles.subtitle} numberOfLines={1}>
+              {row ? (extractProduct(row.product).name || `#${row.id}`) : ''}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={editStyles.closeBtn}>
+            <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+        <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
+          <View style={editStyles.body}>
+            {!!error && (
+              <View style={editStyles.errorBanner}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#DC2626" />
+                <Text style={editStyles.errorText}>{error}</Text>
+              </View>
+            )}
+            <View style={editStyles.fieldsRow}>
+              <View style={editStyles.field}>
+                <Text style={editStyles.label}>Disponível</Text>
+                <TextInput
+                  style={[editStyles.input, editStyles.inputHighlight]}
+                  value={available}
+                  onChangeText={setAvailable}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                  selectTextOnFocus
+                />
+              </View>
+              <View style={editStyles.field}>
+                <Text style={editStyles.label}>Mínimo</Text>
+                <TextInput
+                  style={editStyles.input}
+                  value={minimum}
+                  onChangeText={setMinimum}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                  selectTextOnFocus
+                />
+              </View>
+              <View style={editStyles.field}>
+                <Text style={editStyles.label}>Máximo</Text>
+                <TextInput
+                  style={editStyles.input}
+                  value={maximum}
+                  onChangeText={setMaximum}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#94A3B8"
+                  selectTextOnFocus
+                />
+              </View>
+            </View>
+            <View style={editStyles.infoBox}>
+              <MaterialCommunityIcons name="information-outline" size={14} color="#64748B" />
+              <Text style={editStyles.infoText}>
+                Vendas, pedidos e trânsito são atualizados automaticamente pelo sistema.
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+        <View style={editStyles.footer}>
+          <TouchableOpacity style={editStyles.cancelBtn} onPress={onClose}>
+            <Text style={editStyles.cancelText}>Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[editStyles.saveBtn, { backgroundColor: brandColors?.primary }, saving && { opacity: 0.7 }]}
+            onPress={save}
+            disabled={saving}
+          >
+            {saving
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Text style={editStyles.saveText}>Salvar</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    </AnimatedModal>
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════════════
    Página principal
@@ -74,14 +435,16 @@ const SkeletonRow = () => (
 
 const InventoryDetailPage = ({ route }) => {
   const { inventory } = route.params;
+  const isNoInventory = inventory?._isNoInventory === true;
   const { width } = useWindowDimensions();
 
-  const productsStore        = useStore('products');
-  const productInvStore      = useStore('product_inventories');
-  const peopleStore          = useStore('people');
-  const themeStore           = useStore('theme');
+  const productsStore   = useStore('products');
+  const productInvStore = useStore('product_inventories');
+  const peopleStore     = useStore('people');
+  const invStore        = useStore('inventories');
+  const themeStore      = useStore('theme');
 
-  const { currentCompany }   = peopleStore.getters;
+  const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
 
   const brandColors = useMemo(
@@ -92,53 +455,126 @@ const InventoryDetailPage = ({ route }) => {
     [themeColors, currentCompany?.id],
   );
 
-  const maxContentWidth = 860;
-  const containerWidth  = Math.min(width, maxContentWidth);
+  const maxW = Math.min(width, 860);
 
-  /* ── estado principal ── */
-  const [loading, setLoading]       = useState(true);
-  const [rows, setRows]             = useState([]);   /* registros product_inventories */
-  const [search, setSearch]         = useState('');
+  /* ── estado ── */
+  const [loading, setLoading]   = useState(true);
+  const [rows, setRows]         = useState([]);
+  const [allInvs, setAllInvs]   = useState([]);   /* para transferências */
+  const [search, setSearch]     = useState('');
 
-  /* ── modal ajuste de saldo ── */
-  const [editVisible, setEditVisible]   = useState(false);
-  const [editRow, setEditRow]           = useState(null);
-  const [editAvailable, setEditAvailable] = useState('');
-  const [editMinimum, setEditMinimum]   = useState('');
-  const [editMaximum, setEditMaximum]   = useState('');
-  const [saving, setSaving]             = useState(false);
-  const [saveError, setSaveError]       = useState('');
+  /* modais */
+  const [movRow, setMovRow]         = useState(null);
+  const [editRow, setEditRow]       = useState(null);
+  const [addVisible, setAddVisible] = useState(false);
 
-  /* ── modal adicionar produto ── */
-  const [addVisible, setAddVisible]     = useState(false);
-  const [productSearch, setProductSearch] = useState('');
+  /* modal adicionar */
+  const [productSearch, setProductSearch]   = useState('');
   const [productResults, setProductResults] = useState([]);
-  const [searching, setSearching]       = useState(false);
+  const [searching, setSearching]           = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [addAvailable, setAddAvailable] = useState('0');
-  const [addMinimum, setAddMinimum]     = useState('0');
-  const [addMaximum, setAddMaximum]     = useState('0');
-  const [addSaving, setAddSaving]       = useState(false);
-  const [addError, setAddError]         = useState('');
+  const [addAvail, setAddAvail]   = useState('0');
+  const [addMin, setAddMin]       = useState('0');
+  const [addMax, setAddMax]       = useState('0');
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError]   = useState('');
 
-  /* ── carrega product_inventories filtrado pelo inventory ── */
+  /* ─── carregamento mesclado ─────────────────────────────────────── */
+
   const loadRows = useCallback(async () => {
+    if (!currentCompany?.id) { setLoading(false); return; }
     setLoading(true);
     try {
-      const data = await productInvStore.actions.getItems({
-        'inventory': `/inventories/${inventory.id}`,
+      if (isNoInventory) {
+        /* Produtos sem local: defaultIn e defaultOut ambos ausentes */
+        const data = await productsStore.actions.getItems({
+          company: currentCompany.id,
+          'defaultOutInventory[exists]': false,
+          'defaultInInventory[exists]':  false,
+          active: 1,
+          'order[product]': 'ASC',
+        });
+        /* mapeia para o mesmo shape de row, sem id de PI */
+        setRows((data || []).map(p => ({
+          id: null,
+          product: p,
+          available: 0, sales: 0, ordered: 0, transit: 0, minimum: 0, maximum: 0,
+          _noInventory: true,
+        })));
+        return;
+      }
+
+      const invIRI = `/inventories/${inventory.id}`;
+
+      /* carrega em paralelo: PI records + produtos por defaultOut + defaultIn */
+      const [piData, prodsOut, prodsIn, invData] = await Promise.all([
+        productInvStore.actions.getItems({ 'inventory': invIRI }),
+        productsStore.actions.getItems({
+          company: currentCompany.id,
+          defaultOutInventory: invIRI,
+          active: 1,
+        }).catch(() => []),
+        productsStore.actions.getItems({
+          company: currentCompany.id,
+          defaultInInventory: invIRI,
+          active: 1,
+        }).catch(() => []),
+        invStore.actions.getItems({ people: currentCompany.id, 'order[inventory]': 'ASC' }).catch(() => []),
+      ]);
+
+      /* inventários disponíveis para transferência (exclui o atual) */
+      setAllInvs((invData || []).filter(i => i.id !== inventory.id));
+
+      /* mapa product_id → PI record */
+      const piById = new Map();
+      (piData || []).forEach(pi => {
+        const { id } = extractProduct(pi.product);
+        if (id) piById.set(String(id), pi);
       });
-      setRows(data || []);
+
+      /* mapa product_id → product object (dos linked) */
+      const linkedProds = new Map();
+      [...(prodsOut || []), ...(prodsIn || [])].forEach(p => {
+        linkedProds.set(String(p.id), p);
+      });
+
+      const merged = [];
+      const seen   = new Set();
+
+      /* primeiro: PI records enriquecidos com o objeto de produto se disponível */
+      (piData || []).forEach(pi => {
+        const { id } = extractProduct(pi.product);
+        const key = id ? String(id) : `pi_${pi.id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const enrichedProduct = linkedProds.get(String(id)) || pi.product;
+        merged.push({ ...pi, product: enrichedProduct, _inventoryIRI: invIRI });
+      });
+
+      /* depois: produtos vinculados sem PI record ainda */
+      linkedProds.forEach((product, pid) => {
+        if (seen.has(pid)) return;
+        seen.add(pid);
+        merged.push({
+          id: null,
+          product,
+          available: 0, sales: 0, ordered: 0, transit: 0, minimum: 0, maximum: 0,
+          _inventoryIRI: invIRI,
+        });
+      });
+
+      setRows(merged);
     } catch (_) {
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [inventory.id]);
+  }, [currentCompany?.id, inventory.id, isNoInventory]);
 
   useFocusEffect(useCallback(() => { loadRows(); }, [loadRows]));
 
-  /* ── filtragem local por nome ── */
+  /* ─── filtro busca ─────────────────────────────────────────────── */
+
   const filteredRows = useMemo(() => {
     if (!search.trim()) return rows;
     const q = search.trim().toLowerCase();
@@ -148,152 +584,118 @@ const InventoryDetailPage = ({ route }) => {
     });
   }, [rows, search]);
 
-  /* ── modal editar saldo ── */
-  const openEdit = row => {
-    setEditRow(row);
-    setEditAvailable(String(row.available ?? 0));
-    setEditMinimum(String(row.minimum ?? 0));
-    setEditMaximum(String(row.maximum ?? 0));
-    setSaveError('');
-    setEditVisible(true);
-  };
-  const closeEdit = () => { setEditVisible(false); setEditRow(null); setSaveError(''); };
+  /* ─── movimentação callback ────────────────────────────────────── */
 
-  const handleSaveStock = async () => {
-    if (!editRow) return;
-    setSaving(true);
-    setSaveError('');
-    try {
-      await productInvStore.actions.save({
-        id:        editRow.id,
-        available: parseFloat(String(editAvailable).replace(',', '.')) || 0,
-        minimum:   parseFloat(String(editMinimum).replace(',', '.'))   || 0,
-        maximum:   parseFloat(String(editMaximum).replace(',', '.'))   || 0,
-      });
-      setRows(prev => prev.map(r =>
-        r.id === editRow.id
-          ? {
-              ...r,
-              available: parseFloat(String(editAvailable).replace(',', '.')) || 0,
-              minimum:   parseFloat(String(editMinimum).replace(',', '.'))   || 0,
-              maximum:   parseFloat(String(editMaximum).replace(',', '.'))   || 0,
-            }
-          : r
-      ));
-      closeEdit();
-    } catch (e) {
-      setSaveError(
-        e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao salvar'
-      );
-    } finally {
-      setSaving(false);
-    }
+  const handleMoved = ({ rowId, delta }) => {
+    setRows(prev => prev.map(r =>
+      r.id === rowId
+        ? { ...r, available: Math.max(0, parseFloat(r.available ?? 0) + delta) }
+        : r
+    ));
   };
 
-  /* ── modal adicionar produto ── */
+  /* ─── edição direta ────────────────────────────────────────────── */
+
+  const handleEditSaved = (values) => {
+    setRows(prev => prev.map(r =>
+      r.id === editRow?.id ? { ...r, ...values } : r
+    ));
+  };
+
+  /* ─── adicionar produto ────────────────────────────────────────── */
+
   const openAdd = () => {
-    setProductSearch('');
-    setProductResults([]);
+    setProductSearch(''); setProductResults([]);
     setSelectedProduct(null);
-    setAddAvailable('0');
-    setAddMinimum('0');
-    setAddMaximum('0');
+    setAddAvail('0'); setAddMin('0'); setAddMax('0');
     setAddError('');
     setAddVisible(true);
   };
-  const closeAdd = () => { setAddVisible(false); setSelectedProduct(null); setAddError(''); };
 
-  /* busca produtos enquanto digita */
   const searchProducts = useCallback(async (q) => {
     if (!q.trim() || !currentCompany?.id) { setProductResults([]); return; }
     setSearching(true);
     try {
       const data = await productsStore.actions.getItems({
-        company: currentCompany.id,
-        product: q.trim(),
-        active: 1,
-        itemsPerPage: 20,
+        company: currentCompany.id, product: q.trim(), active: 1, itemsPerPage: 20,
       });
-      /* exclui produtos já adicionados */
-      const existingIds = new Set(rows.map(r => {
-        const { id } = extractProduct(r.product);
-        return String(id);
-      }));
-      const filtered = (data || []).filter(p => !existingIds.has(String(p.id)));
-      setProductResults(filtered);
-    } catch (_) {
-      setProductResults([]);
-    } finally {
-      setSearching(false);
-    }
+      const existingIds = new Set(rows.map(r => String(extractProduct(r.product).id)));
+      setProductResults((data || []).filter(p => !existingIds.has(String(p.id))));
+    } catch (_) { setProductResults([]); }
+    finally { setSearching(false); }
   }, [currentCompany?.id, rows]);
 
-  const handleProductSearchChange = (v) => {
+  const handleProdSearchChange = (v) => {
     setProductSearch(v);
     if (selectedProduct) setSelectedProduct(null);
-    clearTimeout(handleProductSearchChange._timer);
-    handleProductSearchChange._timer = setTimeout(() => searchProducts(v), 350);
-  };
-
-  const handleProductSelect = (product) => {
-    setSelectedProduct(product);
-    setProductSearch(product.product);
-    setProductResults([]);
+    clearTimeout(handleProdSearchChange._t);
+    handleProdSearchChange._t = setTimeout(() => searchProducts(v), 350);
   };
 
   const handleAddToInventory = async () => {
     if (!selectedProduct) { setAddError('Selecione um produto'); return; }
-    setAddSaving(true);
-    setAddError('');
+    setAddSaving(true); setAddError('');
     try {
       const saved = await productInvStore.actions.save({
         inventory: `/inventories/${inventory.id}`,
         product:   `/products/${selectedProduct.id}`,
-        available: parseFloat(String(addAvailable).replace(',', '.')) || 0,
-        minimum:   parseFloat(String(addMinimum).replace(',', '.'))   || 0,
-        maximum:   parseFloat(String(addMaximum).replace(',', '.'))   || 0,
+        available: parseFloat(String(addAvail).replace(',', '.')) || 0,
+        minimum:   parseFloat(String(addMin).replace(',', '.'))   || 0,
+        maximum:   parseFloat(String(addMax).replace(',', '.'))   || 0,
       });
-      /* insere com o objeto product inline para evitar re-fetch */
-      setRows(prev => [...prev, {
-        ...saved,
-        product: selectedProduct,
-      }]);
-      closeAdd();
+      setRows(prev => {
+        /* se já existia como row virtual (sem id), substitui */
+        const idx = prev.findIndex(r => String(extractProduct(r.product).id) === String(selectedProduct.id));
+        const newRow = { ...saved, product: selectedProduct, _inventoryIRI: `/inventories/${inventory.id}` };
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = newRow;
+          return next;
+        }
+        return [...prev, newRow];
+      });
+      setAddVisible(false);
     } catch (e) {
-      setAddError(
-        e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao adicionar'
-      );
-    } finally {
-      setAddSaving(false);
-    }
+      setAddError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao adicionar');
+    } finally { setAddSaving(false); }
   };
 
-  /* ── render ── */
+  /* ─── render ─────────────────────────────────────────────────── */
+
   const invConf = INV_TYPE_CONFIG[inventory.type] || INV_TYPE_CONFIG.default;
 
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Cabeçalho do inventário */}
-      <View style={styles.inventoryHeader}>
-        <View style={[styles.inventoryIconWrap, { backgroundColor: invConf.bg }]}>
-          <MaterialCommunityIcons name={invConf.icon} size={22} color={invConf.color} />
+      {/* Cabeçalho */}
+      <View style={styles.invHeader}>
+        <View style={[styles.invIconWrap, isNoInventory
+          ? { backgroundColor: '#F1F5F9' }
+          : { backgroundColor: invConf.bg }
+        ]}>
+          <MaterialCommunityIcons
+            name={isNoInventory ? 'archive-off-outline' : invConf.icon}
+            size={22}
+            color={isNoInventory ? '#94A3B8' : invConf.color}
+          />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.inventoryName}>{inventory.inventory}</Text>
-          <View style={[styles.typeChip, { backgroundColor: invConf.bg }]}>
-            <Text style={[styles.typeChipText, { color: invConf.color }]}>{invConf.label}</Text>
-          </View>
+          <Text style={styles.invName}>{inventory.inventory}</Text>
+          {!isNoInventory && (
+            <View style={[styles.typeChip, { backgroundColor: invConf.bg }]}>
+              <Text style={[styles.typeChipText, { color: invConf.color }]}>{invConf.label}</Text>
+            </View>
+          )}
         </View>
         <View style={styles.totalBadge}>
-          <Text style={styles.totalBadgeLabel}>produtos</Text>
-          <Text style={styles.totalBadgeCount}>{rows.length}</Text>
+          <Text style={styles.totalLabel}>produtos</Text>
+          <Text style={styles.totalCount}>{rows.length}</Text>
         </View>
       </View>
 
       {/* Busca */}
       {!loading && rows.length > 0 && (
-        <View style={styles.searchWrap}>
+        <View style={styles.searchBar}>
           <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
@@ -314,7 +716,7 @@ const InventoryDetailPage = ({ route }) => {
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 84 }]}
       >
-        <View style={{ width: containerWidth, paddingHorizontal: 16, paddingTop: 8 }}>
+        <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 8 }}>
 
           {/* Skeleton */}
           {loading && (
@@ -325,13 +727,21 @@ const InventoryDetailPage = ({ route }) => {
 
           {/* Empty */}
           {!loading && rows.length === 0 && (
-            <View style={styles.emptyContainer}>
+            <View style={styles.empty}>
               <View style={styles.emptyIconWrap}>
-                <MaterialCommunityIcons name="archive-outline" size={48} color="#CBD5E1" />
+                <MaterialCommunityIcons
+                  name={isNoInventory ? 'check-circle-outline' : 'archive-outline'}
+                  size={48}
+                  color="#CBD5E1"
+                />
               </View>
-              <Text style={styles.emptyTitle}>Nenhum produto</Text>
+              <Text style={styles.emptyTitle}>
+                {isNoInventory ? 'Todos os produtos têm local' : 'Nenhum produto'}
+              </Text>
               <Text style={styles.emptySubtitle}>
-                Adicione produtos a este local para controlar os saldos.
+                {isNoInventory
+                  ? 'Todos os produtos já estão vinculados a um local de estoque.'
+                  : 'Adicione produtos a este local para controlar os saldos.'}
               </Text>
             </View>
           )}
@@ -340,7 +750,9 @@ const InventoryDetailPage = ({ route }) => {
           {!loading && filteredRows.length > 0 && (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <Text style={styles.cardHeaderText}>Saldos de Estoque</Text>
+                <Text style={styles.cardHeaderLabel}>
+                  {isNoInventory ? 'Produtos sem local' : 'Saldos de Estoque'}
+                </Text>
                 <Text style={styles.cardHeaderCount}>
                   {filteredRows.length} {filteredRows.length === 1 ? 'produto' : 'produtos'}
                   {search ? ` · "${search}"` : ''}
@@ -349,15 +761,16 @@ const InventoryDetailPage = ({ route }) => {
 
               {filteredRows.map((row, idx) => {
                 const { name, type, sku } = extractProduct(row.product);
-                const ptConf = PRODUCT_TYPE_CONFIG[type] || null;
-                const isLow  = row.minimum > 0 && row.available <= row.minimum;
+                const ptConf  = PRODUCT_TYPE_CONFIG[type] || null;
+                const isLow   = row.minimum > 0 && row.available <= row.minimum;
+                const hasPI   = !!row.id;
 
                 return (
                   <View
-                    key={row.id || idx}
+                    key={row.id || `vr_${idx}`}
                     style={[styles.productRow, idx < filteredRows.length - 1 && styles.productRowDivider]}
                   >
-                    <View style={styles.productRowLeft}>
+                    <View style={styles.rowLeft}>
                       <Text style={styles.productName} numberOfLines={1}>
                         {name || `Produto #${extractProduct(row.product).id}`}
                       </Text>
@@ -368,44 +781,62 @@ const InventoryDetailPage = ({ route }) => {
                           </View>
                         )}
                         {!!sku && <Text style={styles.skuText}>SKU {sku}</Text>}
+                        {!hasPI && (
+                          <View style={styles.noPiChip}>
+                            <Text style={styles.noPiText}>sem saldo</Text>
+                          </View>
+                        )}
                       </View>
 
-                      <View style={styles.stockGrid}>
-                        <View style={styles.stockCell}>
-                          <Text style={styles.stockCellLabel}>Vendas</Text>
-                          <Text style={styles.stockCellValue}>{fmtN(row.sales)}</Text>
+                      {!isNoInventory && hasPI && (
+                        <View style={styles.stockGrid}>
+                          {[
+                            { label: 'Vendas',   val: row.sales },
+                            { label: 'Pedidos',  val: row.ordered },
+                            { label: 'Trânsito', val: row.transit },
+                            { label: 'Mínimo',   val: row.minimum },
+                            { label: 'Máximo',   val: row.maximum },
+                          ].map(cell => (
+                            <View key={cell.label} style={styles.stockCell}>
+                              <Text style={styles.stockCellLabel}>{cell.label}</Text>
+                              <Text style={styles.stockCellValue}>{fmtN(cell.val)}</Text>
+                            </View>
+                          ))}
                         </View>
-                        <View style={styles.stockCell}>
-                          <Text style={styles.stockCellLabel}>Pedidos</Text>
-                          <Text style={styles.stockCellValue}>{fmtN(row.ordered)}</Text>
-                        </View>
-                        <View style={styles.stockCell}>
-                          <Text style={styles.stockCellLabel}>Trânsito</Text>
-                          <Text style={styles.stockCellValue}>{fmtN(row.transit)}</Text>
-                        </View>
-                        <View style={styles.stockCell}>
-                          <Text style={styles.stockCellLabel}>Mínimo</Text>
-                          <Text style={styles.stockCellValue}>{fmtN(row.minimum)}</Text>
-                        </View>
-                        <View style={styles.stockCell}>
-                          <Text style={styles.stockCellLabel}>Máximo</Text>
-                          <Text style={styles.stockCellValue}>{fmtN(row.maximum)}</Text>
-                        </View>
-                      </View>
+                      )}
                     </View>
 
-                    <View style={styles.productRowRight}>
-                      <View style={[styles.availableBadge, isLow && styles.availableBadgeLow]}>
-                        <Text style={[styles.availableValue, isLow && styles.availableValueLow]}>
-                          {fmtN(row.available)}
-                        </Text>
-                        <Text style={[styles.availableLabel, isLow && styles.availableLabelLow]}>
-                          disp.
-                        </Text>
-                      </View>
-                      <TouchableOpacity style={styles.editBtn} onPress={() => openEdit(row)} activeOpacity={0.75}>
-                        <MaterialCommunityIcons name="pencil-outline" size={15} color="#64748B" />
-                      </TouchableOpacity>
+                    {/* Direita: disponível + ações */}
+                    <View style={styles.rowRight}>
+                      {!isNoInventory && (
+                        <View style={[styles.availBadge, isLow && styles.availBadgeLow]}>
+                          <Text style={[styles.availValue, isLow && styles.availValueLow]}>
+                            {fmtN(row.available)}
+                          </Text>
+                          <Text style={[styles.availLabel, isLow && styles.availLabelLow]}>disp.</Text>
+                        </View>
+                      )}
+
+                      {!isNoInventory && (
+                        <View style={styles.actionBtns}>
+                          <TouchableOpacity
+                            style={[styles.actionBtn, { backgroundColor: '#F0FDF4' }]}
+                            onPress={() => setMovRow(row)}
+                            activeOpacity={0.75}
+                          >
+                            <MaterialCommunityIcons name="swap-vertical" size={15} color="#16A34A" />
+                          </TouchableOpacity>
+                          {hasPI && (
+                            <TouchableOpacity
+                              style={[styles.actionBtn, { backgroundColor: '#F8FAFC' }]}
+                              onPress={() => setEditRow(row)}
+                              activeOpacity={0.75}
+                            >
+                              <MaterialCommunityIcons name="pencil-outline" size={15} color="#64748B" />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
                     </View>
                   </View>
                 );
@@ -413,174 +844,101 @@ const InventoryDetailPage = ({ route }) => {
             </View>
           )}
 
-          {/* Sem resultado de busca */}
           {!loading && rows.length > 0 && filteredRows.length === 0 && (
-            <View style={styles.emptyContainer}>
+            <View style={styles.empty}>
               <MaterialCommunityIcons name="magnify-close" size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>Nenhum resultado</Text>
-              <Text style={styles.emptySubtitle}>Nenhum produto encontrado para "{search}".</Text>
+              <Text style={styles.emptySubtitle}>Nenhum produto para "{search}".</Text>
             </View>
           )}
         </View>
       </ScrollView>
 
-      {/* Botão adicionar produto */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}
-          onPress={openAdd}
-          activeOpacity={0.85}
-        >
-          <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-          <Text style={styles.bottomBarButtonText}>Adicionar Produto</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Modal: ajuste de saldo ──────────────────────────────────── */}
-      <AnimatedModal visible={editVisible} onRequestClose={closeEdit} style={{ justifyContent: 'flex-end' }}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.modalTitle}>Ajustar Saldo</Text>
-              {editRow && (
-                <Text style={styles.modalSubtitle} numberOfLines={1}>
-                  {extractProduct(editRow?.product).name || `#${editRow?.id}`}
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity onPress={closeEdit} style={styles.headerCloseButton}>
-              <MaterialCommunityIcons name="close" size={18} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalBody}>
-              {!!saveError && (
-                <View style={styles.errorBanner}>
-                  <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#DC2626" />
-                  <Text style={styles.errorBannerText}>{saveError}</Text>
-                </View>
-              )}
-              <View style={styles.editFieldsGrid}>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Disponível</Text>
-                  <TextInput
-                    style={[styles.editInput, styles.editInputHighlight]}
-                    value={editAvailable}
-                    onChangeText={setEditAvailable}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
-                    selectTextOnFocus
-                  />
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Mínimo</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editMinimum}
-                    onChangeText={setEditMinimum}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
-                    selectTextOnFocus
-                  />
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Máximo</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={editMaximum}
-                    onChangeText={setEditMaximum}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
-                    selectTextOnFocus
-                  />
-                </View>
-              </View>
-              <View style={styles.editInfoBox}>
-                <MaterialCommunityIcons name="information-outline" size={14} color="#64748B" />
-                <Text style={styles.editInfoText}>
-                  Vendas, pedidos e trânsito são atualizados automaticamente pelo sistema.
-                </Text>
-              </View>
-            </View>
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.modalCancelButton} onPress={closeEdit}>
-              <Text style={styles.modalCancelButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalSaveButton, { backgroundColor: brandColors.primary }, saving && { opacity: 0.7 }]}
-              onPress={handleSaveStock}
-              disabled={saving}
-            >
-              {saving
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.modalSaveButtonText}>Salvar</Text>
-              }
-            </TouchableOpacity>
-          </View>
+      {/* Botão Adicionar (só quando não é sentinel) */}
+      {!isNoInventory && (
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={[styles.bottomBarBtn, { backgroundColor: brandColors.primary }]}
+            onPress={openAdd}
+            activeOpacity={0.85}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <Text style={styles.bottomBarBtnText}>Adicionar Produto</Text>
+          </TouchableOpacity>
         </View>
-      </AnimatedModal>
+      )}
 
-      {/* ── Modal: adicionar produto ────────────────────────────────── */}
-      <AnimatedModal visible={addVisible} onRequestClose={closeAdd} style={{ justifyContent: 'flex-end' }}>
-        <View style={[styles.modalContainer, { maxHeight: '92%' }]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Adicionar Produto</Text>
-            <TouchableOpacity onPress={closeAdd} style={styles.headerCloseButton}>
+      {/* ── Modal Movimentação ────────────────────────────────────────── */}
+      <MovementModal
+        visible={!!movRow}
+        row={movRow}
+        inventories={allInvs}
+        brandColors={brandColors}
+        productInvStore={productInvStore}
+        onClose={() => setMovRow(null)}
+        onMoved={(result) => { handleMoved(result); setMovRow(null); }}
+      />
+
+      {/* ── Modal Editar Saldos ───────────────────────────────────────── */}
+      <EditStockModal
+        visible={!!editRow}
+        row={editRow}
+        brandColors={brandColors}
+        productInvStore={productInvStore}
+        onClose={() => setEditRow(null)}
+        onSaved={handleEditSaved}
+      />
+
+      {/* ── Modal Adicionar Produto ───────────────────────────────────── */}
+      <AnimatedModal visible={addVisible} onRequestClose={() => setAddVisible(false)} style={{ justifyContent: 'flex-end' }}>
+        <View style={addStyles.container}>
+          <View style={addStyles.header}>
+            <Text style={addStyles.title}>Adicionar Produto</Text>
+            <TouchableOpacity onPress={() => setAddVisible(false)} style={addStyles.closeBtn}>
               <MaterialCommunityIcons name="close" size={18} color="#64748B" />
             </TouchableOpacity>
           </View>
-
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalBody}>
+          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
+            <View style={addStyles.body}>
               {!!addError && (
-                <View style={styles.errorBanner}>
-                  <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#DC2626" />
-                  <Text style={styles.errorBannerText}>{addError}</Text>
+                <View style={addStyles.errorBanner}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#DC2626" />
+                  <Text style={addStyles.errorText}>{addError}</Text>
                 </View>
               )}
-
-              {/* Busca de produto */}
-              <View style={styles.addField}>
-                <Text style={styles.editFieldLabel}>
-                  Produto <Text style={{ color: '#EF4444' }}>*</Text>
-                </Text>
+              <View style={addStyles.field}>
+                <Text style={addStyles.fieldLabel}>Produto <Text style={{ color: '#EF4444' }}>*</Text></Text>
                 <View style={[
-                  styles.addSearchWrap,
-                  selectedProduct && { borderColor: brandColors.primary, backgroundColor: '#F0FDF4' }
+                  addStyles.searchWrap,
+                  selectedProduct && { borderColor: brandColors.primary, backgroundColor: '#F0FDF4' },
                 ]}>
-                  {selectedProduct
-                    ? <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} style={{ marginRight: 8 }} />
-                    : <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
-                  }
+                  <MaterialCommunityIcons
+                    name={selectedProduct ? 'check-circle' : 'magnify'}
+                    size={18}
+                    color={selectedProduct ? brandColors.primary : '#94A3B8'}
+                    style={{ marginRight: 8 }}
+                  />
                   <TextInput
-                    style={styles.addSearchInput}
+                    style={addStyles.searchInput}
                     value={productSearch}
-                    onChangeText={handleProductSearchChange}
+                    onChangeText={handleProdSearchChange}
                     placeholder="Digite o nome do produto..."
                     placeholderTextColor="#CBD5E1"
                   />
-                  {searching && <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 8 }} />}
+                  {searching && <ActivityIndicator size="small" color="#94A3B8" />}
                 </View>
-
-                {/* Resultados */}
                 {productResults.length > 0 && (
-                  <View style={styles.productDropdown}>
+                  <View style={addStyles.dropdown}>
                     {productResults.map(p => {
                       const ptConf = PRODUCT_TYPE_CONFIG[p.type] || null;
                       return (
                         <TouchableOpacity
                           key={p.id}
-                          style={styles.productDropdownItem}
-                          onPress={() => handleProductSelect(p)}
+                          style={addStyles.dropdownItem}
+                          onPress={() => { setSelectedProduct(p); setProductSearch(p.product); setProductResults([]); }}
                           activeOpacity={0.75}
                         >
-                          <Text style={styles.productDropdownName} numberOfLines={1}>{p.product}</Text>
+                          <Text style={addStyles.dropdownName} numberOfLines={1}>{p.product}</Text>
                           {ptConf && (
                             <View style={[styles.miniChip, { backgroundColor: ptConf.bg }]}>
                               <Text style={[styles.miniChipText, { color: ptConf.color }]}>{ptConf.label}</Text>
@@ -591,66 +949,44 @@ const InventoryDetailPage = ({ route }) => {
                     })}
                   </View>
                 )}
-
                 {!searching && productSearch.trim().length > 1 && !selectedProduct && productResults.length === 0 && (
-                  <Text style={styles.noResultsText}>Nenhum produto encontrado.</Text>
+                  <Text style={addStyles.noResults}>Nenhum produto encontrado.</Text>
                 )}
               </View>
-
-              {/* Saldos iniciais */}
-              <View style={styles.editFieldsGrid}>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Disponível</Text>
-                  <TextInput
-                    style={[styles.editInput, styles.editInputHighlight]}
-                    value={addAvailable}
-                    onChangeText={setAddAvailable}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
-                    selectTextOnFocus
-                  />
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Mínimo</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={addMinimum}
-                    onChangeText={setAddMinimum}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
-                    selectTextOnFocus
-                  />
-                </View>
-                <View style={styles.editField}>
-                  <Text style={styles.editFieldLabel}>Máximo</Text>
-                  <TextInput
-                    style={styles.editInput}
-                    value={addMaximum}
-                    onChangeText={setAddMaximum}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#94A3B8"
-                    selectTextOnFocus
-                  />
-                </View>
+              <View style={addStyles.fieldsRow}>
+                {[
+                  { label: 'Disponível', val: addAvail, set: setAddAvail, hl: true },
+                  { label: 'Mínimo',     val: addMin,   set: setAddMin },
+                  { label: 'Máximo',     val: addMax,   set: setAddMax },
+                ].map(f => (
+                  <View key={f.label} style={addStyles.numField}>
+                    <Text style={addStyles.numLabel}>{f.label}</Text>
+                    <TextInput
+                      style={[addStyles.numInput, f.hl && addStyles.numInputHl]}
+                      value={f.val}
+                      onChangeText={f.set}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      placeholderTextColor="#94A3B8"
+                      selectTextOnFocus
+                    />
+                  </View>
+                ))}
               </View>
             </View>
           </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.modalCancelButton} onPress={closeAdd}>
-              <Text style={styles.modalCancelButtonText}>Cancelar</Text>
+          <View style={addStyles.footer}>
+            <TouchableOpacity style={addStyles.cancelBtn} onPress={() => setAddVisible(false)}>
+              <Text style={addStyles.cancelText}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalSaveButton, { backgroundColor: brandColors.primary }, addSaving && { opacity: 0.7 }]}
+              style={[addStyles.saveBtn, { backgroundColor: brandColors.primary }, addSaving && { opacity: 0.7 }]}
               onPress={handleAddToInventory}
               disabled={addSaving}
             >
               {addSaving
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.modalSaveButtonText}>Adicionar</Text>
+                : <Text style={addStyles.saveText}>Adicionar</Text>
               }
             </TouchableOpacity>
           </View>
@@ -660,61 +996,42 @@ const InventoryDetailPage = ({ route }) => {
   );
 };
 
-/* ─── Skeletons ──────────────────────────────────────────────────────── */
+/* ─── Estilos skeleton ──────────────────────────────────────────────── */
 
 const skeletonStyles = StyleSheet.create({
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    gap: 12,
-    paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12,
   },
   line: { borderRadius: 6, backgroundColor: '#E2E8F0' },
 });
 
-/* ─── Estilos ────────────────────────────────────────────────────────── */
+/* ─── Estilos da página ─────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  /* cabeçalho */
-  inventoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  invHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
     ...Platform.select({
       web: { boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
       android: { elevation: 2 },
     }),
   },
-  inventoryIconWrap: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  inventoryName: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-  typeChip: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  invIconWrap:  { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  invName:      { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
+  typeChip:     { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   typeChipText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
-  totalBadge: {
-    alignItems: 'center', backgroundColor: '#F1F5F9',
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
-  },
-  totalBadgeLabel: {
-    fontSize: 10, fontWeight: '600', color: '#94A3B8',
-    textTransform: 'uppercase', letterSpacing: 0.3,
-  },
-  totalBadgeCount: { fontSize: 20, fontWeight: '800', color: '#1E293B' },
+  totalBadge:   { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  totalLabel:   { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3 },
+  totalCount:   { fontSize: 20, fontWeight: '800', color: '#1E293B' },
 
-  /* busca */
-  searchWrap: {
+  searchBar: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#fff',
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
@@ -725,13 +1042,8 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center' },
 
-  /* card */
   card: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    marginTop: 12,
-    overflow: 'hidden',
+    width: '100%', backgroundColor: '#fff', borderRadius: 16, marginTop: 12, overflow: 'hidden',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 },
       android: { elevation: 2 },
@@ -743,71 +1055,43 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  cardHeaderText: {
-    fontSize: 12, fontWeight: '700', color: '#475569',
-    textTransform: 'uppercase', letterSpacing: 0.6,
-  },
+  cardHeaderLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6 },
   cardHeaderCount: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
 
-  /* linha produto */
   productRow: {
     flexDirection: 'row', alignItems: 'flex-start',
     paddingHorizontal: 16, paddingVertical: 14, gap: 12,
   },
   productRowDivider: { borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  productRowLeft: { flex: 1 },
+  rowLeft: { flex: 1 },
   productName: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
-  productMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  productMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
   miniChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
   miniChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
   skuText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
+  noPiChip: { backgroundColor: '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
+  noPiText: { fontSize: 9, fontWeight: '700', color: '#D97706', letterSpacing: 0.3 },
 
   stockGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  stockCell: {
-    backgroundColor: '#F8FAFC', borderRadius: 7,
-    paddingHorizontal: 8, paddingVertical: 5,
-    alignItems: 'center', minWidth: 50,
-  },
-  stockCellLabel: {
-    fontSize: 9, fontWeight: '700', color: '#94A3B8',
-    textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2,
-  },
+  stockCell: { backgroundColor: '#F8FAFC', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5, alignItems: 'center', minWidth: 50 },
+  stockCellLabel: { fontSize: 9, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
   stockCellValue: { fontSize: 12, fontWeight: '700', color: '#475569' },
 
-  productRowRight: { alignItems: 'center', gap: 8 },
-  availableBadge: {
-    backgroundColor: '#F0FDF4', borderRadius: 10,
-    paddingHorizontal: 10, paddingVertical: 8,
-    alignItems: 'center', minWidth: 56,
-  },
-  availableBadgeLow: { backgroundColor: '#FFF7ED' },
-  availableValue: { fontSize: 18, fontWeight: '800', color: '#16A34A' },
-  availableValueLow: { color: '#D97706' },
-  availableLabel: {
-    fontSize: 9, fontWeight: '700', color: '#86EFAC',
-    textTransform: 'uppercase', letterSpacing: 0.3,
-  },
-  availableLabelLow: { color: '#FCD34D' },
-  editBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center', justifyContent: 'center',
-  },
+  rowRight: { alignItems: 'center', gap: 6 },
+  availBadge: { backgroundColor: '#F0FDF4', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center', minWidth: 56 },
+  availBadgeLow: { backgroundColor: '#FFF7ED' },
+  availValue: { fontSize: 18, fontWeight: '800', color: '#16A34A' },
+  availValueLow: { color: '#D97706' },
+  availLabel: { fontSize: 9, fontWeight: '700', color: '#86EFAC', textTransform: 'uppercase', letterSpacing: 0.3 },
+  availLabelLow: { color: '#FCD34D' },
+  actionBtns: { flexDirection: 'row', gap: 6 },
+  actionBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
 
-  /* empty */
-  emptyContainer: {
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 60, paddingHorizontal: 32,
-  },
-  emptyIconWrap: {
-    width: 88, height: 88, borderRadius: 44,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-  },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 32 },
+  emptyIconWrap: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: '#334155', marginBottom: 8, textAlign: 'center' },
   emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
 
-  /* bottom bar */
   bottomBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: '#fff',
@@ -819,104 +1103,149 @@ const styles = StyleSheet.create({
       android: { elevation: 6 },
     }),
   },
-  bottomBarButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14, borderRadius: 14,
-  },
-  bottomBarButtonText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  bottomBarBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14 },
+  bottomBarBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+});
 
-  /* modal base */
-  modalContainer: {
+/* ─── Estilos modal movimentação ────────────────────────────────────── */
+
+const movStyles = StyleSheet.create({
+  container: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '90%', width: '100%',
+    maxHeight: '92%', width: '100%',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
       android: { elevation: 10 },
       web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
     }),
   },
-  modalHeader: {
+  header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
     paddingHorizontal: 24, paddingVertical: 20,
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  modalSubtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  headerCloseButton: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center', justifyContent: 'center', marginLeft: 12,
-  },
-  modalScroll: { flexShrink: 1 },
-  modalBody: { padding: 24, gap: 16 },
-  modalFooter: {
-    flexDirection: 'row', gap: 12,
-    paddingHorizontal: 24, paddingVertical: 16,
-    borderTopWidth: 1, borderTopColor: '#F1F5F9',
-  },
-  modalCancelButton: {
-    flex: 1, paddingVertical: 14, borderRadius: 12,
-    borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center',
-  },
-  modalCancelButtonText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
-  modalSaveButton: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  modalSaveButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  title:    { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  subtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  body: { padding: 24, gap: 18 },
 
-  /* modal: adicionar produto */
-  addField: { gap: 6 },
-  addSearchWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#E2E8F0',
-    borderRadius: 10, paddingHorizontal: 12,
-    backgroundColor: '#F8FAFC',
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText:   { fontSize: 13, color: '#DC2626', flex: 1 },
+
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  balanceLabel: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  balanceValue: { fontSize: 22, fontWeight: '800', color: '#1E293B' },
+
+  opsRow: { flexDirection: 'row', gap: 8 },
+  opChip: {
+    flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12,
+    borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
   },
-  addSearchInput: { flex: 1, fontSize: 15, color: '#0F172A', paddingVertical: 12 },
-  productDropdown: {
-    borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10,
-    backgroundColor: '#fff', marginTop: 4, overflow: 'hidden',
+  opLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textAlign: 'center' },
+
+  field: { gap: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
+  qtyInput: {
+    borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 24, fontWeight: '800', color: '#1E293B',
+    backgroundColor: '#F8FAFC', textAlign: 'center',
+  },
+
+  destChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
+  destChipActive: { backgroundColor: '#EDE9FE', borderColor: '#7C3AED' },
+  destChipText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
+  destChipTextActive: { color: '#7C3AED' },
+
+  previewBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12 },
+  previewText: { fontSize: 13, color: '#475569', flex: 1 },
+
+  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center' },
+  cancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: '#1E293B' },
+  confirmText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+});
+
+/* ─── Estilos modal editar saldos ───────────────────────────────────── */
+
+const editStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '85%', width: '100%',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 10 },
+      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
+    }),
+  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  title:    { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  subtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  body: { padding: 24, gap: 16 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { fontSize: 13, color: '#DC2626', flex: 1 },
+  fieldsRow: { flexDirection: 'row', gap: 12 },
+  field: { flex: 1, gap: 6 },
+  label: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
+  input: { borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, fontSize: 18, fontWeight: '700', color: '#0F172A', backgroundColor: '#F8FAFC', textAlign: 'center' },
+  inputHighlight: { borderColor: '#16A34A', backgroundColor: '#F0FDF4', color: '#16A34A' },
+  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12 },
+  infoText: { fontSize: 12, color: '#64748B', flex: 1, lineHeight: 17 },
+  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center' },
+  cancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+});
+
+/* ─── Estilos modal adicionar produto ───────────────────────────────── */
+
+const addStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: '92%', width: '100%',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 10 },
+      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
+    }),
+  },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  title:    { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
+  body: { padding: 24, gap: 18 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
+  errorText: { fontSize: 13, color: '#DC2626', flex: 1 },
+  field: { gap: 6 },
+  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, backgroundColor: '#F8FAFC' },
+  searchInput: { flex: 1, fontSize: 15, color: '#0F172A', paddingVertical: 12 },
+  dropdown: {
+    borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, backgroundColor: '#fff', marginTop: 4, overflow: 'hidden',
     ...Platform.select({
       web: { boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
       android: { elevation: 3 },
     }),
   },
-  productDropdownItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
-    gap: 8,
-  },
-  productDropdownName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  noResultsText: { fontSize: 12, color: '#94A3B8', marginTop: 6, paddingHorizontal: 2 },
-
-  /* modal: ajuste */
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FEF2F2', borderRadius: 10,
-    padding: 12, borderWidth: 1, borderColor: '#FECACA',
-  },
-  errorBannerText: { fontSize: 13, color: '#DC2626', flex: 1 },
-  editFieldsGrid: { flexDirection: 'row', gap: 12 },
-  editField: { flex: 1, gap: 6 },
-  editFieldLabel: {
-    fontSize: 12, fontWeight: '700', color: '#475569',
-    textTransform: 'uppercase', letterSpacing: 0.4,
-  },
-  editInput: {
-    borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 12,
-    fontSize: 18, fontWeight: '700', color: '#0F172A',
-    backgroundColor: '#F8FAFC', textAlign: 'center',
-  },
-  editInputHighlight: {
-    borderColor: '#16A34A', backgroundColor: '#F0FDF4', color: '#16A34A',
-  },
-  editInfoBox: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12, marginTop: 4,
-  },
-  editInfoText: { fontSize: 12, color: '#64748B', flex: 1, lineHeight: 17 },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F8FAFC', gap: 8 },
+  dropdownName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  noResults: { fontSize: 12, color: '#94A3B8', marginTop: 6, paddingHorizontal: 2 },
+  fieldsRow: { flexDirection: 'row', gap: 12 },
+  numField: { flex: 1, gap: 6 },
+  numLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
+  numInput: { borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, fontSize: 18, fontWeight: '700', color: '#0F172A', backgroundColor: '#F8FAFC', textAlign: 'center' },
+  numInputHl: { borderColor: '#16A34A', backgroundColor: '#F0FDF4', color: '#16A34A' },
+  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center' },
+  cancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
 
 export default InventoryDetailPage;

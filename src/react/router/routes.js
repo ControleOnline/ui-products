@@ -67,7 +67,9 @@ const ordersRoutes = [
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
-      title: route.params?.inventory?.inventory || 'Estoque',
+      title: route.params?.inventory?._isNoInventory
+        ? 'Sem Local de Estoque'
+        : (route.params?.inventory?.inventory || 'Estoque'),
     }),
     initialParams: { store: 'inventories' },
   },
