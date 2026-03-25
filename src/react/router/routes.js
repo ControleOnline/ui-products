@@ -3,6 +3,8 @@ import Products from '@controleonline/ui-products/src/react/pages/Products';
 import Categories from '@controleonline/ui-products/src/react/pages/Categories';
 import CustomizeScreen from '@controleonline/ui-products/src/react/pages/CustomizeScreen';
 import ProductDetails from '@controleonline/ui-products/src/react/pages/ProductDetails';
+import Inventories from '@controleonline/ui-products/src/react/pages/Inventories';
+import InventoryDetail from '@controleonline/ui-products/src/react/pages/InventoryDetail';
 
 const ordersRoutes = [
   {
@@ -46,6 +48,28 @@ const ordersRoutes = [
       title: 'Customizar',
     },
     initialParams: { store: 'products' },
+  },
+  {
+    name: 'InventoriesPage',
+    component: Inventories,
+    options: {
+      headerShown: true,
+      headerBackVisible: true,
+      title: 'Locais de Estoque',
+      showCompanyFilter: true,
+      companyFilterMode: 'icon',
+    },
+    initialParams: { store: 'inventories' },
+  },
+  {
+    name: 'InventoryDetail',
+    component: InventoryDetail,
+    options: ({ route }) => ({
+      headerShown: true,
+      headerBackVisible: true,
+      title: route.params?.inventory?.inventory || 'Estoque',
+    }),
+    initialParams: { store: 'inventories' },
   },
 ];
 
