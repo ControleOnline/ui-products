@@ -177,7 +177,7 @@ const CategoriesPage = () => {
           >
             <ImportsPage
               context={{
-                "context": "products",
+                "context": "product",
                 "title": "Importação de Produtos",
                 "searchPlaceholder": "Buscar importações de produtos..."
               }}
