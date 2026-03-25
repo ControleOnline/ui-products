@@ -190,7 +190,7 @@ const AttachmentManager = ({
                         color: String(coverId) === String(row.id) ? '#fff' : '#111',
                         fontSize: 12,
                       }}>
-                      {String(coverId) === String(row.id) ? 'Capa selecionada' : 'Definir capa (local)'}
+                      {String(coverId) === String(row.id) ? 'Capa selecionada ✓' : 'Definir como capa'}
                     </Text>
                   </TouchableOpacity>
 

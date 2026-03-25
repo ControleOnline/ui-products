@@ -9,6 +9,17 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+
+const TYPE_FILTER_OPTIONS = [
+  { key: null,          label: 'Todos' },
+  { key: 'product',     label: 'Produto' },
+  { key: 'service',     label: 'Serviço' },
+  { key: 'manufactured',label: 'Fabricado' },
+  { key: 'component',   label: 'Componente' },
+  { key: 'feedstock',   label: 'Matéria Prima' },
+  { key: 'package',     label: 'Embalagem' },
+  { key: 'custom',      label: 'Custom' },
+];
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
@@ -68,8 +79,21 @@ const ProductsPage = ({ navigation, route }) => {
 
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState(null);
 
   const isManager = env.APP_TYPE === 'MANAGER';
+
+  // Filtra localmente sem nova requisição à API
+  const visibleProducts = useMemo(() => {
+    if (!typeFilter) return categoryProducts;
+    return categoryProducts.filter(p => p.type === typeFilter);
+  }, [categoryProducts, typeFilter]);
+
+  // Tipos presentes na lista atual (para exibir só os filtros relevantes)
+  const availableTypes = useMemo(() => {
+    const set = new Set(categoryProducts.map(p => p.type).filter(Boolean));
+    return TYPE_FILTER_OPTIONS.filter(opt => opt.key === null || set.has(opt.key));
+  }, [categoryProducts]);
 
   /* detecta se a "categoria" selecionada é o sentinel de produtos sem categoria */
   const isNoCategory = category?._isNoCategory === true ||
@@ -99,7 +123,8 @@ const ProductsPage = ({ navigation, route }) => {
       'order[product]': 'ASC',
       'order[description]': 'ASC',
       company: currentCompany?.id,
-      type: ['custom', 'product', 'manufactured', 'service'],
+      // Manager vê todos os tipos; vitrine filtra só os tipos de venda ao cliente
+      ...(isManager ? {} : { type: ['custom', 'product', 'manufactured', 'service'] }),
     };
 
     if (isNoCategory) {
@@ -228,6 +253,32 @@ const ProductsPage = ({ navigation, route }) => {
         </View>
       )}
 
+      {/* Filtro por tipo — exibe sempre que há produtos carregados no manager */}
+      {!loading && categoryProducts.length > 0 && isManager && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.typeFilterBar}
+          style={styles.typeFilterScroll}
+        >
+          {availableTypes.map(opt => {
+            const active = typeFilter === opt.key;
+            return (
+              <TouchableOpacity
+                key={String(opt.key)}
+                style={[styles.typeFilterChip, active && styles.typeFilterChipActive]}
+                onPress={() => setTypeFilter(opt.key)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.typeFilterChipText, active && styles.typeFilterChipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
       {/* Product list */}
       {!loading && categoryProducts.length > 0 && !error && (
         <ScrollView
@@ -236,10 +287,11 @@ const ProductsPage = ({ navigation, route }) => {
         >
           <View style={{ width: containerWidth, paddingHorizontal: 16, paddingTop: 12 }}>
             <Text style={styles.countLabel}>
-              {categoryProducts.length} {categoryProducts.length === 1 ? 'produto' : 'produtos'}
+              {visibleProducts.length} {visibleProducts.length === 1 ? 'produto' : 'produtos'}
+              {typeFilter ? ` · ${TYPE_FILTER_OPTIONS.find(o => o.key === typeFilter)?.label}` : ''}
             </Text>
 
-            {categoryProducts.map(product => (
+            {visibleProducts.map(product => (
               <TouchableOpacity
                 key={product.id}
                 activeOpacity={isManager ? 0.75 : 1}
@@ -249,6 +301,14 @@ const ProductsPage = ({ navigation, route }) => {
                 <ProductItem product={product} category={category} />
               </TouchableOpacity>
             ))}
+
+            {visibleProducts.length === 0 && typeFilter && (
+              <View style={styles.filterEmptyWrap}>
+                <Text style={styles.filterEmptyText}>
+                  Nenhum produto do tipo "{TYPE_FILTER_OPTIONS.find(o => o.key === typeFilter)?.label}" nesta categoria.
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
       )}
@@ -323,6 +383,51 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginBottom: 12,
     letterSpacing: 0.3,
+  },
+
+  typeFilterScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+    height: 52,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#fff',
+  },
+  typeFilterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  typeFilterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  typeFilterChipActive: {
+    backgroundColor: '#0F172A',
+    borderColor: '#0F172A',
+  },
+  typeFilterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  typeFilterChipTextActive: {
+    color: '#fff',
+  },
+  filterEmptyWrap: {
+    paddingVertical: 32,
+    alignItems: 'center',
+  },
+  filterEmptyText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
 
   emptyContainer: {

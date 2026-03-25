@@ -26,12 +26,12 @@ import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedM
  *  quantity     = quantidade usada
  */
 
-/* Extrai a sigla da unidade de medida do produto (ex: 'g', 'kg', 'UN', 'L') */
+/* Extrai a sigla da unidade de medida do produto (ex: 'KG', 'UN', 'L') */
 const extractUnit = p => {
   if (!p) return '';
-  const u = p?.productUnit?.unit || p?.productUnity?.unit || p?.unit;
-  if (u) return String(u).toUpperCase();
-  return '';
+  // API retorna productUnit.productUnit (campo homônimo dentro do objeto ProductUnity)
+  const u = p?.productUnit?.productUnit || p?.productUnit?.unit || p?.productUnity?.productUnit || p?.productUnity?.unit || p?.unit;
+  return u ? String(u).toUpperCase() : '';
 };
 
 const toIri = (value, prefix) => {
@@ -165,19 +165,17 @@ const FeedStockFormModal = ({
               <Text style={styles.fieldLabel}>
                 Qtd{draft.productUnit ? ` (${draft.productUnit})` : ''} <Text style={styles.required}>*</Text>
               </Text>
-              <View style={styles.quantityRow}>
+              <View style={[inputStyle('quantity'), styles.quantityRow]}>
                 <TextInput
                   value={String(draft.quantity)}
                   onChangeText={v => onChangeDraft('quantity', v)}
                   keyboardType="numeric"
-                  style={[inputStyle('quantity'), { flex: 1 }]}
+                  style={styles.quantityInput}
                   placeholder="1"
                   placeholderTextColor="#CBD5E1"
                 />
                 {!!draft.productUnit && (
-                  <View style={styles.unitBadge}>
-                    <Text style={styles.unitBadgeText}>{draft.productUnit}</Text>
-                  </View>
+                  <Text style={styles.unitInline}>{draft.productUnit}</Text>
                 )}
               </View>
               {!!fieldErrors?.quantity && (
@@ -310,14 +308,19 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
   /* IRI numérico do componente para comparação anti-loop */
   const componentNumericId = String(componentIri || '').replace(/\D/g, '');
 
-  /* ── Produto selecionado → abrir formulário ── */
-  const handleProductSelected = product => {
+  /* ── Produto selecionado → busca completo para obter productUnit aninhado ── */
+  const handleProductSelected = async product => {
     setSearchVisible(false);
+    let full = product;
+    try {
+      const data = await productsStore.actions.get(product.id);
+      if (data) full = data;
+    } catch { /* usa dados parciais se falhar */ }
     setEditingItem(null);
     setFormDraft({
-      productChild: String(product.id),
-      productName: product.product || product.name || `#${product.id}`,
-      productUnit: extractUnit(product),
+      productChild: String(full.id),
+      productName: full.product || full.name || `#${full.id}`,
+      productUnit: extractUnit(full),
       quantity: '1',
       price: '0',
     });
@@ -827,21 +830,18 @@ const styles = StyleSheet.create({
   quantityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
-  unitBadge: {
-    backgroundColor: '#E2E8F0',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 44,
+  quantityInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    padding: 0,
   },
-  unitBadgeText: {
+  unitInline: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#475569',
+    color: '#94A3B8',
+    paddingLeft: 6,
   },
 
   /* ─── fields ─── */

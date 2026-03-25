@@ -28,6 +28,14 @@ import { emitProductEvent, PRODUCT_EVENTS } from '@controleonline/ui-products/sr
  *  product.type 'package'             → productGroupProduct.productType 'package'
  *  qualquer outro (product/component/manufactured/etc) → productGroupProduct.productType 'component'
  */
+/* Extrai sigla da unidade de medida do produto */
+const extractUnit = p => {
+  if (!p) return '';
+  // API retorna productUnit.productUnit (campo homônimo dentro do objeto ProductUnity)
+  const u = p?.productUnit?.productUnit || p?.productUnit?.unit || p?.productUnity?.productUnit || p?.productUnity?.unit || p?.unit;
+  return u ? String(u).toUpperCase() : '';
+};
+
 const toGroupProductType = productType => {
   if (productType === 'feedstock') return 'feedstock';
   if (productType === 'package') return 'package';
@@ -211,16 +219,21 @@ const ItemFormModal = ({
               </View>
               <View style={[styles.halfField, { marginBottom: 14 }]}>
                 <Text style={styles.fieldLabel}>
-                  Quantidade <Text style={styles.required}>*</Text>
+                  Qtd{draft.productUnit ? ` (${draft.productUnit})` : ''} <Text style={styles.required}>*</Text>
                 </Text>
-                <TextInput
-                  value={String(draft.quantity)}
-                  onChangeText={v => onChangeDraft('quantity', v)}
-                  keyboardType="numeric"
-                  style={inputStyle('quantity')}
-                  placeholder="1"
-                  placeholderTextColor="#CBD5E1"
-                />
+                <View style={[inputStyle('quantity'), styles.quantityRow]}>
+                  <TextInput
+                    value={String(draft.quantity)}
+                    onChangeText={v => onChangeDraft('quantity', v)}
+                    keyboardType="numeric"
+                    style={styles.quantityInput}
+                    placeholder="1"
+                    placeholderTextColor="#CBD5E1"
+                  />
+                  {!!draft.productUnit && (
+                    <Text style={styles.unitInline}>{draft.productUnit}</Text>
+                  )}
+                </View>
                 {!!fieldErrors?.quantity && (
                   <Text style={styles.fieldErrorText}>{fieldErrors.quantity}</Text>
                 )}
@@ -370,11 +383,6 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       .getItems({
         active: 1,
         company: currentCompany.id,
-        /*
-         * Modificadores de nível 1 só aceitam: component, product, manufactured, package.
-         * Feedstock é insumo — não deve aparecer aqui; é gerenciado dentro de cada componente.
-         */
-        type: ['product', 'component', 'manufactured', 'package'],
         'order[product]': 'ASC',
       })
       .then(data => setAvailableProducts(data || []))
@@ -387,8 +395,8 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
     setLoaded(true);
   };
 
-  /* ── Produto selecionado na busca → abrir formulário ── */
-  const handleProductSelected = product => {
+  /* ── Produto selecionado na busca → busca completo para obter productUnit aninhado ── */
+  const handleProductSelected = async product => {
     setSearchModalVisible(false);
 
     /* segurança: feedstock não pode ser modificador de nível 1 */
@@ -399,11 +407,18 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       return;
     }
 
+    let full = product;
+    try {
+      const data = await productsStore.actions.get(product.id);
+      if (data) full = data;
+    } catch { /* usa dados parciais se falhar */ }
+
     setEditingItem(null);
     setFormDraft({
-      productChild: String(product.id),
-      productName: product.product || product.name || `#${product.id}`,
-      productType: toGroupProductType(product.type),
+      productChild: String(full.id),
+      productName: full.product || full.name || `#${full.id}`,
+      productType: toGroupProductType(full.type),
+      productUnit: extractUnit(full),
       price: '0',
       quantity: '1',
     });
@@ -424,6 +439,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       productChild: String(item.productChild?.id || ''),
       productName: name,
       productType: item.productType || toGroupProductType(item.productChild?.type),
+      productUnit: extractUnit(item.productChild),
       price: String(item.price ?? '0'),
       quantity: String(Number(item.quantity) > 0 ? item.quantity : 1),
     });
@@ -952,6 +968,9 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', gap: 12, marginBottom: 0 },
   halfField: { flex: 1 },
+  quantityRow: { flexDirection: 'row', alignItems: 'center' },
+  quantityInput: { flex: 1, fontSize: 15, color: '#0F172A', padding: 0 },
+  unitInline: { fontSize: 13, fontWeight: '700', color: '#94A3B8', paddingLeft: 6 },
 
   /* ─── botões ─── */
   cancelBtn: {

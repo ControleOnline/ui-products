@@ -8,8 +8,23 @@ import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
 import { APP_ENV } from '@controleonline/../../config/env.js';
 
-const buildCoverUrl = files => {
-  const first = (files || []).find(item => item?.file?.id)
+const TYPE_CONFIG = {
+  product:     { label: 'Produto',       color: '#3B82F6', bg: '#EFF6FF' },
+  service:     { label: 'Serviço',       color: '#8B5CF6', bg: '#F5F3FF' },
+  component:   { label: 'Componente',    color: '#F97316', bg: '#FFF7ED' },
+  feedstock:   { label: 'Matéria Prima', color: '#16A34A', bg: '#F0FDF4' },
+  package:     { label: 'Embalagem',     color: '#0891B2', bg: '#ECFEFF' },
+  custom:      { label: 'Custom',        color: '#DB2777', bg: '#FDF2F8' },
+  manufactured:{ label: 'Fabricado',     color: '#D97706', bg: '#FFFBEB' },
+};
+
+const buildCoverUrl = (files, coverRelationId) => {
+  const arr = files || []
+  let first = null
+  if (coverRelationId) {
+    first = arr.find(item => String(item?.id) === String(coverRelationId) && item?.file?.id)
+  }
+  if (!first) first = arr.find(item => item?.file?.id)
   if (!first) return null
   const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
   return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`
@@ -17,10 +32,22 @@ const buildCoverUrl = files => {
 
 const ProductItem = ({ product, category }) => {
   const navigation = useNavigation();
-  const coverUrl = buildCoverUrl(product.productFiles)
+  const coverUrl = buildCoverUrl(product.productFiles, product?.extraData?.imageCoverRelationId)
   const hasImage = !!coverUrl
+  const isManager = APP_ENV.APP_TYPE === 'MANAGER'
+  const typeConf = TYPE_CONFIG[product.type] || null
 
   const renderAction = () => {
+    if (isManager) {
+      return (
+        <View style={styles.managerMeta}>
+          {!!product.sku && (
+            <Text style={styles.skuLabel} numberOfLines={1}>SKU {product.sku}</Text>
+          )}
+          <MaterialCommunityIcons name="chevron-right" size={20} color="#CBD5E1" />
+        </View>
+      );
+    }
     if (product.type === 'custom') {
       return (
         <TouchableOpacity
@@ -55,9 +82,16 @@ const ProductItem = ({ product, category }) => {
       )}
 
       <View style={[styles.body, !hasImage && styles.bodyNoImage]}>
-        <Text style={styles.name} numberOfLines={2}>
-          {product.product}
-        </Text>
+        <View>
+          <Text style={styles.name} numberOfLines={2}>
+            {product.product}
+          </Text>
+          {typeConf && (
+            <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
+              <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
+            </View>
+          )}
+        </View>
 
         {!!product.description && (
           <Text style={styles.description} numberOfLines={2}>
@@ -132,7 +166,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
     lineHeight: 20,
-    marginBottom: 3,
+    marginBottom: 4,
+  },
+  typeChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 5,
+  },
+  typeChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  managerMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  skuLabel: {
+    fontSize: 11,
+    color: '#94A3B8',
+    fontWeight: '500',
+    maxWidth: 90,
   },
   description: {
     fontSize: 12,

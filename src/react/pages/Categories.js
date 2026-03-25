@@ -22,8 +22,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
 
-const buildCoverUrl = files => {
-  const first = (files || []).find(item => item?.file?.id)
+const buildCoverUrl = (files, coverRelationId) => {
+  const arr = files || []
+  let first = null
+  if (coverRelationId) {
+    first = arr.find(item => String(item?.id) === String(coverRelationId) && item?.file?.id)
+  }
+  if (!first) first = arr.find(item => item?.file?.id)
   if (!first) return null
   const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
   return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`
@@ -130,20 +135,6 @@ const CategoriesPage = () => {
     return data || []
   }, [currentCompany?.id, categoryActions])
 
-  const saveCategoryCover = async relation => {
-    if (!selectedCategory?.id || !relation?.id) return
-    await categoryActions.save({
-      id: selectedCategory.id,
-      extraData: {
-        ...(selectedCategory.extraData || {}),
-        imageCoverRelationId: relation.id,
-      },
-    })
-    const refreshed = await reloadCategories()
-    const fresh = refreshed.find(c => c.id === selectedCategory.id)
-    if (fresh) setSelectedCategory(fresh)
-  }
-
   const getColumns = () => {
     if (width < 640) return 2
     if (width < 960) return 3
@@ -235,9 +226,9 @@ const CategoriesPage = () => {
                           { backgroundColor: category.color || '#CBD5E1' },
                         ]}
                       >
-                        {!!buildCoverUrl(category.categoryFiles) ? (
+                        {!!buildCoverUrl(category.categoryFiles, category?.extraData?.imageCoverRelationId) ? (
                           <Image
-                            source={{ uri: buildCoverUrl(category.categoryFiles) }}
+                            source={{ uri: buildCoverUrl(category.categoryFiles, category?.extraData?.imageCoverRelationId) }}
                             style={styles.cardCoverImage}
                             resizeMode="cover"
                           />
@@ -311,8 +302,6 @@ const CategoriesPage = () => {
                     attachments={selectedCategory.categoryFiles || []}
                     companyId={currentCompany?.id}
                     context="products"
-                    coverRelationId={selectedCategory?.extraData?.imageCoverRelationId}
-                    onCoverChanged={saveCategoryCover}
                     onChanged={async () => {
                       const refreshed = await reloadCategories()
                       const fresh = refreshed.find(c => c.id === selectedCategory.id)
@@ -462,6 +451,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+
 
   emptyContainer: {
     flex: 1,
