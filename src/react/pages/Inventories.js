@@ -108,6 +108,19 @@ const InventoriesPage = () => {
       >
         <View style={{ width: maxW, paddingHorizontal: gap / 2, paddingTop: 16 }}>
 
+          {/* Banner Histórico de Movimentações */}
+          <TouchableOpacity
+            style={styles.historyBanner}
+            onPress={() => navigation.navigate('InventoryMovements')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.historyBannerLeft}>
+              <MaterialCommunityIcons name="history" size={18} color="#7C3AED" />
+              <Text style={styles.historyBannerText}>Histórico de Movimentações</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
           {/* Skeleton */}
           {loading && (
             <View style={[styles.grid, { gap }]}>
@@ -249,6 +262,14 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   scroll: { flex: 1 },
   scrollContent: { alignItems: 'center' },
+
+  historyBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#F5F3FF', borderRadius: 14, borderWidth: 1, borderColor: '#DDD6FE',
+    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16,
+  },
+  historyBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  historyBannerText: { fontSize: 14, fontWeight: '700', color: '#6D28D9' },
 
   countLabel: {
     fontSize: 13, fontWeight: '600', color: '#94A3B8',

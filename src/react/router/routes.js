@@ -5,6 +5,7 @@ import CustomizeScreen from '@controleonline/ui-products/src/react/pages/Customi
 import ProductDetails from '@controleonline/ui-products/src/react/pages/ProductDetails';
 import Inventories from '@controleonline/ui-products/src/react/pages/Inventories';
 import InventoryDetail from '@controleonline/ui-products/src/react/pages/InventoryDetail';
+import InventoryMovements from '@controleonline/ui-products/src/react/pages/InventoryMovements';
 
 const ordersRoutes = [
   {
@@ -71,6 +72,16 @@ const ordersRoutes = [
         ? 'Sem Local de Estoque'
         : (route.params?.inventory?.inventory || 'Estoque'),
     }),
+    initialParams: { store: 'inventories' },
+  },
+  {
+    name: 'InventoryMovements',
+    component: InventoryMovements,
+    options: {
+      headerShown: true,
+      headerBackVisible: true,
+      title: 'Histórico de Movimentações',
+    },
     initialParams: { store: 'inventories' },
   },
 ];

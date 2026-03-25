@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,12 @@ import {
 } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
+import { logMovement } from '@controleonline/ui-products/src/react/services/inventoryMovementLog';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -77,6 +78,7 @@ const MovementModal = ({
   inventories,
   brandColors,
   productInvStore,
+  currentInventory,
   onClose,
   onMoved,
 }) => {
@@ -103,25 +105,44 @@ const MovementModal = ({
     try {
       const curAvail = parseFloat(row?.available ?? 0);
 
+      const { id: prodId, name: prodName, type: prodType } = extractProduct(row.product);
+
       if (op === 'in') {
         /* Entrada: aumenta disponível */
         if (row.id) {
           await productInvStore.actions.save({ id: row.id, available: curAvail + amount });
         } else {
           /* ainda não há registro — cria */
-          const { id: prodId } = extractProduct(row.product);
           await productInvStore.actions.save({
             inventory: row._inventoryIRI,
             product:   `/products/${prodId}`,
             available: amount,
           });
         }
+        logMovement({
+          type: 'in',
+          productId: prodId, productName: prodName, productType: prodType,
+          inventoryId: currentInventory?.id, inventoryName: currentInventory?.inventory,
+          destInventoryId: null, destInventoryName: null,
+          quantity: amount,
+          availableBefore: curAvail,
+          availableAfter: curAvail + amount,
+        });
         onMoved({ rowId: row.id, delta: amount, op });
       } else if (op === 'out') {
         /* Saída: diminui disponível */
         if (row.id) {
           await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
         }
+        logMovement({
+          type: 'out',
+          productId: prodId, productName: prodName, productType: prodType,
+          inventoryId: currentInventory?.id, inventoryName: currentInventory?.inventory,
+          destInventoryId: null, destInventoryName: null,
+          quantity: amount,
+          availableBefore: curAvail,
+          availableAfter: Math.max(0, curAvail - amount),
+        });
         onMoved({ rowId: row.id, delta: -amount, op });
       } else if (op === 'transfer') {
         /* Transferência: diminui origem, aumenta destino */
@@ -130,7 +151,6 @@ const MovementModal = ({
         }
 
         /* localiza ou cria PI no destino */
-        const { id: prodId } = extractProduct(row.product);
         const destPiData = await productInvStore.actions.getItems({
           'inventory': `/inventories/${destInv.id}`,
           'product':   `/products/${prodId}`,
@@ -149,6 +169,15 @@ const MovementModal = ({
             available: amount,
           });
         }
+        logMovement({
+          type: 'transfer',
+          productId: prodId, productName: prodName, productType: prodType,
+          inventoryId: currentInventory?.id, inventoryName: currentInventory?.inventory,
+          destInventoryId: destInv?.id, destInventoryName: destInv?.inventory,
+          quantity: amount,
+          availableBefore: curAvail,
+          availableAfter: Math.max(0, curAvail - amount),
+        });
         onMoved({ rowId: row.id, delta: -amount, op });
       }
 
@@ -437,6 +466,7 @@ const InventoryDetailPage = ({ route }) => {
   const { inventory } = route.params;
   const isNoInventory = inventory?._isNoInventory === true;
   const { width } = useWindowDimensions();
+  const navigation = useNavigation();
 
   const productsStore   = useStore('products');
   const productInvStore = useStore('product_inventories');
@@ -456,6 +486,26 @@ const InventoryDetailPage = ({ route }) => {
   );
 
   const maxW = Math.min(width, 860);
+
+  /* ── botão histórico no header ─────────────────────────────────── */
+  useLayoutEffect(() => {
+    if (!isNoInventory) {
+      navigation.setOptions({
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('InventoryMovements', {
+              inventoryId:   inventory.id,
+              inventoryName: inventory.inventory,
+            })}
+            style={{ paddingHorizontal: 12 }}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="history" size={22} color="#64748B" />
+          </TouchableOpacity>
+        ),
+      });
+    }
+  }, [navigation, inventory.id, isNoInventory]);
 
   /* ── estado ── */
   const [loading, setLoading]   = useState(true);
@@ -875,6 +925,7 @@ const InventoryDetailPage = ({ route }) => {
         inventories={allInvs}
         brandColors={brandColors}
         productInvStore={productInvStore}
+        currentInventory={inventory}
         onClose={() => setMovRow(null)}
         onMoved={(result) => { handleMoved(result); setMovRow(null); }}
       />
