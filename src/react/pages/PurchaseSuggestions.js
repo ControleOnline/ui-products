@@ -33,20 +33,44 @@ const PRODUCT_TYPE_COLORS = {
 
 /* classifica criticidade: 'critical' (vermelho) ou 'low' (laranja) */
 const getCriticality = (available, minimum) => {
+  if (available < 0) return 'critical';
+  if (available === 0) return 'critical';
   if (minimum <= 0) return 'low';
-  return available === 0 || available / minimum < 0.3 ? 'critical' : 'low';
+  return available / minimum < 0.3 ? 'critical' : 'low';
+};
+
+/* extrai ID numérico de qualquer formato (number, IRI string, objeto com id/@id) */
+const extractId = v => {
+  if (!v && v !== 0) return null;
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') {
+    const tail = v.split('/').pop();
+    return tail && !isNaN(tail) ? tail : null;
+  }
+  if (typeof v === 'object') {
+    if (v.id)    return String(v.id);
+    if (v['@id']) return extractId(v['@id']);
+  }
+  return null;
 };
 
 const extractCategoryId = product => {
-  const raw = product?.productCategory?.category
-    ?? product?.productCategories?.[0]?.category
-    ?? product?.category;
-  if (!raw) return null;
-  if (typeof raw === 'number') return String(raw);
-  if (typeof raw === 'string') return raw.split('/').pop() || null;
-  if (typeof raw === 'object') {
-    const id = raw.id ?? iriToId(raw['@id']);
-    return id ? String(id) : null;
+  /* productCategory pode ser objeto único OU array de relações */
+  const pc  = product?.productCategory;
+  const pcs = product?.productCategories;
+  const pcList  = Array.isArray(pc)  ? pc  : (pc  ? [pc]  : []);
+  const pcsList = Array.isArray(pcs) ? pcs : (pcs ? [pcs] : []);
+
+  const candidates = [
+    ...pcList.map(r  => r?.category),
+    ...pcsList.map(r => r?.category),
+    product?.category,
+    product?.categoryId,
+  ];
+
+  for (const c of candidates) {
+    const id = extractId(c);
+    if (id) return id;
   }
   return null;
 };
@@ -79,7 +103,7 @@ const CriticalBadge = ({ level, count }) => (
 );
 
 const StockBar = ({ available, minimum }) => {
-  const pct = minimum > 0 ? Math.min(1, available / minimum) : 0;
+  const pct = minimum > 0 ? Math.min(1, Math.max(0, available / minimum)) : 0;
   const crit = getCriticality(available, minimum);
   return (
     <View style={styles.barTrack}>
@@ -124,18 +148,15 @@ const PurchaseSuggestionsPage = () => {
     if (!currentCompany?.id) return;
     setLoading(true);
     try {
-      const [invData, prodsData, catsData] = await Promise.all([
+      const [invData, catsData] = await Promise.all([
         inventoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` }).catch(() => []),
-        productsStore.actions.getItems({ company: `/people/${currentCompany.id}`, active: 1 }).catch(() => []),
-        categoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` }).catch(() => []),
+        categoriesStore.actions.getItems({ people: `/people/${currentCompany.id}`, itemsPerPage: 500 }).catch(() => []),
       ]);
 
       /* mapas auxiliares */
-      const invMap  = {};
+      const invMap = {};
       (invData || []).forEach(inv => { if (inv.id) invMap[String(inv.id)] = inv.inventory; });
-      const prodsMap = {};
-      (prodsData || []).forEach(p => { if (p.id) prodsMap[String(p.id)] = p; });
-      const catsMap  = {};
+      const catsMap = {};
       (catsData || []).forEach(c => { if (c.id) catsMap[String(c.id)] = c.category || `Categoria ${c.id}`; });
 
       /* carrega product_inventories de todos os locais */
@@ -146,12 +167,27 @@ const PurchaseSuggestionsPage = () => {
       );
       const allPI = mergeDedup(piResults.flat());
 
-      /* filtra críticos: minimum > 0 AND available < minimum */
+      /* filtra sugestões: estoque no mínimo ou abaixo, ou negativo */
       const critical = allPI.filter(pi => {
         const avail = parseFloat(pi.available ?? 0);
         const min   = parseFloat(pi.minimum   ?? 0);
-        return min > 0 && avail < min;
+        return avail < 0 || (min > 0 && avail <= min);
       });
+
+      /* busca os produtos referenciados (por IRI, sem depender de paginação) */
+      const uniqueProdIRIs = [...new Set(
+        critical.map(pi => toIRI(pi.product)).filter(Boolean)
+      )];
+      const prodsList = await Promise.all(
+        uniqueProdIRIs.map(iri => {
+          const id = iriToId(iri);
+          return id
+            ? productsStore.actions.get(id).catch(() => null)
+            : Promise.resolve(null);
+        })
+      );
+      const prodsMap = {};
+      prodsList.forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
 
       /* enriquece */
       const enriched = critical.map(pi => {
@@ -162,7 +198,17 @@ const PurchaseSuggestionsPage = () => {
         const invId   = invIRI ? String(iriToId(invIRI)) : null;
         const avail   = parseFloat(pi.available ?? 0);
         const min     = parseFloat(pi.minimum   ?? 0);
+        const max     = parseFloat(pi.maximum   ?? 0);
         const catId   = prod ? extractCategoryId(prod) : null;
+        /* quantidade sugerida:
+           - estoque negativo: valor absoluto + mínimo
+           - até o máximo se definido, senão mínimo + buffer
+        */
+        const deficit = avail < 0
+          ? Math.abs(avail) + (min > 0 ? min : 0)
+          : max > avail
+            ? max - avail
+            : Math.max(1, min - avail + Math.ceil(min * 0.5));
         return {
           ...pi,
           _prodId:   prodId,
@@ -172,7 +218,8 @@ const PurchaseSuggestionsPage = () => {
           _invName:  invMap[invId] || `Local #${invId}`,
           _avail:    avail,
           _min:      min,
-          _deficit:  min - avail,
+          _max:      max,
+          _deficit:  deficit,
           _level:    getCriticality(avail, min),
           _catId:    catId,
           _catName:  catId ? (catsMap[catId] || 'Sem Categoria') : 'Sem Categoria',
