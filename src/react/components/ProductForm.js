@@ -194,6 +194,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
   const [product, setProduct] = useState(null);
   const [actionStatus, setActionStatus] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [controlarEstoque, setControlarEstoque] = useState(false);
 
   const isDesktop = width >= 768;
 
@@ -202,6 +203,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
       productActions.get(ProductId).then(async data => {
         const normalized = normalizeProductForForm(data);
         setProduct(normalized);
+        setControlarEstoque(Boolean(normalized?.defaultOutInventory || normalized?.defaultInInventory));
 
         let existingCategoryId = extractCategoryId(data);
 
@@ -445,13 +447,18 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
     if (queueIri) payload.queue = queueIri;
     else delete payload.queue;
 
-    const outIri = toIri(payload.defaultOutInventory, '/inventories/');
-    if (outIri) payload.defaultOutInventory = outIri;
-    else delete payload.defaultOutInventory;
+    if (controlarEstoque) {
+      const outIri = toIri(payload.defaultOutInventory, '/inventories/');
+      if (outIri) payload.defaultOutInventory = outIri;
+      else delete payload.defaultOutInventory;
 
-    const inIri = toIri(payload.defaultInInventory, '/inventories/');
-    if (inIri) payload.defaultInInventory = inIri;
-    else delete payload.defaultInInventory;
+      const inIri = toIri(payload.defaultInInventory, '/inventories/');
+      if (inIri) payload.defaultInInventory = inIri;
+      else delete payload.defaultInInventory;
+    } else {
+      payload.defaultOutInventory = null;
+      payload.defaultInInventory  = null;
+    }
 
     // active → boolean
     payload.active = payload.active === true || payload.active === 1 || payload.active === '1' || String(payload.active).toLowerCase() === 'true';
@@ -650,6 +657,48 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
             <Text style={styles.switchLabel}>Destaque</Text>
             <Switch value={Boolean(product.featured)} onValueChange={val => handleChange('featured', val)} />
           </View>
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchLabel}>Controlar Estoque</Text>
+              <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                Define local de entrada e saída para este produto
+              </Text>
+            </View>
+            <Switch
+              value={controlarEstoque}
+              onValueChange={val => {
+                setControlarEstoque(val);
+                if (!val) {
+                  handleChange('defaultOutInventory', '');
+                  handleChange('defaultInInventory', '');
+                }
+              }}
+            />
+          </View>
+          {controlarEstoque && (
+            <>
+              <SelectField
+                label="Estoque de Saída *"
+                value={product.defaultOutInventory || ''}
+                onChange={val => handleChange('defaultOutInventory', val)}
+                brandColors={brandColors}
+                options={[
+                  { value: '', label: 'Selecione...' },
+                  ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt.id) })),
+                ]}
+              />
+              <SelectField
+                label="Estoque de Entrada *"
+                value={product.defaultInInventory || ''}
+                onChange={val => handleChange('defaultInInventory', val)}
+                brandColors={brandColors}
+                options={[
+                  { value: '', label: 'Selecione...' },
+                  ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt.id) })),
+                ]}
+              />
+            </>
+          )}
           <SelectField
             label="Fila"
             value={product.queue || ''}
@@ -658,26 +707,6 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
             options={[
               { value: '', label: 'Sem fila' },
               ...(queuesGetters.items || []).map(opt => ({ value: opt.id, label: opt.queue || opt.name || String(opt.id) })),
-            ]}
-          />
-          <SelectField
-            label="Estoque de Saída"
-            value={product.defaultOutInventory || ''}
-            onChange={val => handleChange('defaultOutInventory', val)}
-            brandColors={brandColors}
-            options={[
-              { value: '', label: 'Padrão' },
-              ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt.id) })),
-            ]}
-          />
-          <SelectField
-            label="Estoque de Entrada"
-            value={product.defaultInInventory || ''}
-            onChange={val => handleChange('defaultInInventory', val)}
-            brandColors={brandColors}
-            options={[
-              { value: '', label: 'Padrão' },
-              ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt.id) })),
             ]}
           />
           <View style={styles.fieldWrap}>

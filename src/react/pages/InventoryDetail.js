@@ -17,7 +17,6 @@ import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedM
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
-import { logMovement } from '@controleonline/ui-products/src/react/services/inventoryMovementLog';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -68,11 +67,21 @@ const SkeletonRow = () => (
   </View>
 );
 
+/* cache de status de order para evitar query repetida */
+let _orderStatusIRI = null;
+const fetchOrderStatus = async statusStore => {
+  if (_orderStatusIRI) return _orderStatusIRI;
+  const data = await statusStore.actions.getItems({ context: 'order', realStatus: 'pending' }).catch(() => []);
+  const s = (data || [])[0];
+  if (s?.id) { _orderStatusIRI = `/statuses/${s.id}`; return _orderStatusIRI; }
+  return null;
+};
+
 /* ═══════════════════════════════════════════════════════════════════════
    Modal de Movimentação — definido fora para estabilidade de referência
    ═══════════════════════════════════════════════════════════════════════ */
 
-const MovementModal = ({
+export const MovementModal = ({
   visible,
   row,
   inventories,
@@ -82,6 +91,12 @@ const MovementModal = ({
   onClose,
   onMoved,
 }) => {
+  const ordersStore       = useStore('orders');
+  const orderProductStore = useStore('order_products');
+  const statusStore       = useStore('status');
+  const peopleStore       = useStore('people');
+  const { currentCompany } = peopleStore.getters;
+
   const [op, setOp]           = useState('in');
   const [qty, setQty]         = useState('');
   const [destInv, setDestInv] = useState(null);
@@ -95,6 +110,26 @@ const MovementModal = ({
 
   const productName = row ? (extractProduct(row.product).name || `#${row.id}`) : '';
 
+  /* cria order + order_product para registrar a movimentação no backend */
+  const createOrderRecord = async (orderType, prodId, opInvIRI, opOutInvIRI) => {
+    const statusIRI = await fetchOrderStatus(statusStore);
+    const orderPayloadBase = {
+      orderType,
+      provider: `/people/${currentCompany.id}`,
+      app: 'StockAdjustment',
+    };
+    if (statusIRI) orderPayloadBase.status = statusIRI;
+    const order = await ordersStore.actions.save(orderPayloadBase);
+    const opPayload = {
+      order:    `/orders/${order.id}`,
+      product:  `/products/${prodId}`,
+      quantity: parseFloat(String(qty).replace(',', '.')),
+    };
+    if (opInvIRI)    opPayload.inInventory  = opInvIRI;
+    if (opOutInvIRI) opPayload.outInventory = opOutInvIRI;
+    await orderProductStore.actions.save(opPayload);
+  };
+
   const confirm = async () => {
     const amount = parseFloat(String(qty).replace(',', '.'));
     if (!amount || amount <= 0) { setError('Informe uma quantidade válida'); return; }
@@ -104,55 +139,41 @@ const MovementModal = ({
     setError('');
     try {
       const curAvail = parseFloat(row?.available ?? 0);
-
-      const { id: prodId, name: prodName, type: prodType } = extractProduct(row.product);
+      const { id: prodId } = extractProduct(row.product);
+      const invIRI = row._inventoryIRI || (currentInventory?.id ? `/inventories/${currentInventory.id}` : null);
 
       if (op === 'in') {
-        /* Entrada: aumenta disponível */
+        /* Entrada: aumenta disponível + registra como purchase */
         if (row.id) {
           await productInvStore.actions.save({ id: row.id, available: curAvail + amount });
         } else {
-          /* ainda não há registro — cria */
           await productInvStore.actions.save({
-            inventory: row._inventoryIRI,
+            inventory: invIRI,
             product:   `/products/${prodId}`,
             available: amount,
           });
         }
-        logMovement({
-          type: 'in',
-          productId: prodId, productName: prodName, productType: prodType,
-          inventoryId: currentInventory?.id, inventoryName: currentInventory?.inventory,
-          destInventoryId: null, destInventoryName: null,
-          quantity: amount,
-          availableBefore: curAvail,
-          availableAfter: curAvail + amount,
-        });
+        await createOrderRecord('purchase', prodId, invIRI, null);
         onMoved({ rowId: row.id, delta: amount, op });
+
       } else if (op === 'out') {
-        /* Saída: diminui disponível */
+        /* Saída: diminui disponível + registra como sale */
         if (row.id) {
           await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
         }
-        logMovement({
-          type: 'out',
-          productId: prodId, productName: prodName, productType: prodType,
-          inventoryId: currentInventory?.id, inventoryName: currentInventory?.inventory,
-          destInventoryId: null, destInventoryName: null,
-          quantity: amount,
-          availableBefore: curAvail,
-          availableAfter: Math.max(0, curAvail - amount),
-        });
+        await createOrderRecord('sale', prodId, null, invIRI);
         onMoved({ rowId: row.id, delta: -amount, op });
+
       } else if (op === 'transfer') {
-        /* Transferência: diminui origem, aumenta destino */
+        /* Transferência: diminui origem, aumenta destino + registra como transfer */
+        const destIRI = `/inventories/${destInv.id}`;
+
         if (row.id) {
           await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
         }
 
-        /* localiza ou cria PI no destino */
         const destPiData = await productInvStore.actions.getItems({
-          'inventory': `/inventories/${destInv.id}`,
+          'inventory': destIRI,
           'product':   `/products/${prodId}`,
         }).catch(() => []);
 
@@ -164,20 +185,13 @@ const MovementModal = ({
           });
         } else {
           await productInvStore.actions.save({
-            inventory: `/inventories/${destInv.id}`,
+            inventory: destIRI,
             product:   `/products/${prodId}`,
             available: amount,
           });
         }
-        logMovement({
-          type: 'transfer',
-          productId: prodId, productName: prodName, productType: prodType,
-          inventoryId: currentInventory?.id, inventoryName: currentInventory?.inventory,
-          destInventoryId: destInv?.id, destInventoryName: destInv?.inventory,
-          quantity: amount,
-          availableBefore: curAvail,
-          availableAfter: Math.max(0, curAvail - amount),
-        });
+        /* um único order_product com outInventory (origem) e inInventory (destino) */
+        await createOrderRecord('transfer', prodId, destIRI, invIRI);
         onMoved({ rowId: row.id, delta: -amount, op });
       }
 

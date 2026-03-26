@@ -6,6 +6,8 @@ import ProductDetails from '@controleonline/ui-products/src/react/pages/ProductD
 import Inventories from '@controleonline/ui-products/src/react/pages/Inventories';
 import InventoryDetail from '@controleonline/ui-products/src/react/pages/InventoryDetail';
 import InventoryMovements from '@controleonline/ui-products/src/react/pages/InventoryMovements';
+import PurchaseSuggestions from '@controleonline/ui-products/src/react/pages/PurchaseSuggestions';
+import PurchaseForm from '@controleonline/ui-products/src/react/pages/PurchaseForm';
 
 const ordersRoutes = [
   {
@@ -83,6 +85,26 @@ const ordersRoutes = [
       title: 'Histórico de Movimentações',
     },
     initialParams: { store: 'inventories' },
+  },
+  {
+    name: 'PurchaseSuggestionsPage',
+    component: PurchaseSuggestions,
+    options: {
+      headerShown: true,
+      headerBackVisible: true,
+      title: 'Sugestões de Compra',
+    },
+    initialParams: { store: 'product_inventories' },
+  },
+  {
+    name: 'PurchaseFormPage',
+    component: PurchaseForm,
+    options: {
+      headerShown: true,
+      headerBackVisible: true,
+      title: 'Registrar Compra',
+    },
+    initialParams: { store: 'orders' },
   },
 ];
 

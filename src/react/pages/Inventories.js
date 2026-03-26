@@ -108,9 +108,21 @@ const InventoriesPage = () => {
       >
         <View style={{ width: maxW, paddingHorizontal: gap / 2, paddingTop: 16 }}>
 
-          {/* Banner Histórico de Movimentações */}
+          {/* Banners de acesso rápido */}
           <TouchableOpacity
             style={styles.historyBanner}
+            onPress={() => navigation.navigate('PurchaseSuggestionsPage')}
+            activeOpacity={0.75}
+          >
+            <View style={styles.historyBannerLeft}>
+              <MaterialCommunityIcons name="cart-arrow-down" size={18} color="#16A34A" />
+              <Text style={[styles.historyBannerText, { color: '#166534' }]}>Sugestões de Compra</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.historyBanner, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', marginBottom: 16 }]}
             onPress={() => navigation.navigate('InventoryMovements')}
             activeOpacity={0.75}
           >
@@ -265,8 +277,8 @@ const styles = StyleSheet.create({
 
   historyBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#F5F3FF', borderRadius: 14, borderWidth: 1, borderColor: '#DDD6FE',
-    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16,
+    backgroundColor: '#F0FDF4', borderRadius: 14, borderWidth: 1, borderColor: '#BBF7D0',
+    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 8,
   },
   historyBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   historyBannerText: { fontSize: 14, fontWeight: '700', color: '#6D28D9' },
