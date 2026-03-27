@@ -63,6 +63,9 @@ const ProductsPage = ({ navigation, route }) => {
   const categoryActions = categoriesStore.actions;
   const { items: categories } = categoriesGetters;
 
+  const productCategoryStore = useStore('product_category');
+  const productCategoryActions = productCategoryStore.actions;
+
   const peopleStore = useStore('people');
   const { currentCompany } = peopleStore.getters;
 
@@ -129,26 +132,29 @@ const ProductsPage = ({ navigation, route }) => {
 
     if (isNoCategory) {
       /*
-       * Filtro "Sem Categoria": busca produtos sem nenhuma categoria vinculada.
-       * Combina duas consultas:
-       *   1) productCategory[exists]=false → sem registro na tabela junction
-       *   2) category[exists]=false        → sem campo category direto
-       * Mescla e desdup para cobrir ambos os casos.
+       * Filtro "Sem Categoria": ExistsFilter do API Platform nao esta configurado
+       * no entity Product para productCategory, entao e ignorado pelo backend.
+       * Solucao: buscar todos os product_categories da empresa para montar o
+       * conjunto de productIds que TEM categoria, depois filtrar client-side.
        */
       if (!categoryProducts || categoryProducts.length === 0) {
         setLoading(true);
         Promise.all([
-          actions.getItems({ ...baseParams, 'productCategory[exists]': false }).catch(() => []),
-          actions.getItems({ ...baseParams, 'category[exists]': false }).catch(() => []),
+          actions.getItems({ ...baseParams, itemsPerPage: 1000 }).catch(() => []),
+          productCategoryActions.getItems({ itemsPerPage: 2000 }).catch(() => []),
         ])
-          .then(([withoutJunction, withoutDirect]) => {
-            const seen = new Set();
-            const merged = [...(withoutJunction || []), ...(withoutDirect || [])].filter(p => {
-              if (!p?.id || seen.has(p.id)) return false;
-              seen.add(p.id);
-              return true;
-            });
-            setCategoryProducts(merged);
+          .then(([allProducts, allRelations]) => {
+            const withCategoryIds = new Set(
+              (allRelations || []).map(r => {
+                const iri = typeof r.product === 'string' ? r.product : r.product?.['@id'] || '';
+                const match = iri.match(/\/products\/(\d+)/);
+                return match ? String(match[1]) : null;
+              }).filter(Boolean)
+            );
+            const withoutCategory = (allProducts || []).filter(
+              p => p?.id && !withCategoryIds.has(String(p.id))
+            );
+            setCategoryProducts(withoutCategory);
             setLoading(false);
           })
           .catch(() => setLoading(false));
