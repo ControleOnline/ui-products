@@ -123,12 +123,13 @@ const PurchaseSuggestionsPage = () => {
   const { width }  = useWindowDimensions();
   const maxW = Math.min(width, 860);
 
-  const peopleStore      = useStore('people');
-  const themeStore       = useStore('theme');
-  const productInvStore  = useStore('product_inventories');
-  const inventoriesStore = useStore('inventories');
-  const productsStore    = useStore('products');
-  const categoriesStore  = useStore('categories');
+  const peopleStore           = useStore('people');
+  const themeStore            = useStore('theme');
+  const productInvStore       = useStore('product_inventories');
+  const inventoriesStore      = useStore('inventories');
+  const productsStore         = useStore('products');
+  const categoriesStore       = useStore('categories');
+  const productCategoryStore  = useStore('product_category');
 
   const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
@@ -189,6 +190,22 @@ const PurchaseSuggestionsPage = () => {
       const prodsMap = {};
       prodsList.forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
 
+      /* busca product_categories para todos os produtos críticos em batch.
+         A API do product não retorna productCategory embutido, então o
+         extractCategoryId sempre retornaria null. Aqui pegamos direto da
+         junction e montamos prodCatMap[productId] → categoryId. */
+      const prodCatRelations = await productCategoryStore.actions
+        .getItems({ itemsPerPage: 2000 })
+        .catch(() => []);
+      const prodCatMap = {};
+      (prodCatRelations || []).forEach(rel => {
+        const prodIRI = typeof rel.product === 'string' ? rel.product : rel.product?.['@id'] || '';
+        const catIRI  = typeof rel.category === 'string' ? rel.category : rel.category?.['@id'] || '';
+        const pId = String(iriToId(prodIRI) || '');
+        const cId = String(iriToId(catIRI)  || '');
+        if (pId && cId && !prodCatMap[pId]) prodCatMap[pId] = cId;
+      });
+
       /* enriquece */
       const enriched = critical.map(pi => {
         const prodIRI = toIRI(pi.product);
@@ -199,7 +216,8 @@ const PurchaseSuggestionsPage = () => {
         const avail   = parseFloat(pi.available ?? 0);
         const min     = parseFloat(pi.minimum   ?? 0);
         const max     = parseFloat(pi.maximum   ?? 0);
-        const catId   = prod ? extractCategoryId(prod) : null;
+        /* catId vem da junction (prodCatMap), que é a fonte confiável */
+        const catId   = prodId ? (prodCatMap[prodId] || null) : null;
         /* quantidade sugerida:
            - estoque negativo: valor absoluto + mínimo
            - até o máximo se definido, senão mínimo + buffer
