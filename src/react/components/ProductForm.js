@@ -281,7 +281,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
 
     if (queuesStore?.actions && !listsRequested.queues) {
       setListsRequested(prev => ({ ...prev, queues: true }));
-      queuesStore.actions.getItems({ people: peopleIRI }).catch(() => {});
+      queuesStore.actions.getItems({ company: peopleIRI }).catch(() => {});
     }
 
     if (inventoriesStore?.actions && !listsRequested.inventories) {
