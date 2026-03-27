@@ -10,8 +10,10 @@ import { useStore } from '@store';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 const TYPE_OPTIONS = [
-  { key: 'default',   label: 'Padrão',   icon: 'home-outline', color: '#3B82F6', bg: '#EFF6FF' },
-  { key: 'warehouse', label: 'Depósito', icon: 'warehouse',     color: '#D97706', bg: '#FFFBEB' },
+  { key: 'sales',        label: 'Vendas',        icon: 'cart-outline',       color: '#3B82F6', bg: '#EFF6FF' },
+  { key: 'internal',     label: 'Interno',        icon: 'home-outline',       color: '#6366F1', bg: '#EEF2FF' },
+  { key: 'consignment',  label: 'Consignação',    icon: 'swap-horizontal',    color: '#D97706', bg: '#FFFBEB' },
+  { key: 'damaged',      label: 'Avariado',       icon: 'alert-circle-outline', color: '#DC2626', bg: '#FEF2F2' },
 ];
 
 const InventoryForm = forwardRef(({ inventory, onSaved }, ref) => {
@@ -20,7 +22,7 @@ const InventoryForm = forwardRef(({ inventory, onSaved }, ref) => {
   const { currentCompany } = peopleStore.getters;
 
   const [name, setName] = useState(inventory?.inventory || '');
-  const [type, setType] = useState(inventory?.type || 'default');
+  const [type, setType] = useState(inventory?.type || 'sales');
   const [errors, setErrors] = useState({});
 
   const validate = () => {

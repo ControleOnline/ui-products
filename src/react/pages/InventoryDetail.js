@@ -46,13 +46,19 @@ const fmtN = v => {
   return isNaN(n) ? '0' : n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 };
 
-/* extrai id/nome/tipo/sku do campo product (IRI ou objeto) */
+/* extrai id/nome/tipo/sku/descricao do campo product (IRI ou objeto) */
 const extractProduct = p => {
-  if (!p) return { id: null, name: null, type: null, sku: null };
+  if (!p) return { id: null, name: null, type: null, sku: null, description: null };
   if (typeof p === 'object') {
-    return { id: p.id || null, name: p.product || null, type: p.type || null, sku: p.sku || null };
+    return {
+      id:          p.id          || null,
+      name:        p.product     || null,
+      type:        p.type        || null,
+      sku:         p.sku         || null,
+      description: p.description || null,
+    };
   }
-  return { id: String(p).replace(/\D/g, '') || null, name: null, type: null, sku: null };
+  return { id: String(p).replace(/\D/g, '') || null, name: null, type: null, sku: null, description: null };
 };
 
 /* ─── Skeleton ──────────────────────────────────────────────────────── */
@@ -824,7 +830,7 @@ const InventoryDetailPage = ({ route }) => {
               </View>
 
               {filteredRows.map((row, idx) => {
-                const { name, type, sku } = extractProduct(row.product);
+                const { name, type, sku, description } = extractProduct(row.product);
                 const ptConf  = PRODUCT_TYPE_CONFIG[type] || null;
                 const isLow   = row.minimum > 0 && row.available <= row.minimum;
                 const hasPI   = !!row.id;
@@ -838,6 +844,11 @@ const InventoryDetailPage = ({ route }) => {
                       <Text style={styles.productName} numberOfLines={1}>
                         {name || `Produto #${extractProduct(row.product).id}`}
                       </Text>
+                      {!!description && (
+                        <Text style={styles.productDescription} numberOfLines={1}>
+                          {description}
+                        </Text>
+                      )}
                       <View style={styles.productMeta}>
                         {ptConf && (
                           <View style={[styles.miniChip, { backgroundColor: ptConf.bg }]}>
@@ -1129,7 +1140,8 @@ const styles = StyleSheet.create({
   },
   productRowDivider: { borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
   rowLeft: { flex: 1 },
-  productName: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
+  productName: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
+  productDescription: { fontSize: 11, color: '#64748B', marginBottom: 4 },
   productMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
   miniChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
   miniChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
