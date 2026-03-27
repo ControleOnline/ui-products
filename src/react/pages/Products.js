@@ -130,17 +130,25 @@ const ProductsPage = ({ navigation, route }) => {
     if (isNoCategory) {
       /*
        * Filtro "Sem Categoria": busca produtos sem nenhuma categoria vinculada.
-       * Usa o ExistsFilter do API Platform: productCategory[exists]=false
+       * Combina duas consultas:
+       *   1) productCategory[exists]=false → sem registro na tabela junction
+       *   2) category[exists]=false        → sem campo category direto
+       * Mescla e desdup para cobrir ambos os casos.
        */
       if (!categoryProducts || categoryProducts.length === 0) {
         setLoading(true);
-        actions
-          .getItems({
-            ...baseParams,
-            'productCategory[exists]': false,
-          })
-          .then(data => {
-            setCategoryProducts(data || []);
+        Promise.all([
+          actions.getItems({ ...baseParams, 'productCategory[exists]': false }).catch(() => []),
+          actions.getItems({ ...baseParams, 'category[exists]': false }).catch(() => []),
+        ])
+          .then(([withoutJunction, withoutDirect]) => {
+            const seen = new Set();
+            const merged = [...(withoutJunction || []), ...(withoutDirect || [])].filter(p => {
+              if (!p?.id || seen.has(p.id)) return false;
+              seen.add(p.id);
+              return true;
+            });
+            setCategoryProducts(merged);
             setLoading(false);
           })
           .catch(() => setLoading(false));

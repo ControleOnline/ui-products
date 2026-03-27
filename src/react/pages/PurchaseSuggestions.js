@@ -150,7 +150,7 @@ const PurchaseSuggestionsPage = () => {
     try {
       const [invData, catsData] = await Promise.all([
         inventoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` }).catch(() => []),
-        categoriesStore.actions.getItems({ people: `/people/${currentCompany.id}`, context: 'products', itemsPerPage: 500 }).catch(() => []),
+        categoriesStore.actions.getItems({ company: currentCompany.id, context: 'products', itemsPerPage: 500 }).catch(() => []),
       ]);
 
       /* mapas auxiliares */
