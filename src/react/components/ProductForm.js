@@ -259,24 +259,36 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
   }, [getData]);
 
   const [listsRequested, setListsRequested] = useState({ units: false, queues: false, inventories: false });
+
+  // reseta flags ao trocar de empresa para recarregar listas da empresa correta
+  const prevCompanyIdRef = React.useRef(null);
   useEffect(() => {
-    const companyId = currentCompany?.id;
-
-    if (productUnitStore?.actions && (!productUnitGetters.items || productUnitGetters.items.length === 0) && !listsRequested.units) {
-      setListsRequested(prev => ({ ...prev, units: true }));
-      productUnitStore.actions.getItems({ company: companyId }).catch(() => {});
-    }
-
-    if (queuesStore?.actions && (!queuesGetters.items || queuesGetters.items.length === 0) && !listsRequested.queues) {
-      setListsRequested(prev => ({ ...prev, queues: true }));
-      queuesStore.actions.getItems({ company: companyId }).catch(() => {});
-    }
-
-    if (inventoriesStore?.actions && (!inventoriesGetters.items || inventoriesGetters.items.length === 0) && !listsRequested.inventories) {
-      setListsRequested(prev => ({ ...prev, inventories: true }));
-      inventoriesStore.actions.getItems({ company: companyId }).catch(() => {});
+    if (prevCompanyIdRef.current !== currentCompany?.id) {
+      prevCompanyIdRef.current = currentCompany?.id;
+      setListsRequested({ units: false, queues: false, inventories: false });
     }
   }, [currentCompany?.id]);
+
+  useEffect(() => {
+    const companyId = currentCompany?.id;
+    if (!companyId) return;
+    const peopleIRI = `/people/${companyId}`;
+
+    if (productUnitStore?.actions && !listsRequested.units) {
+      setListsRequested(prev => ({ ...prev, units: true }));
+      productUnitStore.actions.getItems({ people: peopleIRI }).catch(() => {});
+    }
+
+    if (queuesStore?.actions && !listsRequested.queues) {
+      setListsRequested(prev => ({ ...prev, queues: true }));
+      queuesStore.actions.getItems({ people: peopleIRI }).catch(() => {});
+    }
+
+    if (inventoriesStore?.actions && !listsRequested.inventories) {
+      setListsRequested(prev => ({ ...prev, inventories: true }));
+      inventoriesStore.actions.getItems({ people: peopleIRI }).catch(() => {});
+    }
+  }, [currentCompany?.id, listsRequested]);
 
   useEffect(() => {
     if (!currentCompany?.id) return;
