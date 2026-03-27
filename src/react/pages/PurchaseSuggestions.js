@@ -150,14 +150,14 @@ const PurchaseSuggestionsPage = () => {
     try {
       const [invData, catsData] = await Promise.all([
         inventoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` }).catch(() => []),
-        categoriesStore.actions.getItems({ people: `/people/${currentCompany.id}`, itemsPerPage: 500 }).catch(() => []),
+        categoriesStore.actions.getItems({ people: `/people/${currentCompany.id}`, context: 'products', itemsPerPage: 500 }).catch(() => []),
       ]);
 
       /* mapas auxiliares */
       const invMap = {};
       (invData || []).forEach(inv => { if (inv.id) invMap[String(inv.id)] = inv.inventory; });
       const catsMap = {};
-      (catsData || []).forEach(c => { if (c.id) catsMap[String(c.id)] = c.category || `Categoria ${c.id}`; });
+      (catsData || []).forEach(c => { if (c.id) catsMap[String(c.id)] = c.name || c.category || `Categoria ${c.id}`; });
 
       /* carrega product_inventories de todos os locais */
       const piResults = await Promise.all(
