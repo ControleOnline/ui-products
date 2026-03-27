@@ -36,8 +36,8 @@ const PRODUCT_TYPE_CONFIG = {
 };
 
 const MOVEMENT_OPS = [
-  { key: 'in',       label: 'Entrada',       icon: 'arrow-down-circle',    color: '#16A34A', bg: '#F0FDF4' },
-  { key: 'out',      label: 'Saída',         icon: 'arrow-up-circle',      color: '#DC2626', bg: '#FEF2F2' },
+  { key: 'in',       label: 'Compra',        icon: 'cart-arrow-down',       color: '#16A34A', bg: '#F0FDF4' },
+  { key: 'out',      label: 'Perda',         icon: 'alert-circle-outline',  color: '#DC2626', bg: '#FEF2F2' },
   { key: 'transfer', label: 'Transferência', icon: 'swap-horizontal-circle', color: '#7C3AED', bg: '#F5F3FF' },
 ];
 
@@ -96,6 +96,7 @@ export const MovementModal = ({
   currentInventory,
   onClose,
   onMoved,
+  navigation,
 }) => {
   const ordersStore       = useStore('orders');
   const orderProductStore = useStore('order_products');
@@ -241,11 +242,38 @@ export const MovementModal = ({
             <View style={movStyles.opsRow}>
               {MOVEMENT_OPS.map(opt => {
                 const active = op === opt.key;
+                const handleOpPress = () => {
+                  if (opt.key === 'in') {
+                    /* Compra: abre PurchaseFormPage com produto pré-selecionado */
+                    const { id: prodId, name: prodName, type: prodType } = extractProduct(row?.product);
+                    const invId   = row?._inventoryIRI
+                      ? String(iriToId(row._inventoryIRI))
+                      : currentInventory?.id ? String(currentInventory.id) : null;
+                    const invName = currentInventory?.inventory || `Local #${invId}`;
+                    resetAndClose();
+                    if (navigation) {
+                      navigation.navigate('PurchaseFormPage', {
+                        items: [{
+                          piId:            row?.id || null,
+                          productId:       prodId ? String(prodId) : null,
+                          productName:     prodName || `Produto #${prodId}`,
+                          productType:     prodType || null,
+                          suggestedQty:    1,
+                          inInventoryId:   invId,
+                          inInventoryName: invName,
+                        }],
+                      });
+                    }
+                    return;
+                  }
+                  setOp(opt.key);
+                  setError('');
+                };
                 return (
                   <TouchableOpacity
                     key={opt.key}
                     style={[movStyles.opChip, active && { backgroundColor: opt.bg, borderColor: opt.color }]}
-                    onPress={() => { setOp(opt.key); setError(''); }}
+                    onPress={handleOpPress}
                     activeOpacity={0.75}
                   >
                     <MaterialCommunityIcons
@@ -259,14 +287,14 @@ export const MovementModal = ({
               })}
             </View>
 
-            {/* Quantidade */}
+            {/* Quantidade (oculto para Compra pois redireciona ao PurchaseForm) */}
+            {op !== 'in' && (
             <View style={movStyles.field}>
               <Text style={movStyles.fieldLabel}>Quantidade</Text>
               <TextInput
                 style={[
                   movStyles.qtyInput,
-                  op === 'in'  && { borderColor: '#16A34A', color: '#16A34A' },
-                  op === 'out' && { borderColor: '#DC2626', color: '#DC2626' },
+                  op === 'out'      && { borderColor: '#DC2626', color: '#DC2626' },
                   op === 'transfer' && { borderColor: '#7C3AED', color: '#7C3AED' },
                 ]}
                 value={qty}
@@ -277,6 +305,7 @@ export const MovementModal = ({
                 selectTextOnFocus
               />
             </View>
+            )}
 
             {/* Destino (transferência) */}
             {op === 'transfer' && (
