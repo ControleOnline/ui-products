@@ -589,20 +589,8 @@ const InventoryDetailPage = ({ route }) => {
   const [search, setSearch]     = useState('');
 
   /* modais */
-  const [movRow, setMovRow]         = useState(null);
-  const [editRow, setEditRow]       = useState(null);
-  const [addVisible, setAddVisible] = useState(false);
-
-  /* modal adicionar */
-  const [productSearch, setProductSearch]   = useState('');
-  const [productResults, setProductResults] = useState([]);
-  const [searching, setSearching]           = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [addAvail, setAddAvail]   = useState('0');
-  const [addMin, setAddMin]       = useState('0');
-  const [addMax, setAddMax]       = useState('0');
-  const [addSaving, setAddSaving] = useState(false);
-  const [addError, setAddError]   = useState('');
+  const [movRow, setMovRow]   = useState(null);
+  const [editRow, setEditRow] = useState(null);
 
   /* ─── carregamento mesclado ─────────────────────────────────────── */
 
@@ -742,64 +730,6 @@ const InventoryDetailPage = ({ route }) => {
     setRows(prev => prev.map(r =>
       r.id === editRow?.id ? { ...r, ...values } : r
     ));
-  };
-
-  /* ─── adicionar produto ────────────────────────────────────────── */
-
-  const openAdd = () => {
-    setProductSearch(''); setProductResults([]);
-    setSelectedProduct(null);
-    setAddAvail('0'); setAddMin('0'); setAddMax('0');
-    setAddError('');
-    setAddVisible(true);
-  };
-
-  const searchProducts = useCallback(async (q) => {
-    if (!q.trim() || !currentCompany?.id) { setProductResults([]); return; }
-    setSearching(true);
-    try {
-      const data = await productsStore.actions.getItems({
-        company: currentCompany.id, product: q.trim(), active: 1, itemsPerPage: 20,
-      });
-      const existingIds = new Set(rows.map(r => String(extractProduct(r.product).id)));
-      setProductResults((data || []).filter(p => !existingIds.has(String(p.id))));
-    } catch (_) { setProductResults([]); }
-    finally { setSearching(false); }
-  }, [currentCompany?.id, rows]);
-
-  const handleProdSearchChange = (v) => {
-    setProductSearch(v);
-    if (selectedProduct) setSelectedProduct(null);
-    clearTimeout(handleProdSearchChange._t);
-    handleProdSearchChange._t = setTimeout(() => searchProducts(v), 350);
-  };
-
-  const handleAddToInventory = async () => {
-    if (!selectedProduct) { setAddError('Selecione um produto'); return; }
-    setAddSaving(true); setAddError('');
-    try {
-      const saved = await productInvStore.actions.save({
-        inventory: `/inventories/${inventory.id}`,
-        product:   `/products/${selectedProduct.id}`,
-        available: parseFloat(String(addAvail).replace(',', '.')) || 0,
-        minimum:   parseFloat(String(addMin).replace(',', '.'))   || 0,
-        maximum:   parseFloat(String(addMax).replace(',', '.'))   || 0,
-      });
-      setRows(prev => {
-        /* se já existia como row virtual (sem id), substitui */
-        const idx = prev.findIndex(r => String(extractProduct(r.product).id) === String(selectedProduct.id));
-        const newRow = { ...saved, product: selectedProduct, _inventoryIRI: `/inventories/${inventory.id}` };
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = newRow;
-          return next;
-        }
-        return [...prev, newRow];
-      });
-      setAddVisible(false);
-    } catch (e) {
-      setAddError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao adicionar');
-    } finally { setAddSaving(false); }
   };
 
   /* ─── render ─────────────────────────────────────────────────── */
@@ -1001,20 +931,6 @@ const InventoryDetailPage = ({ route }) => {
         </View>
       </ScrollView>
 
-      {/* Botão Adicionar (só quando não é sentinel) */}
-      {!isNoInventory && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.bottomBarBtn, { backgroundColor: brandColors.primary }]}
-            onPress={openAdd}
-            activeOpacity={0.85}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.bottomBarBtnText}>Adicionar Produto</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* ── Modal Movimentação ────────────────────────────────────────── */}
       <MovementModal
         visible={!!movRow}
@@ -1038,109 +954,6 @@ const InventoryDetailPage = ({ route }) => {
         onSaved={handleEditSaved}
       />
 
-      {/* ── Modal Adicionar Produto ───────────────────────────────────── */}
-      <AnimatedModal visible={addVisible} onRequestClose={() => setAddVisible(false)} style={{ justifyContent: 'flex-end' }}>
-        <View style={addStyles.container}>
-          <View style={addStyles.header}>
-            <Text style={addStyles.title}>Adicionar Produto</Text>
-            <TouchableOpacity onPress={() => setAddVisible(false)} style={addStyles.closeBtn}>
-              <MaterialCommunityIcons name="close" size={18} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
-            <View style={addStyles.body}>
-              {!!addError && (
-                <View style={addStyles.errorBanner}>
-                  <MaterialCommunityIcons name="alert-circle-outline" size={15} color="#DC2626" />
-                  <Text style={addStyles.errorText}>{addError}</Text>
-                </View>
-              )}
-              <View style={addStyles.field}>
-                <Text style={addStyles.fieldLabel}>Produto <Text style={{ color: '#EF4444' }}>*</Text></Text>
-                <View style={[
-                  addStyles.searchWrap,
-                  selectedProduct && { borderColor: brandColors.primary, backgroundColor: '#F0FDF4' },
-                ]}>
-                  <MaterialCommunityIcons
-                    name={selectedProduct ? 'check-circle' : 'magnify'}
-                    size={18}
-                    color={selectedProduct ? brandColors.primary : '#94A3B8'}
-                    style={{ marginRight: 8 }}
-                  />
-                  <TextInput
-                    style={addStyles.searchInput}
-                    value={productSearch}
-                    onChangeText={handleProdSearchChange}
-                    placeholder="Digite o nome do produto..."
-                    placeholderTextColor="#CBD5E1"
-                  />
-                  {searching && <ActivityIndicator size="small" color="#94A3B8" />}
-                </View>
-                {productResults.length > 0 && (
-                  <View style={addStyles.dropdown}>
-                    {productResults.map(p => {
-                      const ptConf = PRODUCT_TYPE_CONFIG[p.type] || null;
-                      return (
-                        <TouchableOpacity
-                          key={p.id}
-                          style={addStyles.dropdownItem}
-                          onPress={() => { setSelectedProduct(p); setProductSearch(p.product); setProductResults([]); }}
-                          activeOpacity={0.75}
-                        >
-                          <Text style={addStyles.dropdownName} numberOfLines={1}>{p.product}</Text>
-                          {ptConf && (
-                            <View style={[styles.miniChip, { backgroundColor: ptConf.bg }]}>
-                              <Text style={[styles.miniChipText, { color: ptConf.color }]}>{ptConf.label}</Text>
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-                {!searching && productSearch.trim().length > 1 && !selectedProduct && productResults.length === 0 && (
-                  <Text style={addStyles.noResults}>Nenhum produto encontrado.</Text>
-                )}
-              </View>
-              <View style={addStyles.fieldsRow}>
-                {[
-                  { label: 'Disponível', val: addAvail, set: setAddAvail, hl: true },
-                  { label: 'Mínimo',     val: addMin,   set: setAddMin },
-                  { label: 'Máximo',     val: addMax,   set: setAddMax },
-                ].map(f => (
-                  <View key={f.label} style={addStyles.numField}>
-                    <Text style={addStyles.numLabel}>{f.label}</Text>
-                    <TextInput
-                      style={[addStyles.numInput, f.hl && addStyles.numInputHl]}
-                      value={f.val}
-                      onChangeText={f.set}
-                      keyboardType="numeric"
-                      placeholder="0"
-                      placeholderTextColor="#94A3B8"
-                      selectTextOnFocus
-                    />
-                  </View>
-                ))}
-              </View>
-            </View>
-          </ScrollView>
-          <View style={addStyles.footer}>
-            <TouchableOpacity style={addStyles.cancelBtn} onPress={() => setAddVisible(false)}>
-              <Text style={addStyles.cancelText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[addStyles.saveBtn, { backgroundColor: brandColors.primary }, addSaving && { opacity: 0.7 }]}
-              onPress={handleAddToInventory}
-              disabled={addSaving}
-            >
-              {addSaving
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={addStyles.saveText}>Adicionar</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-      </AnimatedModal>
     </SafeAreaView>
   );
 };
@@ -1241,20 +1054,6 @@ const styles = StyleSheet.create({
   emptyIconWrap: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   emptyTitle: { fontSize: 17, fontWeight: '700', color: '#334155', marginBottom: 8, textAlign: 'center' },
   emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
-
-  bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: '#fff',
-    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
-    borderTopWidth: 1, borderTopColor: '#F1F5F9',
-    ...Platform.select({
-      web: { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
-      android: { elevation: 6 },
-    }),
-  },
-  bottomBarBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14 },
-  bottomBarBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 });
 
 /* ─── Estilos modal movimentação ────────────────────────────────────── */
@@ -1352,50 +1151,5 @@ const editStyles = StyleSheet.create({
   saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
 
-/* ─── Estilos modal adicionar produto ───────────────────────────────── */
-
-const addStyles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '92%', width: '100%',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
-      android: { elevation: 10 },
-      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
-    }),
-  },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  title:    { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
-  body: { padding: 24, gap: 18 },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
-  errorText: { fontSize: 13, color: '#DC2626', flex: 1 },
-  field: { gap: 6 },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, backgroundColor: '#F8FAFC' },
-  searchInput: { flex: 1, fontSize: 15, color: '#0F172A', paddingVertical: 12 },
-  dropdown: {
-    borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, backgroundColor: '#fff', marginTop: 4, overflow: 'hidden',
-    ...Platform.select({
-      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.08)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
-      android: { elevation: 3 },
-    }),
-  },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F8FAFC', gap: 8 },
-  dropdownName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  noResults: { fontSize: 12, color: '#94A3B8', marginTop: 6, paddingHorizontal: 2 },
-  fieldsRow: { flexDirection: 'row', gap: 12 },
-  numField: { flex: 1, gap: 6 },
-  numLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
-  numInput: { borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, fontSize: 18, fontWeight: '700', color: '#0F172A', backgroundColor: '#F8FAFC', textAlign: 'center' },
-  numInputHl: { borderColor: '#16A34A', backgroundColor: '#F0FDF4', color: '#16A34A' },
-  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center' },
-  cancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
-  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-});
 
 export default InventoryDetailPage;

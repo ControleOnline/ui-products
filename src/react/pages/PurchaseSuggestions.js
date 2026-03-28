@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Platform, useWindowDimensions, ActivityIndicator,
@@ -139,10 +139,12 @@ const PurchaseSuggestionsPage = () => {
     [themeColors, currentCompany?.id],
   );
 
-  const [items, setItems]         = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [selected, setSelected]   = useState(new Set()); /* set de piId */
-  const [collapsed, setCollapsed] = useState(new Set()); /* categorias recolhidas */
+  const [items, setItems]           = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [selected, setSelected]     = useState(new Set()); /* set de piId */
+  const [collapsed, setCollapsed]   = useState(new Set()); /* categorias recolhidas */
+  const [visibleCount, setVisibleCount] = useState(50);   /* paginação client-side */
+  const loadingMoreRef = useRef(false);
 
   /* ── carregamento ──────────────────────────────────────────────── */
   const loadData = useCallback(async () => {
@@ -190,13 +192,25 @@ const PurchaseSuggestionsPage = () => {
       const prodsMap = {};
       prodsList.forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
 
-      /* busca product_categories para todos os produtos críticos em batch.
-         A API do product não retorna productCategory embutido, então o
-         extractCategoryId sempre retornaria null. Aqui pegamos direto da
-         junction e montamos prodCatMap[productId] → categoryId. */
-      const prodCatRelations = await productCategoryStore.actions
-        .getItems({ itemsPerPage: 2000 })
-        .catch(() => []);
+      /* busca product_categories apenas para os produtos críticos.
+         Filtra por product IRI para evitar requisitar tudo (2000+).
+         Faz requisições em lotes de 20 IRIs para não sobrecarregar a URL. */
+      const BATCH = 20;
+      const prodCatBatches = [];
+      for (let i = 0; i < uniqueProdIRIs.length; i += BATCH) {
+        prodCatBatches.push(uniqueProdIRIs.slice(i, i + BATCH));
+      }
+      const prodCatResults = await Promise.all(
+        prodCatBatches.map(batch =>
+          productCategoryStore.actions
+            .getItems(Object.fromEntries([
+              ['itemsPerPage', 200],
+              ...batch.map((iri, idx) => [`product[${idx}]`, iri]),
+            ]))
+            .catch(() => [])
+        )
+      );
+      const prodCatRelations = prodCatResults.flat();
       const prodCatMap = {};
       (prodCatRelations || []).forEach(rel => {
         const prodIRI = typeof rel.product === 'string' ? rel.product : rel.product?.['@id'] || '';
@@ -251,6 +265,7 @@ const PurchaseSuggestionsPage = () => {
       });
 
       setItems(enriched);
+      setVisibleCount(50); /* reset paginação a cada carregamento */
       /* pré-seleciona todos */
       setSelected(new Set(enriched.map(e => e.id)));
     } catch (_) {
@@ -262,10 +277,26 @@ const PurchaseSuggestionsPage = () => {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  /* ── agrupamento por categoria ─────────────────────────────────── */
+  /* ── scroll infinito ───────────────────────────────────────────── */
+  const handleScroll = useCallback(({ nativeEvent }) => {
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 300;
+    if (nearBottom && !loadingMoreRef.current && visibleCount < items.length) {
+      loadingMoreRef.current = true;
+      setVisibleCount(prev => {
+        const next = Math.min(prev + 50, items.length);
+        loadingMoreRef.current = false;
+        return next;
+      });
+    }
+  }, [visibleCount, items.length]);
+
+  /* ── agrupamento por categoria (apenas items visíveis) ──────────── */
+  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
+
   const grouped = useMemo(() => {
     const map = new Map();
-    items.forEach(item => {
+    visibleItems.forEach(item => {
       const key = item._catName;
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(item);
@@ -285,7 +316,7 @@ const PurchaseSuggestionsPage = () => {
       });
   }, [items]);
 
-  const selectedItems = useMemo(() => items.filter(i => selected.has(i.id)), [items, selected]);
+  const selectedItems = useMemo(() => visibleItems.filter(i => selected.has(i.id)), [visibleItems, selected]);
 
   const toggleItem = id => {
     setSelected(prev => {
@@ -335,6 +366,8 @@ const PurchaseSuggestionsPage = () => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]}
+        scrollEventThrottle={200}
+        onScroll={handleScroll}
       >
         <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 12 }}>
 
@@ -506,6 +539,16 @@ const PurchaseSuggestionsPage = () => {
               </View>
             );
           })}
+
+          {/* indicador de mais itens disponíveis */}
+          {visibleCount < items.length && (
+            <View style={{ alignItems: 'center', paddingVertical: 16 }}>
+              <ActivityIndicator size="small" color={brandColors.primary} />
+              <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 6 }}>
+                Carregando mais... ({visibleCount}/{items.length})
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
