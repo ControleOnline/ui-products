@@ -177,30 +177,24 @@ const PurchaseSuggestionsPage = () => {
         return avail < 0 || (min > 0 && avail <= min);
       });
 
-      /* busca os produtos referenciados (por IRI, sem depender de paginação) */
+      /* busca todos os produtos da empresa em uma única request (em vez de
+         uma por produto crítico). itemsPerPage cobre a grande maioria dos casos. */
+      const [prodsData, prodCatRelations] = await Promise.all([
+        productsStore.actions.getItems({
+          company: currentCompany.id,
+          active: 1,
+          itemsPerPage: 500,
+        }).catch(() => []),
+        /* busca todas as relações produto↔categoria da empresa em uma request */
+        productCategoryStore.actions.getItems({ itemsPerPage: 500 }).catch(() => []),
+      ]);
+
       const uniqueProdIRIs = [...new Set(
         critical.map(pi => toIRI(pi.product)).filter(Boolean)
       )];
-      const prodsList = await Promise.all(
-        uniqueProdIRIs.map(iri => {
-          const id = iriToId(iri);
-          return id
-            ? productsStore.actions.get(id).catch(() => null)
-            : Promise.resolve(null);
-        })
-      );
-      const prodsMap = {};
-      prodsList.forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
 
-      /* busca product_categories apenas para os produtos críticos,
-         uma requisição por produto (sem itemsPerPage — são poucos itens). */
-      const prodCatRelations = (await Promise.all(
-        uniqueProdIRIs.map(iri =>
-          productCategoryStore.actions
-            .getItems({ product: iri })
-            .catch(() => [])
-        )
-      )).flat();
+      const prodsMap = {};
+      (prodsData || []).forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
       const prodCatMap = {};
       (prodCatRelations || []).forEach(rel => {
         const prodIRI = typeof rel.product === 'string' ? rel.product : rel.product?.['@id'] || '';
