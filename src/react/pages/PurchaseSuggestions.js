@@ -192,25 +192,15 @@ const PurchaseSuggestionsPage = () => {
       const prodsMap = {};
       prodsList.forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
 
-      /* busca product_categories apenas para os produtos críticos.
-         Filtra por product IRI para evitar requisitar tudo (2000+).
-         Faz requisições em lotes de 20 IRIs para não sobrecarregar a URL. */
-      const BATCH = 20;
-      const prodCatBatches = [];
-      for (let i = 0; i < uniqueProdIRIs.length; i += BATCH) {
-        prodCatBatches.push(uniqueProdIRIs.slice(i, i + BATCH));
-      }
-      const prodCatResults = await Promise.all(
-        prodCatBatches.map(batch =>
+      /* busca product_categories apenas para os produtos críticos,
+         uma requisição por produto (sem itemsPerPage — são poucos itens). */
+      const prodCatRelations = (await Promise.all(
+        uniqueProdIRIs.map(iri =>
           productCategoryStore.actions
-            .getItems(Object.fromEntries([
-              ['itemsPerPage', 200],
-              ...batch.map((iri, idx) => [`product[${idx}]`, iri]),
-            ]))
+            .getItems({ product: iri })
             .catch(() => [])
         )
-      );
-      const prodCatRelations = prodCatResults.flat();
+      )).flat();
       const prodCatMap = {};
       (prodCatRelations || []).forEach(rel => {
         const prodIRI = typeof rel.product === 'string' ? rel.product : rel.product?.['@id'] || '';
