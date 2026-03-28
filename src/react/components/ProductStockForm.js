@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useStore } from '@store';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
@@ -55,7 +55,9 @@ const StockTabSkeleton = () => (
 
 /* ─── componente ────────────────────────────────────────────────────── */
 
-const ProductStockForm = ({ ProductId }) => {
+const ProductStockForm = ({ ProductId, rootNavigation }) => {
+  const innerNavigation = useNavigation();
+  const navigation = rootNavigation || innerNavigation;
   const peopleStore     = useStore('people');
   const themeStore      = useStore('theme');
   const productInvStore = useStore('product_inventories');
@@ -131,6 +133,29 @@ const ProductStockForm = ({ ProductId }) => {
       _inventoryIRI:  invIRI,
     });
   };
+
+  const openPurchaseFromStock = useCallback((params) => {
+    let navRef = navigation;
+    let guard = 0;
+    while (navRef && guard < 10) {
+      try {
+        const routeNames = navRef?.getState?.()?.routeNames || [];
+        if (Array.isArray(routeNames) && routeNames.includes('PurchaseFormPage')) {
+          navRef.navigate('PurchaseFormPage', params);
+          return true;
+        }
+      } catch (_) {}
+      navRef = navRef?.getParent?.();
+      guard += 1;
+    }
+
+    try {
+      navigation.navigate('PurchaseFormPage', params);
+      return true;
+    } catch (_) {}
+
+    return false;
+  }, [navigation]);
 
   /* ── guards ─────────────────────────────────────────────────────── */
   if (!ProductId) {
@@ -230,6 +255,7 @@ const ProductStockForm = ({ ProductId }) => {
         brandColors={brandColors}
         productInvStore={productInvStore}
         currentInventory={movInv}
+        onOpenPurchase={openPurchaseFromStock}
         onClose={() => { setMovRow(null); setMovInv(null); }}
         onMoved={delta => {
           handleMoved(delta);

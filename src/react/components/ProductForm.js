@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
-import Carousel from '@controleonline/ui-products/src/react/components/products/Carousel';
 import { useNavigation } from '@react-navigation/native';
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
@@ -541,12 +540,6 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {!!product?.id && (
-          <View style={styles.imageSection}>
-            <Carousel images={product.productFiles || []} style={styles.carouselBox} />
-          </View>
-        )}
-
         {!!actionStatus && (
           <View style={[
             styles.statusBanner,
@@ -772,9 +765,6 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollContent: { padding: 16, paddingBottom: 100 },
-
-  imageSection: { width: '100%', aspectRatio: 16 / 9, borderRadius: 16, overflow: 'hidden', marginBottom: 16, backgroundColor: '#F1F5F9' },
-  carouselBox: { flex: 1 },
 
   sectionCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
   sectionCardError: { borderWidth: 1.5, borderColor: '#FCA5A5' },

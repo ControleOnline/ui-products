@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Platform, ActivityIndicator, KeyboardAvoidingView,
@@ -19,6 +19,32 @@ const fmtN = v => {
 
 const toIRI   = v => (typeof v === 'string' ? v : v?.['@id'] || null);
 const iriToId = iri => { const s = toIRI(iri); return s ? (parseInt(s.split('/').pop(), 10) || null) : null; };
+const getCompanyId = value => {
+  if (!value) return null;
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const m = value.match(/\/people\/(\d+)(?:\?.*)?$/);
+    if (m?.[1]) return parseInt(m[1], 10);
+    const digits = value.replace(/\D/g, '');
+    return digits ? parseInt(digits, 10) : null;
+  }
+  if (typeof value === 'object') {
+    if (value.id) return getCompanyId(value.id);
+    if (value['@id']) return getCompanyId(value['@id']);
+  }
+  return null;
+};
+
+const getProductCompanyId = product => (
+  getCompanyId(
+    product?.company
+    ?? product?.people
+    ?? product?.person
+    ?? product?.provider
+    ?? product?.owner
+    ?? null
+  )
+);
 
 /* cache de status para evitar query repetida */
 let _orderStatusIRI = null;
@@ -46,6 +72,11 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
       <View style={rowStyles.header}>
         <View style={{ flex: 1 }}>
           <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
+          {item.productDescription ? (
+            <Text style={rowStyles.productDescription} numberOfLines={2}>
+              {item.productDescription}
+            </Text>
+          ) : null}
           {item.productType ? (
             <Text style={rowStyles.productType}>{item.productType}</Text>
           ) : null}
@@ -132,21 +163,54 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [open, setOpen]       = useState(false);
+  const searchRequestRef = useRef(0);
 
   const search = useCallback(async text => {
+    const companyId = currentCompany?.id;
+    if (!companyId) { setResults([]); return; }
     if (!text || text.length < 2) { setResults([]); return; }
+    const requestId = ++searchRequestRef.current;
     setSearching(true);
     try {
       const data = await productsStore.actions.getItems({
         product: text,
-        people: `/people/${currentCompany.id}`,
-        itemsPerPage: 20,
+        company: companyId,
+        people: `/people/${companyId}`,
+        active: 1,
+        'order[product]': 'ASC',
+        itemsPerPage: 30,
       }).catch(() => []);
-      setResults(data || []);
+      if (requestId !== searchRequestRef.current) return;
+
+      const baseItems = Array.isArray(data) ? data : [];
+      const safeResults = [];
+
+      for (const item of baseItems) {
+        let product = item;
+        let productCompanyId = getProductCompanyId(product);
+
+        if (!productCompanyId && product?.id) {
+          const detailed = await productsStore.actions.get(product.id).catch(() => null);
+          if (requestId !== searchRequestRef.current) return;
+          if (detailed) {
+            product = detailed;
+            productCompanyId = getProductCompanyId(detailed);
+          }
+        }
+
+        if (String(productCompanyId) === String(companyId)) {
+          safeResults.push(product);
+        }
+      }
+
+      if (requestId !== searchRequestRef.current) return;
+      setResults(safeResults);
     } finally {
-      setSearching(false);
+      if (requestId === searchRequestRef.current) {
+        setSearching(false);
+      }
     }
-  }, [currentCompany?.id]);
+  }, [currentCompany?.id, productsStore.actions]);
 
   useEffect(() => {
     const timer = setTimeout(() => search(query), 350);
@@ -158,6 +222,7 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
       _key:          uid(),
       productId:     prod.id,
       productName:   prod.product || `#${prod.id}`,
+      productDescription: String(prod.description || '').trim() || null,
       productType:   prod.type    || null,
       qty:           '1',
       price:         '',
@@ -207,7 +272,12 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
               onPress={() => pick(prod)}
               activeOpacity={0.75}
             >
-              <Text style={searchStyles.resultName}>{prod.product || `#${prod.id}`}</Text>
+              <View style={searchStyles.resultTextBlock}>
+                <Text style={searchStyles.resultName}>{prod.product || `#${prod.id}`}</Text>
+                <Text style={searchStyles.resultDescription} numberOfLines={1}>
+                  {String(prod.description || '').trim() || 'Sem descrição'}
+                </Text>
+              </View>
               {prod.type ? <Text style={searchStyles.resultType}>{prod.type}</Text> : null}
             </TouchableOpacity>
           ))}
@@ -266,6 +336,7 @@ const PurchaseForm = () => {
         _key:          uid(),
         productId:     p.productId,
         productName:   p.productName   || `#${p.productId}`,
+        productDescription: String(p.productDescription || p.description || '').trim() || null,
         productType:   p.productType   || null,
         qty:           String(p.suggestedQty || 1),
         price:         '',
@@ -509,6 +580,7 @@ const rowStyles = StyleSheet.create({
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
   productName: { fontSize: 14, fontWeight: '700', color: '#1E293B', lineHeight: 19 },
+  productDescription: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 16 },
   productType: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
   removeBtn: {
     width: 28, height: 28, borderRadius: 14,
@@ -568,7 +640,9 @@ const searchStyles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
   },
-  resultName: { fontSize: 14, fontWeight: '600', color: '#1E293B', flex: 1 },
+  resultTextBlock: { flex: 1, minWidth: 0, marginRight: 8 },
+  resultName: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  resultDescription: { fontSize: 12, color: '#64748B', marginTop: 2 },
   resultType: { fontSize: 11, color: '#94A3B8', marginLeft: 8 },
 });
 

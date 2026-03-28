@@ -83,6 +83,8 @@ const ordersRoutes = [
       headerShown: true,
       headerBackVisible: true,
       title: 'Histórico de Movimentações',
+      showCompanyFilter: true,
+      companyFilterMode: 'icon',
     },
     initialParams: { store: 'inventories' },
   },
@@ -93,6 +95,8 @@ const ordersRoutes = [
       headerShown: true,
       headerBackVisible: true,
       title: 'Sugestões de Compra',
+      showCompanyFilter: true,
+      companyFilterMode: 'icon',
     },
     initialParams: { store: 'product_inventories' },
   },
@@ -109,3 +113,4 @@ const ordersRoutes = [
 ];
 
 export default ordersRoutes;
+

@@ -61,6 +61,15 @@ const extractProduct = p => {
   return { id: String(p).replace(/\D/g, '') || null, name: null, type: null, sku: null, description: null };
 };
 
+const iriToId = iri => {
+  if (!iri) return null;
+  const s = String(iri);
+  const match = s.match(/\/(\d+)(?:\?.*)?$/);
+  if (match?.[1]) return match[1];
+  const digits = s.replace(/\D/g, '');
+  return digits || null;
+};
+
 /* ─── Skeleton ──────────────────────────────────────────────────────── */
 
 const SkeletonRow = () => (
@@ -96,7 +105,7 @@ export const MovementModal = ({
   currentInventory,
   onClose,
   onMoved,
-  navigation,
+  onOpenPurchase,
 }) => {
   const ordersStore       = useStore('orders');
   const orderProductStore = useStore('order_products');
@@ -123,19 +132,34 @@ export const MovementModal = ({
       ? String(iriToId(row._inventoryIRI))
       : currentInventory?.id ? String(currentInventory.id) : null;
     const invName = currentInventory?.inventory || `Local #${invId}`;
-    resetAndClose();
-    if (!navigation) return;
-    navigation.navigate('PurchaseFormPage', {
+    const currentAvailable = parseFloat(row?.available ?? 0);
+    const currentMinimum = parseFloat(row?.minimum ?? 0);
+    const suggestedQty = Math.max(
+      1,
+      Math.ceil(
+        currentMinimum > currentAvailable
+          ? (currentMinimum - currentAvailable)
+          : 1,
+      ),
+    );
+
+    const params = {
       items: [{
         piId: row?.id || null,
         productId: prodId ? String(prodId) : null,
         productName: prodName || `Produto #${prodId}`,
         productType: prodType || null,
-        suggestedQty: 1,
+        suggestedQty,
         inInventoryId: invId,
         inInventoryName: invName,
       }],
-    });
+    };
+
+    if (!onOpenPurchase || !onOpenPurchase(params)) {
+      setError('Não foi possível abrir a tela de compras.');
+      return;
+    }
+    resetAndClose();
   };
 
   /* cria order + order_product para registrar a movimentação no backend */
@@ -268,11 +292,6 @@ export const MovementModal = ({
               {MOVEMENT_OPS.map(opt => {
                 const active = op === opt.key;
                 const handleOpPress = () => {
-                  if (opt.key === 'in') {
-                    /* Compra: abre PurchaseFormPage com produto pre-selecionado */
-                    openPurchaseForm();
-                    return;
-                  }
                   setOp(opt.key);
                   setError('');
                 };
@@ -679,6 +698,23 @@ const InventoryDetailPage = ({ route }) => {
 
   useFocusEffect(useCallback(() => { loadRows(); }, [loadRows]));
 
+  const openPurchaseFromDetail = useCallback((params) => {
+    let navRef = navigation;
+    let guard = 0;
+    while (navRef && guard < 8) {
+      try {
+        const routeNames = navRef?.getState?.()?.routeNames || [];
+        if (Array.isArray(routeNames) && routeNames.includes('PurchaseFormPage')) {
+          navRef.navigate('PurchaseFormPage', params);
+          return true;
+        }
+      } catch (_) {}
+      navRef = navRef?.getParent?.();
+      guard += 1;
+    }
+    return false;
+  }, [navigation]);
+
   /* ─── filtro busca ─────────────────────────────────────────────── */
 
   const filteredRows = useMemo(() => {
@@ -987,7 +1023,7 @@ const InventoryDetailPage = ({ route }) => {
         brandColors={brandColors}
         productInvStore={productInvStore}
         currentInventory={inventory}
-        navigation={navigation}
+        onOpenPurchase={openPurchaseFromDetail}
         onClose={() => setMovRow(null)}
         onMoved={(result) => { handleMoved(result); setMovRow(null); }}
       />
