@@ -116,6 +116,21 @@ const StockBar = ({ available, minimum }) => {
   );
 };
 
+/* ─── helper paginação (máx 50 por request) ────────────────────────── */
+const fetchAllPages = async (actionFn, params) => {
+  const PAGE_SIZE = 50;
+  const results = [];
+  let page = 1;
+  while (true) {
+    const batch = await actionFn({ ...params, itemsPerPage: PAGE_SIZE, page }).catch(() => null);
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    results.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+    page++;
+  }
+  return results;
+};
+
 /* ─── Página ────────────────────────────────────────────────────────── */
 
 const PurchaseSuggestionsPage = () => {
@@ -145,15 +160,20 @@ const PurchaseSuggestionsPage = () => {
   const [collapsed, setCollapsed]   = useState(new Set()); /* categorias recolhidas */
   const [visibleCount, setVisibleCount] = useState(50);   /* paginação client-side */
   const loadingMoreRef = useRef(false);
+  const runningRef     = useRef(false); /* guard contra chamadas duplicadas */
 
   /* ── carregamento ──────────────────────────────────────────────── */
   const loadData = useCallback(async () => {
-    if (!currentCompany?.id) return;
+    if (!currentCompany?.id || runningRef.current) return;
+    runningRef.current = true;
     setLoading(true);
     try {
-      const [invData, catsData] = await Promise.all([
-        inventoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` }).catch(() => []),
-        categoriesStore.actions.getItems({ company: currentCompany.id, context: 'products', itemsPerPage: 500 }).catch(() => []),
+      /* RODADA 1 — tudo independente em paralelo, máx 50 por request */
+      const [invData, catsData, prodsData, prodCatRelations] = await Promise.all([
+        fetchAllPages(inventoriesStore.actions.getItems,    { people: `/people/${currentCompany.id}` }),
+        fetchAllPages(categoriesStore.actions.getItems,     { company: currentCompany.id, context: 'products' }),
+        fetchAllPages(productsStore.actions.getItems,       { company: currentCompany.id, active: 1 }),
+        fetchAllPages(productCategoryStore.actions.getItems, {}),
       ]);
 
       /* mapas auxiliares */
@@ -161,11 +181,13 @@ const PurchaseSuggestionsPage = () => {
       (invData || []).forEach(inv => { if (inv.id) invMap[String(inv.id)] = inv.inventory; });
       const catsMap = {};
       (catsData || []).forEach(c => { if (c.id) catsMap[String(c.id)] = c.name || c.category || `Categoria ${c.id}`; });
+      const prodsMap = {};
+      (prodsData || []).forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
 
-      /* carrega product_inventories de todos os locais */
+      /* RODADA 2 — product_inventories (depende de invData), máx 50 por request */
       const piResults = await Promise.all(
         (invData || []).map(inv =>
-          productInvStore.actions.getItems({ inventory: `/inventories/${inv.id}` }).catch(() => [])
+          fetchAllPages(productInvStore.actions.getItems, { inventory: `/inventories/${inv.id}` })
         )
       );
       const allPI = mergeDedup(piResults.flat());
@@ -176,25 +198,6 @@ const PurchaseSuggestionsPage = () => {
         const min   = parseFloat(pi.minimum   ?? 0);
         return avail < 0 || (min > 0 && avail <= min);
       });
-
-      /* busca todos os produtos da empresa em uma única request (em vez de
-         uma por produto crítico). itemsPerPage cobre a grande maioria dos casos. */
-      const [prodsData, prodCatRelations] = await Promise.all([
-        productsStore.actions.getItems({
-          company: currentCompany.id,
-          active: 1,
-          itemsPerPage: 500,
-        }).catch(() => []),
-        /* busca todas as relações produto↔categoria da empresa em uma request */
-        productCategoryStore.actions.getItems({ itemsPerPage: 500 }).catch(() => []),
-      ]);
-
-      const uniqueProdIRIs = [...new Set(
-        critical.map(pi => toIRI(pi.product)).filter(Boolean)
-      )];
-
-      const prodsMap = {};
-      (prodsData || []).forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
       const prodCatMap = {};
       (prodCatRelations || []).forEach(rel => {
         const prodIRI = typeof rel.product === 'string' ? rel.product : rel.product?.['@id'] || '';
@@ -255,6 +258,7 @@ const PurchaseSuggestionsPage = () => {
     } catch (_) {
       setItems([]);
     } finally {
+      runningRef.current = false;
       setLoading(false);
     }
   }, [currentCompany?.id]);
