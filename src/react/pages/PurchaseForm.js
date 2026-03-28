@@ -384,8 +384,9 @@ const PurchaseForm = () => {
 
       const order = await ordersStore.actions.save(orderPayload);
 
-      /* cria order_products e atualiza estoque em paralelo por lote */
-      await Promise.all(items.map(async it => {
+      /* cria order_products e atualiza estoque sequencialmente (1 a 1)
+         para evitar deadlock no MySQL ao recalcular o preço do pedido */
+      for (const it of items) {
         const qty     = parseFloat(String(it.qty).replace(',', '.'));
         const invIRI  = `/inventories/${it.inInventoryId}`;
         const prodIRI = `/products/${it.productId}`;
@@ -422,7 +423,7 @@ const PurchaseForm = () => {
             available: qty,
           });
         }
-      }));
+      }
 
       setDone(true);
     } catch (e) {
