@@ -87,7 +87,10 @@ const ProductStockForm = ({ ProductId }) => {
     try {
       const [piData, invData] = await Promise.all([
         productInvStore.actions.getItems({ product: `/products/${ProductId}` }).catch(() => []),
-        inventoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` }).catch(() => []),
+        inventoriesStore.actions.getItems({
+          people: `/people/${currentCompany.id}`,
+          itemsPerPage: 200,
+        }).catch(() => []),
       ]);
       const map = {};
       (invData || []).forEach(inv => { if (inv.id) map[String(inv.id)] = inv.inventory; });

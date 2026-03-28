@@ -20,8 +20,8 @@ import { colors } from '@controleonline/../../src/styles/colors';
 /* ─── configurações ─────────────────────────────────────────────────── */
 
 const OP_CONFIG = {
-  in:       { label: 'Entrada',       icon: 'arrow-down-circle',     color: '#16A34A', bg: '#F0FDF4' },
-  out:      { label: 'Saída',         icon: 'arrow-up-circle',       color: '#DC2626', bg: '#FEF2F2' },
+  in:       { label: 'Compra',       icon: 'arrow-down-circle',     color: '#16A34A', bg: '#F0FDF4' },
+  out:      { label: 'Perda',         icon: 'arrow-up-circle',       color: '#DC2626', bg: '#FEF2F2' },
   transfer: { label: 'Transferência', icon: 'swap-horizontal-circle', color: '#7C3AED', bg: '#F5F3FF' },
 };
 
@@ -377,7 +377,7 @@ const InventoryMovementsPage = ({ route }) => {
               </View>
               <Text style={styles.emptyTitle}>Nenhuma movimentação</Text>
               <Text style={styles.emptySubtitle}>
-                Entradas, saídas e transferências feitas pelo app aparecem aqui.
+                Compras, perdas e transferências feitas pelo app aparecem aqui.
               </Text>
             </View>
           )}

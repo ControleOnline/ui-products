@@ -117,6 +117,27 @@ export const MovementModal = ({
 
   const productName = row ? (extractProduct(row.product).name || `#${row.id}`) : '';
 
+  const openPurchaseForm = () => {
+    const { id: prodId, name: prodName, type: prodType } = extractProduct(row?.product);
+    const invId = row?._inventoryIRI
+      ? String(iriToId(row._inventoryIRI))
+      : currentInventory?.id ? String(currentInventory.id) : null;
+    const invName = currentInventory?.inventory || `Local #${invId}`;
+    resetAndClose();
+    if (!navigation) return;
+    navigation.navigate('PurchaseFormPage', {
+      items: [{
+        piId: row?.id || null,
+        productId: prodId ? String(prodId) : null,
+        productName: prodName || `Produto #${prodId}`,
+        productType: prodType || null,
+        suggestedQty: 1,
+        inInventoryId: invId,
+        inInventoryName: invName,
+      }],
+    });
+  };
+
   /* cria order + order_product para registrar a movimentação no backend */
   const createOrderRecord = async (orderType, prodId, opInvIRI, opOutInvIRI) => {
     const statusIRI = await fetchOrderStatus(statusStore);
@@ -138,6 +159,10 @@ export const MovementModal = ({
   };
 
   const confirm = async () => {
+    if (op === 'in') {
+      openPurchaseForm();
+      return;
+    }
     const amount = parseFloat(String(qty).replace(',', '.'));
     if (!amount || amount <= 0) { setError('Informe uma quantidade válida'); return; }
     if (op === 'transfer' && !destInv) { setError('Selecione o local de destino'); return; }
@@ -168,7 +193,7 @@ export const MovementModal = ({
         if (row.id) {
           await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
         }
-        await createOrderRecord('sale', prodId, null, invIRI);
+        await createOrderRecord('loss', prodId, null, invIRI);
         onMoved({ rowId: row.id, delta: -amount, op });
 
       } else if (op === 'transfer') {
@@ -244,26 +269,8 @@ export const MovementModal = ({
                 const active = op === opt.key;
                 const handleOpPress = () => {
                   if (opt.key === 'in') {
-                    /* Compra: abre PurchaseFormPage com produto pré-selecionado */
-                    const { id: prodId, name: prodName, type: prodType } = extractProduct(row?.product);
-                    const invId   = row?._inventoryIRI
-                      ? String(iriToId(row._inventoryIRI))
-                      : currentInventory?.id ? String(currentInventory.id) : null;
-                    const invName = currentInventory?.inventory || `Local #${invId}`;
-                    resetAndClose();
-                    if (navigation) {
-                      navigation.navigate('PurchaseFormPage', {
-                        items: [{
-                          piId:            row?.id || null,
-                          productId:       prodId ? String(prodId) : null,
-                          productName:     prodName || `Produto #${prodId}`,
-                          productType:     prodType || null,
-                          suggestedQty:    1,
-                          inInventoryId:   invId,
-                          inInventoryName: invName,
-                        }],
-                      });
-                    }
+                    /* Compra: abre PurchaseFormPage com produto pre-selecionado */
+                    openPurchaseForm();
                     return;
                   }
                   setOp(opt.key);
@@ -367,7 +374,7 @@ export const MovementModal = ({
           >
             {saving
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={movStyles.confirmText}>Confirmar</Text>
+              : <Text style={movStyles.confirmText}>{op === 'in' ? 'Ir para Compra' : 'Confirmar'}</Text>
             }
           </TouchableOpacity>
         </View>
@@ -980,6 +987,7 @@ const InventoryDetailPage = ({ route }) => {
         brandColors={brandColors}
         productInvStore={productInvStore}
         currentInventory={inventory}
+        navigation={navigation}
         onClose={() => setMovRow(null)}
         onMoved={(result) => { handleMoved(result); setMovRow(null); }}
       />

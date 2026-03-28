@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
@@ -51,14 +52,67 @@ const extractItems = response => {
   return [];
 };
 
+const mergeById = (base, incoming) => {
+  const map = new Map();
+  (base || []).forEach(item => map.set(String(item?.id || item?.['@id'] || ''), item));
+  (incoming || []).forEach(item => map.set(String(item?.id || item?.['@id'] || ''), item));
+  return Array.from(map.values());
+};
+
 /* ─── Modal de busca de produto para insumo ─── */
-const FeedStockSearchModal = ({ visible, onClose, onSelect, products, excludeId }) => {
+const FeedStockSearchModal = ({
+  visible,
+  onClose,
+  onSelect,
+  products,
+  loading,
+  loadingMore,
+  hasMore,
+  onSearch,
+  onLoadMore,
+  excludeId,
+}) => {
   const [search, setSearch] = useState('');
+  const onSearchRef = useRef(onSearch);
+  const loadingMoreLockRef = useRef(false);
+
+  const normalizedSearch = String(search || '').trim();
+  const minChars = 2;
+  const requestQuery = normalizedSearch.length >= minChars ? normalizedSearch : '';
+
+  useEffect(() => {
+    onSearchRef.current = onSearch;
+  }, [onSearch]);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    const t = setTimeout(() => {
+      if (onSearchRef.current) onSearchRef.current(requestQuery);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [visible, requestQuery]);
+
+  useEffect(() => {
+    if (!loadingMore) loadingMoreLockRef.current = false;
+  }, [loadingMore, requestQuery]);
+
   const filtered = (products || []).filter(p => {
     /* anti-loop: não permite que o próprio componente seja seu insumo */
     if (excludeId && String(p.id) === String(excludeId)) return false;
-    return String(p.product || p.name || '').toLowerCase().includes(search.toLowerCase());
+    return true;
   });
+
+  const handleScroll = ({ nativeEvent }) => {
+    if (!onLoadMore || loading || loadingMore || !hasMore || loadingMoreLockRef.current) return;
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    const paddingToBottom = 140;
+    const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    if (nearBottom) {
+      loadingMoreLockRef.current = true;
+      onLoadMore(requestQuery);
+    }
+  };
+
   const handleClose = () => { setSearch(''); onClose(); };
 
   return (
@@ -89,14 +143,28 @@ const FeedStockSearchModal = ({ visible, onClose, onSelect, products, excludeId 
           )}
         </View>
 
-        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {filtered.length === 0 && (
+        <ScrollView
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={100}
+        >
+          {loading && (
             <View style={styles.searchEmpty}>
-              <MaterialCommunityIcons name="package-variant-remove" size={32} color="#CBD5E1" />
-              <Text style={styles.searchEmptyText}>Nenhum produto encontrado</Text>
+              <ActivityIndicator size="small" color="#94A3B8" />
+              <Text style={styles.searchEmptyText}>Buscando produtos...</Text>
             </View>
           )}
-          {filtered.map(p => {
+          {!loading && filtered.length === 0 && (
+            <View style={styles.searchEmpty}>
+              <MaterialCommunityIcons name="package-variant-remove" size={32} color="#CBD5E1" />
+              <Text style={styles.searchEmptyText}>
+                {requestQuery ? 'Nenhum insumo encontrado' : 'Nenhum insumo ativo disponível'}
+              </Text>
+            </View>
+          )}
+          {!loading && filtered.map(p => {
             const unit = extractUnit(p);
             return (
               <TouchableOpacity
@@ -117,6 +185,12 @@ const FeedStockSearchModal = ({ visible, onClose, onSelect, products, excludeId 
               </TouchableOpacity>
             );
           })}
+          {!loading && loadingMore && (
+            <View style={styles.searchMoreFooter}>
+              <ActivityIndicator size="small" color="#94A3B8" />
+              <Text style={styles.searchMoreText}>Carregando mais...</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
     </AnimatedModal>
@@ -235,6 +309,11 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
   const [loaded, setLoaded] = useState(false);
   const [items, setItems] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  const [searchingProducts, setSearchingProducts] = useState(false);
+  const [loadingMoreProducts, setLoadingMoreProducts] = useState(false);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [productsPage, setProductsPage] = useState(1);
+  const [productsQuery, setProductsQuery] = useState('');
 
   /* modais */
   const [searchVisible, setSearchVisible] = useState(false);
@@ -268,11 +347,30 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
     fetchItems().then(() => setLoaded(true));
   }, [expanded, componentIri, productGroupIri]);
 
-  /* ── Buscar produtos disponíveis ── */
-  useEffect(() => {
-    if (!currentCompany?.id) return;
-    productsStore.actions
-      .getItems({
+  /* IRI numérico do componente para comparação anti-loop */
+  const componentNumericId = String(componentIri || '').replace(/\D/g, '');
+
+  const searchAvailableProducts = useCallback(async (searchTerm, page = 1, append = false) => {
+    const q = String(searchTerm || '').trim();
+    if (!currentCompany?.id) {
+      setAllProducts([]);
+      setHasMoreProducts(false);
+      setProductsPage(1);
+      setProductsQuery('');
+      setSearchingProducts(false);
+      setLoadingMoreProducts(false);
+      return;
+    }
+
+    if (append) {
+      if (loadingMoreProducts || searchingProducts || !hasMoreProducts) return;
+      setLoadingMoreProducts(true);
+    } else {
+      setSearchingProducts(true);
+    }
+
+    try {
+      const response = await productsStore.actions.getItems({
         active: 1,
         company: currentCompany.id,
         /*
@@ -281,10 +379,62 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
          */
         type: ['feedstock'],
         'order[product]': 'ASC',
-      })
-      .then(data => setAllProducts(data || []))
-      .catch(() => {});
-  }, [currentCompany?.id]);
+        itemsPerPage: 50,
+        page,
+        ...(q ? { product: q } : {}),
+      });
+      const list = extractItems(response);
+      const existingChildIds = new Set(
+        (items || []).map(item =>
+          String(item?.productChild?.id || String(item?.productChild || '').replace(/\D/g, '') || '')
+        ).filter(Boolean)
+      );
+      const filtered = (list || []).filter(prod =>
+        String(prod?.id || '') !== String(componentNumericId || '') &&
+        !existingChildIds.has(String(prod?.id || ''))
+      );
+      setAllProducts(prev => (append ? mergeById(prev, filtered) : filtered));
+
+      const hasNextByView = !!response?.['hydra:view']?.next;
+      setHasMoreProducts(hasNextByView || (list || []).length >= 50);
+      setProductsPage(page);
+      setProductsQuery(q);
+    } catch (_) {
+      if (!append) setAllProducts([]);
+      setHasMoreProducts(false);
+    } finally {
+      setSearchingProducts(false);
+      setLoadingMoreProducts(false);
+    }
+  }, [
+    currentCompany?.id,
+    loadingMoreProducts,
+    searchingProducts,
+    hasMoreProducts,
+    items,
+    componentNumericId,
+  ]);
+
+  const handleSearchProducts = useCallback((searchTerm) => {
+    const q = String(searchTerm || '').trim();
+    const normalized = q.length >= 2 ? q : '';
+    searchAvailableProducts(normalized, 1, false);
+  }, [searchAvailableProducts]);
+
+  const handleLoadMoreProducts = useCallback((searchTerm) => {
+    const q = String(searchTerm || '').trim();
+    const normalized = q.length >= 2 ? q : '';
+    if (normalized !== productsQuery) return;
+    if (!hasMoreProducts || searchingProducts || loadingMoreProducts) return;
+    searchAvailableProducts(normalized, productsPage + 1, true);
+  }, [
+    productsQuery,
+    hasMoreProducts,
+    searchingProducts,
+    loadingMoreProducts,
+    searchAvailableProducts,
+    productsPage,
+  ]);
 
   const reloadItems = async () => {
     await fetchItems();
@@ -304,9 +454,6 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
 
     return errs;
   };
-
-  /* IRI numérico do componente para comparação anti-loop */
-  const componentNumericId = String(componentIri || '').replace(/\D/g, '');
 
   /* ── Produto selecionado → busca completo para obter productUnit aninhado ── */
   const handleProductSelected = async product => {
@@ -541,6 +688,11 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         onClose={() => setSearchVisible(false)}
         onSelect={handleProductSelected}
         products={allProducts}
+        loading={searchingProducts}
+        loadingMore={loadingMoreProducts}
+        hasMore={hasMoreProducts}
+        onSearch={handleSearchProducts}
+        onLoadMore={handleLoadMoreProducts}
         excludeId={componentNumericId}
       />
 
@@ -746,6 +898,18 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   searchEmptyText: { fontSize: 14, color: '#94A3B8' },
+  searchMoreFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  searchMoreText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
   searchResultItem: {
     flexDirection: 'row',
     alignItems: 'center',

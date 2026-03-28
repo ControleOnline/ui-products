@@ -276,17 +276,17 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
 
     if (productUnitStore?.actions && !listsRequested.units) {
       setListsRequested(prev => ({ ...prev, units: true }));
-      productUnitStore.actions.getItems({ people: peopleIRI }).catch(() => {});
+      productUnitStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => {});
     }
 
     if (queuesStore?.actions && !listsRequested.queues) {
       setListsRequested(prev => ({ ...prev, queues: true }));
-      queuesStore.actions.getItems({ company: peopleIRI }).catch(() => {});
+      queuesStore.actions.getItems({ company: peopleIRI, itemsPerPage: 200 }).catch(() => {});
     }
 
     if (inventoriesStore?.actions && !listsRequested.inventories) {
       setListsRequested(prev => ({ ...prev, inventories: true }));
-      inventoriesStore.actions.getItems({ people: peopleIRI }).catch(() => {});
+      inventoriesStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => {});
     }
   }, [currentCompany?.id, listsRequested]);
 
@@ -297,6 +297,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
         context: 'products',
         company: currentCompany.id,
         'order[name]': 'ASC',
+        itemsPerPage: 200,
       }).catch(() => {});
     }
   }, [currentCompany?.id]);

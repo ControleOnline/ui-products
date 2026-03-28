@@ -320,7 +320,11 @@ const ProductGroups = ({ ProductId }) => {
     }
     setLoadingGroups(true);
     return actions
-      .getItems({ parentProduct: `/products/${ProductId}`, people: currentCompany?.id })
+      .getItems({
+        parentProduct: `/products/${ProductId}`,
+        people: currentCompany?.id,
+        itemsPerPage: 200,
+      })
       .then(response => {
         const items = Array.isArray(response)
           ? response
