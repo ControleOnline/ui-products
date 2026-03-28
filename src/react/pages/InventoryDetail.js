@@ -645,16 +645,31 @@ const InventoryDetailPage = ({ route }) => {
         if (id) piById.set(String(id), pi);
       });
 
-      /* mapa product_id → product object (dos linked) */
+      /* mapa product_id → product object (dos linked por defaultIn/Out) */
       const linkedProds = new Map();
       [...(prodsOut || []), ...(prodsIn || [])].forEach(p => {
         linkedProds.set(String(p.id), p);
       });
 
+      /* produtos em PI que não vieram via defaultIn/Out (ex: compra manual)
+         precisam ser buscados individualmente para ter nome/tipo disponível */
+      const missingProdIds = (piData || [])
+        .map(pi => extractProduct(pi.product).id)
+        .filter(id => id && !linkedProds.has(String(id)));
+
+      if (missingProdIds.length > 0) {
+        const fetched = await Promise.all(
+          [...new Set(missingProdIds)].map(id =>
+            productsStore.actions.get(id).catch(() => null)
+          )
+        );
+        fetched.forEach(p => { if (p?.id) linkedProds.set(String(p.id), p); });
+      }
+
       const merged = [];
       const seen   = new Set();
 
-      /* primeiro: PI records enriquecidos com o objeto de produto se disponível */
+      /* primeiro: PI records enriquecidos com o objeto de produto */
       (piData || []).forEach(pi => {
         const { id } = extractProduct(pi.product);
         const key = id ? String(id) : `pi_${pi.id}`;
