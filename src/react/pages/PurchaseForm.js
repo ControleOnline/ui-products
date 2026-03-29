@@ -10,9 +10,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
 
-/* ─── constantes de paginação ───────────────────────────────────────── */
+/* ─── paginação global ──────────────────────────────────────────────── */
 
-const PAGE_SIZE = 50; /* regra global: nunca trazer dados sem paginação */
+const PAGE_SIZE = 50;
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -22,7 +22,6 @@ const fmtN = v => {
 };
 
 const toIRI   = v => (typeof v === 'string' ? v : v?.['@id'] || null);
-const iriToId = iri => { const s = toIRI(iri); return s ? (parseInt(s.split('/').pop(), 10) || null) : null; };
 const getCompanyId = value => {
   if (!value) return null;
   if (typeof value === 'number') return value;
@@ -41,16 +40,11 @@ const getCompanyId = value => {
 
 const getProductCompanyId = product => (
   getCompanyId(
-    product?.company
-    ?? product?.people
-    ?? product?.person
-    ?? product?.provider
-    ?? product?.owner
-    ?? null
+    product?.company ?? product?.people ?? product?.person
+    ?? product?.provider ?? product?.owner ?? null
   )
 );
 
-/* cache de status para evitar query repetida */
 let _orderStatusIRI = null;
 const fetchOrderStatus = async statusStore => {
   if (_orderStatusIRI) return _orderStatusIRI;
@@ -63,104 +57,25 @@ const fetchOrderStatus = async statusStore => {
 let _uid = 0;
 const uid = () => String(++_uid);
 
-/* ─── ProductRow ────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   SupplierSelector
+   ═══════════════════════════════════════════════════════════════════════ */
 
-const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
-  const selInv = inventories.find(i => String(i.id) === String(item.inInventoryId)) || null;
-
-  return (
-    <View style={rowStyles.card}>
-      <View style={rowStyles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
-          {item.productDescription ? (
-            <Text style={rowStyles.productDescription} numberOfLines={2}>{item.productDescription}</Text>
-          ) : null}
-          {item.productType ? (
-            <Text style={rowStyles.productType}>{item.productType}</Text>
-          ) : null}
-        </View>
-        <TouchableOpacity onPress={onRemove} style={rowStyles.removeBtn} activeOpacity={0.75}>
-          <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={rowStyles.fields}>
-        <View style={rowStyles.fieldWrap}>
-          <Text style={rowStyles.fieldLabel}>Quantidade *</Text>
-          <TextInput
-            style={[rowStyles.input, { borderColor: brandColors.primary + '66' }]}
-            value={String(item.qty)}
-            onChangeText={v => onChange({ qty: v })}
-            keyboardType="numeric"
-            placeholder="0"
-            placeholderTextColor="#CBD5E1"
-            selectTextOnFocus
-          />
-        </View>
-
-        <View style={rowStyles.fieldWrap}>
-          <Text style={rowStyles.fieldLabel}>Preço Unit. (R$)</Text>
-          <TextInput
-            style={[rowStyles.input, { borderColor: '#E2E8F0' }]}
-            value={String(item.price)}
-            onChangeText={v => onChange({ price: v })}
-            keyboardType="numeric"
-            placeholder="0,00"
-            placeholderTextColor="#CBD5E1"
-            selectTextOnFocus
-          />
-        </View>
-      </View>
-
-      <View style={rowStyles.invSection}>
-        <Text style={rowStyles.fieldLabel}>Local de Entrada</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-          <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
-            {inventories.map(inv => {
-              const sel = String(item.inInventoryId) === String(inv.id);
-              return (
-                <TouchableOpacity
-                  key={inv.id}
-                  style={[rowStyles.invChip, sel && { backgroundColor: brandColors.primary + '18', borderColor: brandColors.primary }]}
-                  onPress={() => onChange({ inInventoryId: inv.id, inInventoryName: inv.inventory })}
-                  activeOpacity={0.75}
-                >
-                  <MaterialCommunityIcons name="warehouse" size={12} color={sel ? brandColors.primary : '#94A3B8'} />
-                  <Text style={[rowStyles.invChipText, sel && { color: brandColors.primary, fontWeight: '700' }]}>
-                    {inv.inventory}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
-        {!item.inInventoryId && (
-          <Text style={rowStyles.invHint}>Selecione onde este produto será recebido</Text>
-        )}
-      </View>
-    </View>
-  );
-};
-
-/* ─── SupplierSelector ──────────────────────────────────────────────── */
-
-const SupplierSelector = ({ brandColors, value, onSelect }) => {
-  const peopleStore    = useStore('people');
+const SupplierSelector = ({ brandColors, value, onSelect, showApplyToAll, onApplyToAll }) => {
+  const peopleStore        = useStore('people');
   const { currentCompany } = peopleStore.getters;
 
-  const [open,       setOpen]       = useState(false);
-  const [query,      setQuery]      = useState('');
-  const [suppliers,  setSuppliers]  = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [page,       setPage]       = useState(1);
-  const [hasMore,    setHasMore]    = useState(false);
+  const [open,      setOpen]      = useState(false);
+  const [query,     setQuery]     = useState('');
+  const [suppliers, setSuppliers] = useState([]);
+  const [loading,   setLoading]   = useState(false);
+  const [page,      setPage]      = useState(1);
+  const [hasMore,   setHasMore]   = useState(false);
   const reqRef = useRef(0);
 
   const fetchSuppliers = useCallback(async (q, p) => {
     const companyId = currentCompany?.id;
     if (!companyId) return;
-
     const reqId = ++reqRef.current;
     setLoading(true);
     try {
@@ -171,10 +86,8 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
         page:            p,
       };
       if (q.trim()) params.name = q.trim();
-
       const data = await peopleStore.actions.getItems(params).catch(() => []);
       if (reqId !== reqRef.current) return;
-
       const items = Array.isArray(data) ? data : [];
       setSuppliers(prev => p === 1 ? items : [...prev, ...items]);
       setHasMore(items.length === PAGE_SIZE);
@@ -183,7 +96,6 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
     }
   }, [currentCompany?.id, peopleStore.actions]);
 
-  /* dispara busca ao abrir ou ao digitar (debounce 300ms) */
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => { setPage(1); fetchSuppliers(query, 1); }, 300);
@@ -208,12 +120,20 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
   /* selecionado */
   if (value) {
     return (
-      <View style={supplierStyles.selectedWrap}>
-        <MaterialCommunityIcons name="truck-outline" size={16} color="#15803D" />
-        <Text style={supplierStyles.selectedName} numberOfLines={1}>{value.name}</Text>
-        <TouchableOpacity onPress={clear} style={supplierStyles.clearBtn} activeOpacity={0.7}>
-          <MaterialCommunityIcons name="close-circle" size={17} color="#86EFAC" />
-        </TouchableOpacity>
+      <View>
+        <View style={supplierStyles.selectedWrap}>
+          <MaterialCommunityIcons name="truck-outline" size={14} color="#15803D" />
+          <Text style={supplierStyles.selectedName} numberOfLines={1}>{value.name}</Text>
+          <TouchableOpacity onPress={clear} style={supplierStyles.clearBtn} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="close-circle" size={15} color="#86EFAC" />
+          </TouchableOpacity>
+        </View>
+        {showApplyToAll && (
+          <TouchableOpacity style={supplierStyles.applyAllBtn} onPress={onApplyToAll} activeOpacity={0.75}>
+            <MaterialCommunityIcons name="arrow-collapse-down" size={12} color="#2563EB" />
+            <Text style={supplierStyles.applyAllText}>Usar "{value.name}" para todos os produtos</Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   }
@@ -226,18 +146,18 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
         onPress={() => setOpen(true)}
         activeOpacity={0.75}
       >
-        <MaterialCommunityIcons name="truck-outline" size={16} color="#94A3B8" />
-        <Text style={supplierStyles.triggerText}>Fornecedor (opcional)</Text>
-        <MaterialCommunityIcons name="chevron-down" size={16} color="#94A3B8" />
+        <MaterialCommunityIcons name="truck-outline" size={13} color="#94A3B8" />
+        <Text style={supplierStyles.triggerText}>Definir fornecedor</Text>
+        <MaterialCommunityIcons name="chevron-down" size={14} color="#CBD5E1" />
       </TouchableOpacity>
     );
   }
 
   /* aberto */
   return (
-    <View style={supplierStyles.dropdownWrap}>
+    <View>
       <View style={[supplierStyles.searchBox, { borderColor: brandColors.primary }]}>
-        <MaterialCommunityIcons name="magnify" size={15} color="#94A3B8" style={{ marginRight: 6 }} />
+        <MaterialCommunityIcons name="magnify" size={14} color="#94A3B8" style={{ marginRight: 6 }} />
         <TextInput
           style={supplierStyles.searchInput}
           value={query}
@@ -248,14 +168,14 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
         />
         {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 6 }} />}
         <TouchableOpacity onPress={() => { setOpen(false); setQuery(''); }} style={{ marginLeft: 6 }}>
-          <MaterialCommunityIcons name="close" size={15} color="#94A3B8" />
+          <MaterialCommunityIcons name="close" size={14} color="#94A3B8" />
         </TouchableOpacity>
       </View>
 
       {suppliers.length > 0 && (
         <View style={supplierStyles.resultList}>
           <ScrollView
-            style={{ maxHeight: 220 }}
+            style={{ maxHeight: 200 }}
             keyboardShouldPersistTaps="handled"
             onScroll={({ nativeEvent: { layoutMeasurement, contentOffset, contentSize } }) => {
               if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 20) loadMore();
@@ -275,14 +195,14 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
                 )}
               </TouchableOpacity>
             ))}
-            {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ padding: 10 }} />}
+            {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ padding: 8 }} />}
           </ScrollView>
         </View>
       )}
 
       {!loading && suppliers.length === 0 && (
         <View style={supplierStyles.emptyState}>
-          <MaterialCommunityIcons name="truck-off-outline" size={22} color="#CBD5E1" />
+          <MaterialCommunityIcons name="truck-off-outline" size={18} color="#CBD5E1" />
           <Text style={supplierStyles.emptyText}>Nenhum fornecedor encontrado</Text>
         </View>
       )}
@@ -290,58 +210,135 @@ const SupplierSelector = ({ brandColors, value, onSelect }) => {
   );
 };
 
-/* ─── ProductSearch ─────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   ProductRow
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showApplyToAll, onApplyToAll }) => (
+  <View style={rowStyles.card}>
+    {/* cabeçalho */}
+    <View style={rowStyles.header}>
+      <View style={{ flex: 1 }}>
+        <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
+        {item.productDescription ? (
+          <Text style={rowStyles.productDescription} numberOfLines={2}>{item.productDescription}</Text>
+        ) : null}
+        {item.productType ? <Text style={rowStyles.productType}>{item.productType}</Text> : null}
+      </View>
+      <TouchableOpacity onPress={onRemove} style={rowStyles.removeBtn} activeOpacity={0.75}>
+        <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
+      </TouchableOpacity>
+    </View>
+
+    {/* quantidade + preço */}
+    <View style={rowStyles.fields}>
+      <View style={rowStyles.fieldWrap}>
+        <Text style={rowStyles.fieldLabel}>Quantidade *</Text>
+        <TextInput
+          style={[rowStyles.input, { borderColor: brandColors.primary + '66' }]}
+          value={String(item.qty)}
+          onChangeText={v => onChange({ qty: v })}
+          keyboardType="numeric"
+          placeholder="0"
+          placeholderTextColor="#CBD5E1"
+          selectTextOnFocus
+        />
+      </View>
+      <View style={rowStyles.fieldWrap}>
+        <Text style={rowStyles.fieldLabel}>Preço Unit. (R$)</Text>
+        <TextInput
+          style={[rowStyles.input, { borderColor: '#E2E8F0' }]}
+          value={String(item.price)}
+          onChangeText={v => onChange({ price: v })}
+          keyboardType="numeric"
+          placeholder="0,00"
+          placeholderTextColor="#CBD5E1"
+          selectTextOnFocus
+        />
+      </View>
+    </View>
+
+    {/* local de entrada */}
+    <View style={rowStyles.invSection}>
+      <Text style={rowStyles.fieldLabel}>Local de Entrada</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+          {inventories.map(inv => {
+            const sel = String(item.inInventoryId) === String(inv.id);
+            return (
+              <TouchableOpacity
+                key={inv.id}
+                style={[rowStyles.invChip, sel && { backgroundColor: brandColors.primary + '18', borderColor: brandColors.primary }]}
+                onPress={() => onChange({ inInventoryId: inv.id, inInventoryName: inv.inventory })}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name="warehouse" size={12} color={sel ? brandColors.primary : '#94A3B8'} />
+                <Text style={[rowStyles.invChipText, sel && { color: brandColors.primary, fontWeight: '700' }]}>
+                  {inv.inventory}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
+      {!item.inInventoryId && (
+        <Text style={rowStyles.invHint}>Selecione onde este produto será recebido</Text>
+      )}
+    </View>
+
+    {/* fornecedor do produto */}
+    <View style={rowStyles.supplierSection}>
+      <Text style={rowStyles.fieldLabel}>Fornecedor</Text>
+      <SupplierSelector
+        brandColors={brandColors}
+        value={item.supplier || null}
+        onSelect={supplier => onChange({ supplier })}
+        showApplyToAll={showApplyToAll}
+        onApplyToAll={onApplyToAll}
+      />
+    </View>
+  </View>
+);
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ProductSearch
+   ═══════════════════════════════════════════════════════════════════════ */
 
 const ProductSearch = ({ inventories, brandColors, onAdd }) => {
-  const productsStore  = useStore('products');
-  const peopleStore    = useStore('people');
+  const productsStore      = useStore('products');
+  const peopleStore        = useStore('people');
   const { currentCompany } = peopleStore.getters;
 
   const [query,    setQuery]    = useState('');
   const [results,  setResults]  = useState([]);
   const [searching, setSearching] = useState(false);
   const [open,     setOpen]     = useState(false);
-  const searchRef  = useRef(0);
+  const searchRef = useRef(0);
 
   const search = useCallback(async text => {
     const companyId = currentCompany?.id;
-    if (!companyId) { setResults([]); return; }
-    if (!text || text.length < 2) { setResults([]); return; }
-
+    if (!companyId || !text || text.length < 2) { setResults([]); return; }
     const reqId = ++searchRef.current;
     setSearching(true);
     try {
       const data = await productsStore.actions.getItems({
-        product:        text,
-        company:        companyId,
-        people:         `/people/${companyId}`,
-        active:         1,
-        'order[product]': 'ASC',
-        itemsPerPage:   PAGE_SIZE,
+        product: text, company: companyId,
+        people: `/people/${companyId}`, active: 1,
+        'order[product]': 'ASC', itemsPerPage: PAGE_SIZE,
       }).catch(() => []);
       if (reqId !== searchRef.current) return;
 
-      const baseItems = Array.isArray(data) ? data : [];
       const safeResults = [];
-
-      for (const item of baseItems) {
+      for (const item of (Array.isArray(data) ? data : [])) {
         let product = item;
-        let productCompanyId = getProductCompanyId(product);
-
-        if (!productCompanyId && product?.id) {
-          const detailed = await productsStore.actions.get(product.id).catch(() => null);
+        let cId = getProductCompanyId(product);
+        if (!cId && product?.id) {
+          const d = await productsStore.actions.get(product.id).catch(() => null);
           if (reqId !== searchRef.current) return;
-          if (detailed) {
-            product = detailed;
-            productCompanyId = getProductCompanyId(detailed);
-          }
+          if (d) { product = d; cId = getProductCompanyId(d); }
         }
-
-        if (String(productCompanyId) === String(companyId)) {
-          safeResults.push(product);
-        }
+        if (String(cId) === String(companyId)) safeResults.push(product);
       }
-
       if (reqId !== searchRef.current) return;
       setResults(safeResults);
     } finally {
@@ -365,10 +362,9 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
       price:              '',
       inInventoryId:      null,
       inInventoryName:    null,
+      supplier:           null,
     });
-    setQuery('');
-    setResults([]);
-    setOpen(false);
+    setQuery(''); setResults([]); setOpen(false);
   };
 
   return (
@@ -403,12 +399,7 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
       {results.length > 0 && open && (
         <View style={searchStyles.resultList}>
           {results.map(prod => (
-            <TouchableOpacity
-              key={prod.id}
-              style={searchStyles.resultItem}
-              onPress={() => pick(prod)}
-              activeOpacity={0.75}
-            >
+            <TouchableOpacity key={prod.id} style={searchStyles.resultItem} onPress={() => pick(prod)} activeOpacity={0.75}>
               <View style={searchStyles.resultTextBlock}>
                 <Text style={searchStyles.resultName}>{prod.product || `#${prod.id}`}</Text>
                 <Text style={searchStyles.resultDescription} numberOfLines={1}>
@@ -444,32 +435,27 @@ const PurchaseForm = () => {
   const { colors: themeColors } = themeStore.getters;
 
   const brandColors = useMemo(
-    () => resolveThemePalette(
-      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
-      baseColors,
-    ),
+    () => resolveThemePalette({ ...themeColors, ...(currentCompany?.theme?.colors || {}) }, baseColors),
     [themeColors, currentCompany?.id],
   );
 
   const [inventories, setInventories] = useState([]);
-  const [supplier,    setSupplier]    = useState(null);   /* { id, name } */
   const [items,       setItems]       = useState([]);
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState('');
   const [done,        setDone]        = useState(false);
+  const [ordersCreated, setOrdersCreated] = useState(0);
 
-  /* pré-carrega inventários — paginado (PAGE_SIZE) */
+  /* inventários — paginado */
   useFocusEffect(useCallback(() => {
     if (!currentCompany?.id) return;
     inventoriesStore.actions.getItems({
-      people:       `/people/${currentCompany.id}`,
+      people: `/people/${currentCompany.id}`,
       itemsPerPage: PAGE_SIZE,
-    })
-      .then(data => setInventories(data || []))
-      .catch(() => {});
+    }).then(data => setInventories(data || [])).catch(() => {});
   }, [currentCompany?.id]));
 
-  /* inicializa itens a partir dos params de navegação */
+  /* pré-preenche com itens de navegação */
   useEffect(() => {
     const preItems = route.params?.items;
     if (preItems?.length) {
@@ -483,6 +469,7 @@ const PurchaseForm = () => {
         price:              '',
         inInventoryId:      p.inInventoryId   || null,
         inInventoryName:    p.inInventoryName || null,
+        supplier:           null,
       })));
     }
   }, [route.params?.items]);
@@ -495,6 +482,11 @@ const PurchaseForm = () => {
 
   const addItem = item => setItems(prev => [...prev, item]);
 
+  /* aplica fornecedor de um item em todos */
+  const applySupplierToAll = useCallback(supplier => {
+    setItems(prev => prev.map(it => ({ ...it, supplier })));
+  }, []);
+
   /* validação */
   const validate = () => {
     if (items.length === 0) return 'Adicione ao menos um produto.';
@@ -506,7 +498,7 @@ const PurchaseForm = () => {
     return null;
   };
 
-  /* confirmação — sequencial para evitar deadlock no MySQL */
+  /* confirmação — agrupa por fornecedor, 1 pedido por grupo, itens 1 a 1 */
   const confirm = async () => {
     const msg = validate();
     if (msg) { setError(msg); return; }
@@ -516,56 +508,56 @@ const PurchaseForm = () => {
     try {
       const statusIRI = await fetchOrderStatus(statusStore);
 
-      const orderPayload = {
-        orderType: 'purchase',
-        provider:  `/people/${currentCompany.id}`,
-        app:       'StockAdjustment',
-      };
-      if (statusIRI)     orderPayload.status = statusIRI;
-      if (supplier?.id)  orderPayload.client = `/people/${supplier.id}`;
-
-      const order = await ordersStore.actions.save(orderPayload);
-
-      /* 1 a 1 para evitar deadlock no recalculo de preço do pedido */
+      /* agrupa itens por fornecedor (null = sem fornecedor) */
+      const groups = new Map();
       for (const it of items) {
-        const qty    = parseFloat(String(it.qty).replace(',', '.'));
-        const invIRI = `/inventories/${it.inInventoryId}`;
-        const prodIRI = `/products/${it.productId}`;
-
-        const opPayload = {
-          order:       `/orders/${order.id}`,
-          product:     prodIRI,
-          quantity:    qty,
-          inInventory: invIRI,
-        };
-        if (it.price) {
-          const p = parseFloat(String(it.price).replace(',', '.'));
-          if (p > 0) opPayload.unitPrice = p;
-        }
-        await orderProductStore.actions.save(opPayload);
-
-        /* atualiza saldo no product_inventories */
-        const piData = await productInvStore.actions.getItems({
-          inventory:    invIRI,
-          product:      prodIRI,
-          itemsPerPage: 1,
-        }).catch(() => []);
-
-        const pi = (piData || [])[0];
-        if (pi?.id) {
-          await productInvStore.actions.save({
-            id:        pi.id,
-            available: parseFloat(pi.available ?? 0) + qty,
-          });
-        } else {
-          await productInvStore.actions.save({
-            inventory: invIRI,
-            product:   prodIRI,
-            available: qty,
-          });
-        }
+        const key = it.supplier?.id ? String(it.supplier.id) : '__none__';
+        if (!groups.has(key)) groups.set(key, { supplier: it.supplier || null, items: [] });
+        groups.get(key).items.push(it);
       }
 
+      let created = 0;
+
+      for (const [, group] of groups) {
+        const orderPayload = {
+          orderType: 'purchase',
+          provider:  `/people/${currentCompany.id}`,
+          app:       'StockAdjustment',
+        };
+        if (statusIRI)          orderPayload.status = statusIRI;
+        if (group.supplier?.id) orderPayload.client = `/people/${group.supplier.id}`;
+
+        const order = await ordersStore.actions.save(orderPayload);
+
+        /* 1 a 1 para evitar deadlock no MySQL */
+        for (const it of group.items) {
+          const qty     = parseFloat(String(it.qty).replace(',', '.'));
+          const invIRI  = `/inventories/${it.inInventoryId}`;
+          const prodIRI = `/products/${it.productId}`;
+
+          const opPayload = { order: `/orders/${order.id}`, product: prodIRI, quantity: qty, inInventory: invIRI };
+          if (it.price) {
+            const p = parseFloat(String(it.price).replace(',', '.'));
+            if (p > 0) opPayload.unitPrice = p;
+          }
+          await orderProductStore.actions.save(opPayload);
+
+          /* atualiza saldo */
+          const piData = await productInvStore.actions.getItems({
+            inventory: invIRI, product: prodIRI, itemsPerPage: 1,
+          }).catch(() => []);
+          const pi = (piData || [])[0];
+          if (pi?.id) {
+            await productInvStore.actions.save({ id: pi.id, available: parseFloat(pi.available ?? 0) + qty });
+          } else {
+            await productInvStore.actions.save({ inventory: invIRI, product: prodIRI, available: qty });
+          }
+        }
+
+        created++;
+      }
+
+      setOrdersCreated(created);
       setDone(true);
     } catch (e) {
       setError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao registrar compra.');
@@ -576,6 +568,7 @@ const PurchaseForm = () => {
 
   /* tela de sucesso */
   if (done) {
+    const supplierNames = [...new Set(items.map(it => it.supplier?.name).filter(Boolean))];
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.successWrap}>
@@ -585,7 +578,8 @@ const PurchaseForm = () => {
           <Text style={styles.successTitle}>Compra registrada!</Text>
           <Text style={styles.successSub}>
             {items.length} {items.length === 1 ? 'produto adicionado' : 'produtos adicionados'} ao estoque
-            {supplier ? ` via ${supplier.name}` : ''}.
+            {ordersCreated > 1 ? ` em ${ordersCreated} pedidos` : ''}
+            {supplierNames.length > 0 ? ` via ${supplierNames.join(', ')}` : ''}.
           </Text>
           <TouchableOpacity
             style={[styles.successBtn, { backgroundColor: brandColors.primary }]}
@@ -596,7 +590,7 @@ const PurchaseForm = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.successBtnOutline}
-            onPress={() => { setDone(false); setItems([]); setSupplier(null); }}
+            onPress={() => { setDone(false); setItems([]); setOrdersCreated(0); }}
             activeOpacity={0.75}
           >
             <Text style={[styles.successBtnOutlineText, { color: brandColors.primary }]}>Nova compra</Text>
@@ -626,13 +620,6 @@ const PurchaseForm = () => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* fornecedor */}
-          <SupplierSelector
-            brandColors={brandColors}
-            value={supplier}
-            onSelect={setSupplier}
-          />
-
           {/* resumo */}
           {totalItems > 0 && (
             <View style={styles.summaryCard}>
@@ -668,15 +655,13 @@ const PurchaseForm = () => {
               brandColors={brandColors}
               onChange={patch => updateItem(it._key, patch)}
               onRemove={() => removeItem(it._key)}
+              showApplyToAll={totalItems > 1 && !!it.supplier}
+              onApplyToAll={() => applySupplierToAll(it.supplier)}
             />
           ))}
 
           {/* busca / adicionar */}
-          <ProductSearch
-            inventories={inventories}
-            brandColors={brandColors}
-            onAdd={addItem}
-          />
+          <ProductSearch inventories={inventories} brandColors={brandColors} onAdd={addItem} />
 
           {/* erro */}
           {!!error && (
@@ -718,10 +703,7 @@ const PurchaseForm = () => {
 
 const rowStyles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
+    backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 10,
     ...Platform.select({
       ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6 },
       android: { elevation: 2 },
@@ -734,59 +716,60 @@ const rowStyles = StyleSheet.create({
   productType:        { fontSize: 11, color: '#94A3B8', marginTop: 2 },
   removeBtn: {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center',
-    marginLeft: 8,
+    backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 8,
   },
-  fields:     { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  fieldWrap:  { flex: 1 },
+  fields:    { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  fieldWrap: { flex: 1 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
   input: {
-    borderWidth: 1.5, borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 9,
-    fontSize: 15, fontWeight: '700', color: '#1E293B',
-    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
+    fontSize: 15, fontWeight: '700', color: '#1E293B', backgroundColor: '#F8FAFC',
   },
-  invSection:  { marginTop: 2 },
+  invSection:     { marginTop: 2 },
   invChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
   },
-  invChipText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  invHint:     { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
+  invChipText:    { fontSize: 12, fontWeight: '600', color: '#64748B' },
+  invHint:        { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
+  supplierSection: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 },
 });
 
 /* ─── estilos SupplierSelector ──────────────────────────────────────── */
 
 const supplierStyles = StyleSheet.create({
   triggerBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    backgroundColor: '#F8FAFC', marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderStyle: 'dashed', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 8,
+    backgroundColor: '#FAFAFA', marginTop: 6,
   },
-  triggerText: { flex: 1, fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+  triggerText: { flex: 1, fontSize: 12, color: '#94A3B8', fontWeight: '600' },
 
   selectedWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#F0FDF4', borderRadius: 12, borderWidth: 1.5, borderColor: '#86EFAC',
-    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F0FDF4', borderRadius: 8, borderWidth: 1, borderColor: '#86EFAC',
+    paddingHorizontal: 10, paddingVertical: 8, marginTop: 6,
   },
-  selectedName: { flex: 1, fontSize: 14, fontWeight: '700', color: '#15803D' },
+  selectedName: { flex: 1, fontSize: 12, fontWeight: '700', color: '#15803D' },
   clearBtn:     { padding: 2 },
 
-  dropdownWrap: { marginBottom: 12 },
+  applyAllBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    marginTop: 5, paddingHorizontal: 4,
+  },
+  applyAllText: { fontSize: 11, color: '#2563EB', fontWeight: '600' },
+
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: '#fff',
+    borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8,
+    backgroundColor: '#fff', marginTop: 6,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
+  searchInput: { flex: 1, fontSize: 13, color: '#1E293B', padding: 0 },
 
   resultList: {
-    backgroundColor: '#fff', borderRadius: 12, marginTop: 4,
+    backgroundColor: '#fff', borderRadius: 10, marginTop: 4,
     borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden',
     ...Platform.select({
       ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
@@ -794,15 +777,15 @@ const supplierStyles = StyleSheet.create({
       web:     { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
     }),
   },
-  resultItem: {
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
-  },
-  resultName:  { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  resultAlias: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  resultItem:  { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
+  resultName:  { fontSize: 13, fontWeight: '600', color: '#1E293B' },
+  resultAlias: { fontSize: 11, color: '#64748B', marginTop: 1 },
 
-  emptyState: { backgroundColor: '#fff', borderRadius: 12, marginTop: 4, padding: 20, alignItems: 'center', gap: 8 },
-  emptyText:  { fontSize: 13, color: '#94A3B8' },
+  emptyState: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, marginTop: 4,
+  },
+  emptyText: { fontSize: 12, color: '#94A3B8' },
 });
 
 /* ─── estilos ProductSearch ─────────────────────────────────────────── */
@@ -819,10 +802,9 @@ const searchStyles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10,
-    backgroundColor: '#fff',
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#fff',
   },
-  searchInput:  { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
   resultList: {
     backgroundColor: '#fff', borderRadius: 12, marginTop: 4,
     borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden',
@@ -837,7 +819,7 @@ const searchStyles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12,
     borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
   },
-  resultTextBlock: { flex: 1, minWidth: 0, marginRight: 8 },
+  resultTextBlock:   { flex: 1, minWidth: 0, marginRight: 8 },
   resultName:        { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   resultDescription: { fontSize: 12, color: '#64748B', marginTop: 2 },
   resultType:        { fontSize: 11, color: '#94A3B8', marginLeft: 8 },
@@ -852,18 +834,17 @@ const styles = StyleSheet.create({
 
   summaryCard: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 16, padding: 16,
-    marginBottom: 14,
+    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14,
     ...Platform.select({
       ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6 },
       android: { elevation: 2 },
       web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
     }),
   },
-  summaryItem:   { flex: 1, alignItems: 'center' },
-  summaryLabel:  { fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  summaryValue:  { fontSize: 18, fontWeight: '800', color: '#1E293B' },
-  summaryDivider:{ width: 1, height: 36, backgroundColor: '#F1F5F9' },
+  summaryItem:    { flex: 1, alignItems: 'center' },
+  summaryLabel:   { fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  summaryValue:   { fontSize: 18, fontWeight: '800', color: '#1E293B' },
+  summaryDivider: { width: 1, height: 36, backgroundColor: '#F1F5F9' },
 
   errorBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -886,19 +867,16 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
-  successWrap:       { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  successWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   successIcon: {
     width: 120, height: 120, borderRadius: 60,
     backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
   },
-  successTitle:      { fontSize: 24, fontWeight: '800', color: '#16A34A', marginBottom: 8, textAlign: 'center' },
-  successSub:        { fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 32 },
-  successBtn:        { width: '100%', paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginBottom: 10 },
-  successBtnText:    { color: '#fff', fontWeight: '700', fontSize: 16 },
-  successBtnOutline: {
-    width: '100%', paddingVertical: 14, borderRadius: 14,
-    alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0',
-  },
+  successTitle:          { fontSize: 24, fontWeight: '800', color: '#16A34A', marginBottom: 8, textAlign: 'center' },
+  successSub:            { fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 32 },
+  successBtn:            { width: '100%', paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginBottom: 10 },
+  successBtnText:        { color: '#fff', fontWeight: '700', fontSize: 16 },
+  successBtnOutline:     { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0' },
   successBtnOutlineText: { fontWeight: '700', fontSize: 15 },
 });
 
