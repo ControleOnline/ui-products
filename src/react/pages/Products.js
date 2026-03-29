@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { NO_CATEGORY_SENTINEL } from './Categories';
 import {
+  FlatList,
   ScrollView,
   View,
   TouchableOpacity,
@@ -83,6 +84,7 @@ const ProductsPage = ({ navigation, route }) => {
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(50);
 
   const isManager = env.APP_TYPE === 'MANAGER';
 
@@ -91,6 +93,15 @@ const ProductsPage = ({ navigation, route }) => {
     if (!typeFilter) return categoryProducts;
     return categoryProducts.filter(p => p.type === typeFilter);
   }, [categoryProducts, typeFilter]);
+
+  // Reseta paginação visual ao trocar filtro ou categoria
+  useEffect(() => { setVisibleCount(50); }, [typeFilter, category]);
+
+  // Fatia para scroll infinito (exibe 50 por vez)
+  const productsData = useMemo(
+    () => visibleProducts.slice(0, visibleCount),
+    [visibleProducts, visibleCount],
+  );
 
   // Tipos presentes na lista atual (para exibir só os filtros relevantes)
   const availableTypes = useMemo(() => {
@@ -183,6 +194,7 @@ const ProductsPage = ({ navigation, route }) => {
         actions
           .getItems({
             ...baseParams,
+            itemsPerPage: 50,
             'productCategory.category': category['@id'],
           })
           .then(data => {
@@ -295,36 +307,44 @@ const ProductsPage = ({ navigation, route }) => {
 
       {/* Product list */}
       {!loading && categoryProducts.length > 0 && !error && (
-        <ScrollView
+        <FlatList
+          data={productsData}
+          keyExtractor={item => String(item.id)}
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, isManager && { paddingBottom: 84 }]}
-        >
-          <View style={{ width: containerWidth, paddingHorizontal: 16, paddingTop: 12 }}>
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingHorizontal: 16, paddingTop: 12 },
+            isManager && { paddingBottom: 84 },
+          ]}
+          onEndReached={() => {
+            if (visibleCount < visibleProducts.length) setVisibleCount(v => v + 50);
+          }}
+          onEndReachedThreshold={0.3}
+          ListHeaderComponent={() => (
             <Text style={styles.countLabel}>
               {visibleProducts.length} {visibleProducts.length === 1 ? 'produto' : 'produtos'}
               {typeFilter ? ` · ${TYPE_FILTER_OPTIONS.find(o => o.key === typeFilter)?.label}` : ''}
             </Text>
-
-            {visibleProducts.map(product => (
-              <TouchableOpacity
-                key={product.id}
-                activeOpacity={isManager ? 0.75 : 1}
-                onPress={() => handleProductPress(product)}
-                disabled={!isManager}
-              >
-                <ProductItem product={product} category={category} />
-              </TouchableOpacity>
-            ))}
-
-            {visibleProducts.length === 0 && typeFilter && (
+          )}
+          ListEmptyComponent={() =>
+            visibleProducts.length === 0 && typeFilter ? (
               <View style={styles.filterEmptyWrap}>
                 <Text style={styles.filterEmptyText}>
                   Nenhum produto do tipo "{TYPE_FILTER_OPTIONS.find(o => o.key === typeFilter)?.label}" nesta categoria.
                 </Text>
               </View>
-            )}
-          </View>
-        </ScrollView>
+            ) : null
+          }
+          renderItem={({ item: product }) => (
+            <TouchableOpacity
+              activeOpacity={isManager ? 0.75 : 1}
+              onPress={() => handleProductPress(product)}
+              disabled={!isManager}
+            >
+              <ProductItem product={product} category={category} />
+            </TouchableOpacity>
+          )}
+        />
       )}
 
       {/* Add product bar (MANAGER only) */}

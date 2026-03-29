@@ -131,7 +131,7 @@ function mergeDedup(arr) {
 
 /* ─── página ────────────────────────────────────────────────────────── */
 
-const PAGE_SIZE = 30;
+const PAGE_SIZE = 50;
 
 const InventoryMovementsPage = ({ route }) => {
   const { width } = useWindowDimensions();
@@ -366,7 +366,16 @@ const InventoryMovementsPage = ({ route }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 }]}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: 24 }]}
+        scrollEventThrottle={400}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
+          if (nearBottom && !loading && hasMore) setPage(p => p + 1);
+        }}
+      >
         <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 4 }}>
 
           {loading && (
@@ -406,16 +415,12 @@ const InventoryMovementsPage = ({ route }) => {
             </View>
           )}
 
-          {!loading && hasMore && (
-            <TouchableOpacity
-              style={[styles.loadMoreBtn, { borderColor: brandColors.primary }]}
-              onPress={() => setPage(p => p + 1)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.loadMoreText, { color: brandColors.primary }]}>
-                Carregar mais ({filtered.length - displayed.length} restantes)
-              </Text>
-            </TouchableOpacity>
+          {hasMore && (
+            <ActivityIndicator
+              size="small"
+              color={brandColors.primary}
+              style={{ marginVertical: 16 }}
+            />
           )}
         </View>
       </ScrollView>
