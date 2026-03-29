@@ -288,7 +288,7 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
 
     {/* fornecedor do produto */}
     <View style={rowStyles.supplierSection}>
-      <Text style={rowStyles.fieldLabel}>Fornecedor</Text>
+      <Text style={rowStyles.fieldLabel}>Fornecedor *</Text>
       <SupplierSelector
         brandColors={brandColors}
         value={item.supplier || null}
@@ -492,8 +492,9 @@ const PurchaseForm = () => {
     if (items.length === 0) return 'Adicione ao menos um produto.';
     for (const it of items) {
       const q = parseFloat(String(it.qty).replace(',', '.'));
-      if (!q || q <= 0) return `Quantidade inválida para "${it.productName}".`;
+      if (!q || q <= 0)   return `Quantidade inválida para "${it.productName}".`;
       if (!it.inInventoryId) return `Selecione o local de entrada para "${it.productName}".`;
+      if (!it.supplier?.id)  return `Selecione o fornecedor para "${it.productName}".`;
     }
     return null;
   };
