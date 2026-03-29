@@ -214,91 +214,117 @@ const SupplierSelector = ({ brandColors, value, onSelect, showApplyToAll, onAppl
    ProductRow
    ═══════════════════════════════════════════════════════════════════════ */
 
-const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showApplyToAll, onApplyToAll }) => (
-  <View style={rowStyles.card}>
-    {/* cabeçalho */}
-    <View style={rowStyles.header}>
-      <View style={{ flex: 1 }}>
-        <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
-        {item.productDescription ? (
-          <Text style={rowStyles.productDescription} numberOfLines={2}>{item.productDescription}</Text>
-        ) : null}
-        {item.productType ? <Text style={rowStyles.productType}>{item.productType}</Text> : null}
-      </View>
-      <TouchableOpacity onPress={onRemove} style={rowStyles.removeBtn} activeOpacity={0.75}>
-        <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
-      </TouchableOpacity>
-    </View>
-
-    {/* quantidade + preço */}
-    <View style={rowStyles.fields}>
-      <View style={rowStyles.fieldWrap}>
-        <Text style={rowStyles.fieldLabel}>Quantidade *</Text>
-        <TextInput
-          style={[rowStyles.input, { borderColor: brandColors.primary + '66' }]}
-          value={String(item.qty)}
-          onChangeText={v => onChange({ qty: v })}
-          keyboardType="numeric"
-          placeholder="0"
-          placeholderTextColor="#CBD5E1"
-          selectTextOnFocus
-        />
-      </View>
-      <View style={rowStyles.fieldWrap}>
-        <Text style={rowStyles.fieldLabel}>Preço Unit. (R$)</Text>
-        <TextInput
-          style={[rowStyles.input, { borderColor: '#E2E8F0' }]}
-          value={String(item.price)}
-          onChangeText={v => onChange({ price: v })}
-          keyboardType="numeric"
-          placeholder="0,00"
-          placeholderTextColor="#CBD5E1"
-          selectTextOnFocus
-        />
-      </View>
-    </View>
-
-    {/* local de entrada */}
-    <View style={rowStyles.invSection}>
-      <Text style={rowStyles.fieldLabel}>Local de Entrada</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-        <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
-          {inventories.map(inv => {
-            const sel = String(item.inInventoryId) === String(inv.id);
-            return (
-              <TouchableOpacity
-                key={inv.id}
-                style={[rowStyles.invChip, sel && { backgroundColor: brandColors.primary + '18', borderColor: brandColors.primary }]}
-                onPress={() => onChange({ inInventoryId: inv.id, inInventoryName: inv.inventory })}
-                activeOpacity={0.75}
-              >
-                <MaterialCommunityIcons name="warehouse" size={12} color={sel ? brandColors.primary : '#94A3B8'} />
-                <Text style={[rowStyles.invChipText, sel && { color: brandColors.primary, fontWeight: '700' }]}>
-                  {inv.inventory}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showApplyToAll, onApplyToAll, mode }) => {
+  const isTransfer = mode === 'transfer';
+  return (
+    <View style={rowStyles.card}>
+      {/* cabeçalho */}
+      <View style={rowStyles.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
+          {item.productDescription ? (
+            <Text style={rowStyles.productDescription} numberOfLines={2}>{item.productDescription}</Text>
+          ) : null}
+          {item.productType ? <Text style={rowStyles.productType}>{item.productType}</Text> : null}
         </View>
-      </ScrollView>
-      {!item.inInventoryId && (
-        <Text style={rowStyles.invHint}>Selecione onde este produto será recebido</Text>
+        <TouchableOpacity onPress={onRemove} style={rowStyles.removeBtn} activeOpacity={0.75}>
+          <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
+        </TouchableOpacity>
+      </View>
+
+      {/* quantidade (+ preço só em compra) */}
+      <View style={rowStyles.fields}>
+        <View style={rowStyles.fieldWrap}>
+          <Text style={rowStyles.fieldLabel}>Quantidade *</Text>
+          <TextInput
+            style={[rowStyles.input, { borderColor: isTransfer ? '#7C3AED66' : brandColors.primary + '66' }]}
+            value={String(item.qty)}
+            onChangeText={v => onChange({ qty: v })}
+            keyboardType="numeric"
+            placeholder="0"
+            placeholderTextColor="#CBD5E1"
+            selectTextOnFocus
+          />
+        </View>
+        {!isTransfer && (
+          <View style={rowStyles.fieldWrap}>
+            <Text style={rowStyles.fieldLabel}>Preço Unit. (R$)</Text>
+            <TextInput
+              style={[rowStyles.input, { borderColor: '#E2E8F0' }]}
+              value={String(item.price)}
+              onChangeText={v => onChange({ price: v })}
+              keyboardType="numeric"
+              placeholder="0,00"
+              placeholderTextColor="#CBD5E1"
+              selectTextOnFocus
+            />
+          </View>
+        )}
+      </View>
+
+      {/* local de entrada / destino */}
+      <View style={rowStyles.invSection}>
+        <Text style={rowStyles.fieldLabel}>{isTransfer ? 'Local de Destino *' : 'Local de Entrada'}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+          <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+            {inventories.map(inv => {
+              const sel = String(item.inInventoryId) === String(inv.id);
+              const selColor = isTransfer ? '#7C3AED' : brandColors.primary;
+              return (
+                <TouchableOpacity
+                  key={inv.id}
+                  style={[rowStyles.invChip, sel && { backgroundColor: selColor + '18', borderColor: selColor }]}
+                  onPress={() => onChange({ inInventoryId: inv.id, inInventoryName: inv.inventory })}
+                  activeOpacity={0.75}
+                >
+                  <MaterialCommunityIcons name="warehouse" size={12} color={sel ? selColor : '#94A3B8'} />
+                  <Text style={[rowStyles.invChipText, sel && { color: selColor, fontWeight: '700' }]}>
+                    {inv.inventory}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+        {!item.inInventoryId && (
+          <Text style={rowStyles.invHint}>
+            {isTransfer ? 'Selecione o destino da transferência' : 'Selecione onde este produto será recebido'}
+          </Text>
+        )}
+      </View>
+
+      {/* observação (apenas transferência) */}
+      {isTransfer && (
+        <View style={rowStyles.commentSection}>
+          <Text style={rowStyles.fieldLabel}>Observação (opcional)</Text>
+          <TextInput
+            style={rowStyles.commentInput}
+            value={item.comment || ''}
+            onChangeText={v => onChange({ comment: v })}
+            placeholder="Motivo da transferência..."
+            placeholderTextColor="#CBD5E1"
+            multiline
+            numberOfLines={2}
+          />
+        </View>
+      )}
+
+      {/* fornecedor (apenas compra) */}
+      {!isTransfer && (
+        <View style={rowStyles.supplierSection}>
+          <Text style={rowStyles.fieldLabel}>Fornecedor *</Text>
+          <SupplierSelector
+            brandColors={brandColors}
+            value={item.supplier || null}
+            onSelect={supplier => onChange({ supplier })}
+            showApplyToAll={showApplyToAll}
+            onApplyToAll={onApplyToAll}
+          />
+        </View>
       )}
     </View>
-
-    {/* fornecedor do produto */}
-    <View style={rowStyles.supplierSection}>
-      <Text style={rowStyles.fieldLabel}>Fornecedor *</Text>
-      <SupplierSelector
-        brandColors={brandColors}
-        value={item.supplier || null}
-        onSelect={supplier => onChange({ supplier })}
-        showApplyToAll={showApplyToAll}
-        onApplyToAll={onApplyToAll}
-      />
-    </View>
-  </View>
-);
+  );
+};
 
 /* ═══════════════════════════════════════════════════════════════════════
    ProductSearch
@@ -363,6 +389,7 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
       inInventoryId:      null,
       inInventoryName:    null,
       supplier:           null,
+      comment:            '',
     });
     setQuery(''); setResults([]); setOpen(false);
   };
@@ -423,6 +450,9 @@ const PurchaseForm = () => {
   const navigation = useNavigation();
   const route      = useRoute();
 
+  const mode       = route.params?.mode || 'purchase';
+  const isTransfer = mode === 'transfer';
+
   const peopleStore       = useStore('people');
   const themeStore        = useStore('theme');
   const ordersStore       = useStore('orders');
@@ -439,12 +469,15 @@ const PurchaseForm = () => {
     [themeColors, currentCompany?.id],
   );
 
-  const [inventories, setInventories] = useState([]);
-  const [items,       setItems]       = useState([]);
-  const [saving,      setSaving]      = useState(false);
-  const [error,       setError]       = useState('');
-  const [done,        setDone]        = useState(false);
-  const [ordersCreated, setOrdersCreated] = useState(0);
+  const [inventories,     setInventories]     = useState([]);
+  const [items,           setItems]           = useState([]);
+  const [saving,          setSaving]          = useState(false);
+  const [error,           setError]           = useState('');
+  const [done,            setDone]            = useState(false);
+  const [ordersCreated,   setOrdersCreated]   = useState(0);
+  /* transferência — origem global */
+  const [outInventoryId,   setOutInventoryId]   = useState(null);
+  const [outInventoryName, setOutInventoryName] = useState(null);
 
   /* inventários — paginado */
   useFocusEffect(useCallback(() => {
@@ -457,7 +490,11 @@ const PurchaseForm = () => {
 
   /* pré-preenche com itens de navegação */
   useEffect(() => {
-    const preItems = route.params?.items;
+    const preItems   = route.params?.items;
+    const preOutId   = route.params?.outInventoryId;
+    const preOutName = route.params?.outInventoryName;
+    if (preOutId)   setOutInventoryId(String(preOutId));
+    if (preOutName) setOutInventoryName(preOutName);
     if (preItems?.length) {
       setItems(preItems.map(p => ({
         _key:               uid(),
@@ -467,9 +504,10 @@ const PurchaseForm = () => {
         productType:        p.productType   || null,
         qty:                String(p.suggestedQty || 1),
         price:              '',
-        inInventoryId:      p.inInventoryId   || null,
-        inInventoryName:    p.inInventoryName || null,
+        inInventoryId:      isTransfer ? null : (p.inInventoryId || null),
+        inInventoryName:    isTransfer ? null : (p.inInventoryName || null),
         supplier:           null,
+        comment:            '',
       })));
     }
   }, [route.params?.items]);
@@ -490,16 +528,19 @@ const PurchaseForm = () => {
   /* validação */
   const validate = () => {
     if (items.length === 0) return 'Adicione ao menos um produto.';
+    if (isTransfer && !outInventoryId) return 'Selecione o local de origem.';
     for (const it of items) {
       const q = parseFloat(String(it.qty).replace(',', '.'));
-      if (!q || q <= 0)   return `Quantidade inválida para "${it.productName}".`;
-      if (!it.inInventoryId) return `Selecione o local de entrada para "${it.productName}".`;
-      if (!it.supplier?.id)  return `Selecione o fornecedor para "${it.productName}".`;
+      if (!q || q <= 0) return `Quantidade inválida para "${it.productName}".`;
+      if (!it.inInventoryId) return `Selecione o local de ${isTransfer ? 'destino' : 'entrada'} para "${it.productName}".`;
+      if (isTransfer && String(it.inInventoryId) === String(outInventoryId))
+        return `Origem e destino não podem ser iguais para "${it.productName}".`;
+      if (!isTransfer && !it.supplier?.id) return `Selecione o fornecedor para "${it.productName}".`;
     }
     return null;
   };
 
-  /* confirmação — agrupa por fornecedor, 1 pedido por grupo, itens 1 a 1 */
+  /* confirmação */
   const confirm = async () => {
     const msg = validate();
     if (msg) { setError(msg); return; }
@@ -509,7 +550,60 @@ const PurchaseForm = () => {
     try {
       const statusIRI = await fetchOrderStatus(statusStore);
 
-      /* agrupa itens por fornecedor (null = sem fornecedor) */
+      /* ── transferência ── */
+      if (isTransfer) {
+        const outIRI = `/inventories/${outInventoryId}`;
+        const order  = await ordersStore.actions.save({
+          orderType: 'transfer',
+          provider:  `/people/${currentCompany.id}`,
+          app:       'StockAdjustment',
+          ...(statusIRI ? { status: statusIRI } : {}),
+        });
+
+        for (const it of items) {
+          const qty     = parseFloat(String(it.qty).replace(',', '.'));
+          const inIRI   = `/inventories/${it.inInventoryId}`;
+          const prodIRI = `/products/${it.productId}`;
+
+          const opPayload = {
+            order:        `/orders/${order.id}`,
+            product:      prodIRI,
+            quantity:     qty,
+            outInventory: outIRI,
+            inInventory:  inIRI,
+          };
+          if (it.comment?.trim()) opPayload.comments = it.comment.trim();
+          await orderProductStore.actions.save(opPayload);
+
+          /* diminui origem */
+          const piOutData = await productInvStore.actions.getItems({
+            inventory: outIRI, product: prodIRI, itemsPerPage: 1,
+          }).catch(() => []);
+          const piOut = (piOutData || [])[0];
+          if (piOut?.id) {
+            await productInvStore.actions.save({
+              id: piOut.id, available: Math.max(0, parseFloat(piOut.available ?? 0) - qty),
+            });
+          }
+
+          /* aumenta destino */
+          const piInData = await productInvStore.actions.getItems({
+            inventory: inIRI, product: prodIRI, itemsPerPage: 1,
+          }).catch(() => []);
+          const piIn = (piInData || [])[0];
+          if (piIn?.id) {
+            await productInvStore.actions.save({ id: piIn.id, available: parseFloat(piIn.available ?? 0) + qty });
+          } else {
+            await productInvStore.actions.save({ inventory: inIRI, product: prodIRI, available: qty });
+          }
+        }
+
+        setOrdersCreated(1);
+        setDone(true);
+        return;
+      }
+
+      /* ── compra — agrupa por fornecedor, 1 pedido por grupo, itens 1 a 1 ── */
       const groups = new Map();
       for (const it of items) {
         const key = it.supplier?.id ? String(it.supplier.id) : '__none__';
@@ -530,7 +624,6 @@ const PurchaseForm = () => {
 
         const order = await ordersStore.actions.save(orderPayload);
 
-        /* 1 a 1 para evitar deadlock no MySQL */
         for (const it of group.items) {
           const qty     = parseFloat(String(it.qty).replace(',', '.'));
           const invIRI  = `/inventories/${it.inInventoryId}`;
@@ -543,7 +636,6 @@ const PurchaseForm = () => {
           }
           await orderProductStore.actions.save(opPayload);
 
-          /* atualiza saldo */
           const piData = await productInvStore.actions.getItems({
             inventory: invIRI, product: prodIRI, itemsPerPage: 1,
           }).catch(() => []);
@@ -561,7 +653,7 @@ const PurchaseForm = () => {
       setOrdersCreated(created);
       setDone(true);
     } catch (e) {
-      setError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao registrar compra.');
+      setError(e?.response?.data?.['hydra:description'] || e?.message || `Erro ao ${isTransfer ? 'registrar transferência' : 'registrar compra'}.`);
     } finally {
       setSaving(false);
     }
@@ -569,6 +661,38 @@ const PurchaseForm = () => {
 
   /* tela de sucesso */
   if (done) {
+    if (isTransfer) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.successWrap}>
+            <View style={[styles.successIcon, { backgroundColor: '#F5F3FF' }]}>
+              <MaterialCommunityIcons name="check-circle-outline" size={64} color="#7C3AED" />
+            </View>
+            <Text style={[styles.successTitle, { color: '#7C3AED' }]}>Transferência realizada!</Text>
+            <Text style={styles.successSub}>
+              {items.length} {items.length === 1 ? 'produto transferido' : 'produtos transferidos'}
+              {outInventoryName ? ` de ${outInventoryName}` : ''} para{' '}
+              {[...new Set(items.map(it => it.inInventoryName).filter(Boolean))].join(', ') || 'o destino selecionado'}.
+            </Text>
+            <TouchableOpacity
+              style={[styles.successBtn, { backgroundColor: '#7C3AED' }]}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.successBtnText}>Concluir</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.successBtnOutline}
+              onPress={() => { setDone(false); setItems([]); setOrdersCreated(0); }}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.successBtnOutlineText, { color: '#7C3AED' }]}>Nova transferência</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+
     const supplierNames = [...new Set(items.map(it => it.supplier?.name).filter(Boolean))];
     return (
       <SafeAreaView style={styles.container}>
@@ -647,6 +771,36 @@ const PurchaseForm = () => {
             </View>
           )}
 
+          {/* origem (transferência) */}
+          {isTransfer && (
+            <View style={styles.originCard}>
+              <Text style={styles.originLabel}>Local de Origem *</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+                <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+                  {inventories.map(inv => {
+                    const sel = String(inv.id) === String(outInventoryId);
+                    return (
+                      <TouchableOpacity
+                        key={inv.id}
+                        style={[styles.originChip, sel && styles.originChipSelected]}
+                        onPress={() => { setOutInventoryId(String(inv.id)); setOutInventoryName(inv.inventory); }}
+                        activeOpacity={0.75}
+                      >
+                        <MaterialCommunityIcons name="warehouse" size={12} color={sel ? '#7C3AED' : '#94A3B8'} />
+                        <Text style={[styles.originChipText, sel && { color: '#7C3AED', fontWeight: '700' }]}>
+                          {inv.inventory}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+              {!outInventoryId && (
+                <Text style={styles.originHint}>Selecione de onde os produtos serão transferidos</Text>
+              )}
+            </View>
+          )}
+
           {/* lista de produtos */}
           {items.map(it => (
             <ProductRow
@@ -658,6 +812,7 @@ const PurchaseForm = () => {
               onRemove={() => removeItem(it._key)}
               showApplyToAll={totalItems > 1 && !!it.supplier}
               onApplyToAll={() => applySupplierToAll(it.supplier)}
+              mode={mode}
             />
           ))}
 
@@ -678,7 +833,12 @@ const PurchaseForm = () => {
         {/* rodapé */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.confirmBtn, { backgroundColor: items.length === 0 ? '#CBD5E1' : brandColors.primary }]}
+            style={[styles.confirmBtn, {
+              backgroundColor:
+                items.length === 0 || (isTransfer && !outInventoryId)
+                  ? '#CBD5E1'
+                  : isTransfer ? '#7C3AED' : brandColors.primary,
+            }]}
             onPress={confirm}
             disabled={saving || items.length === 0}
             activeOpacity={0.85}
@@ -687,9 +847,18 @@ const PurchaseForm = () => {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <MaterialCommunityIcons name="cart-check" size={20} color="#fff" />
+                <MaterialCommunityIcons
+                  name={isTransfer ? 'swap-horizontal-circle' : 'cart-check'}
+                  size={20}
+                  color="#fff"
+                />
                 <Text style={styles.confirmBtnText}>
-                  {items.length === 0 ? 'Adicione produtos' : `Confirmar Compra (${totalItems})`}
+                  {items.length === 0
+                    ? 'Adicione produtos'
+                    : isTransfer
+                      ? `Transferir (${totalItems})`
+                      : `Confirmar Compra (${totalItems})`
+                  }
                 </Text>
               </>
             )}
@@ -735,6 +904,12 @@ const rowStyles = StyleSheet.create({
   invChipText:    { fontSize: 12, fontWeight: '600', color: '#64748B' },
   invHint:        { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
   supplierSection: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 },
+  commentSection: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 },
+  commentInput: {
+    marginTop: 6, borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#1E293B',
+    backgroundColor: '#F8FAFC', textAlignVertical: 'top', minHeight: 60,
+  },
 });
 
 /* ─── estilos SupplierSelector ──────────────────────────────────────── */
@@ -867,6 +1042,24 @@ const styles = StyleSheet.create({
     gap: 8, paddingVertical: 15, borderRadius: 14,
   },
   confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  originCard: {
+    backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12,
+    ...Platform.select({
+      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6 },
+      android: { elevation: 2 },
+      web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
+    }),
+  },
+  originLabel:       { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4 },
+  originChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
+  },
+  originChipSelected: { backgroundColor: '#F5F3FF', borderColor: '#7C3AED' },
+  originChipText:    { fontSize: 12, fontWeight: '600', color: '#64748B' },
+  originHint:        { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
 
   successWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   successIcon: {

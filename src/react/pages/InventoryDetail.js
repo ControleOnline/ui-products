@@ -106,6 +106,7 @@ export const MovementModal = ({
   onClose,
   onMoved,
   onOpenPurchase,
+  onOpenTransfer,
 }) => {
   const ordersStore       = useStore('orders');
   const orderProductStore = useStore('order_products');
@@ -113,14 +114,13 @@ export const MovementModal = ({
   const peopleStore       = useStore('people');
   const { currentCompany } = peopleStore.getters;
 
-  const [op, setOp]           = useState('in');
-  const [qty, setQty]         = useState('');
-  const [destInv, setDestInv] = useState(null);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
+  const [op, setOp]         = useState('in');
+  const [qty, setQty]       = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
 
   const resetAndClose = () => {
-    setOp('in'); setQty(''); setDestInv(null); setError(''); setSaving(false);
+    setOp('in'); setQty(''); setError(''); setSaving(false);
     onClose();
   };
 
@@ -162,6 +162,33 @@ export const MovementModal = ({
     resetAndClose();
   };
 
+  const openTransferForm = () => {
+    const { id: prodId, name: prodName, type: prodType } = extractProduct(row?.product);
+    const invId = row?._inventoryIRI
+      ? String(iriToId(row._inventoryIRI))
+      : currentInventory?.id ? String(currentInventory.id) : null;
+    const invName = currentInventory?.inventory || `Local #${invId}`;
+
+    const params = {
+      mode: 'transfer',
+      outInventoryId:   invId,
+      outInventoryName: invName,
+      items: [{
+        piId:        row?.id || null,
+        productId:   prodId ? String(prodId) : null,
+        productName: prodName || `Produto #${prodId}`,
+        productType: prodType || null,
+        suggestedQty: 1,
+      }],
+    };
+
+    if (!onOpenTransfer || !onOpenTransfer(params)) {
+      setError('Não foi possível abrir a tela de transferências.');
+      return;
+    }
+    resetAndClose();
+  };
+
   /* cria order + order_product para registrar a movimentação no backend */
   const createOrderRecord = async (orderType, prodId, opInvIRI, opOutInvIRI) => {
     const statusIRI = await fetchOrderStatus(statusStore);
@@ -187,9 +214,12 @@ export const MovementModal = ({
       openPurchaseForm();
       return;
     }
+    if (op === 'transfer') {
+      openTransferForm();
+      return;
+    }
     const amount = parseFloat(String(qty).replace(',', '.'));
     if (!amount || amount <= 0) { setError('Informe uma quantidade válida'); return; }
-    if (op === 'transfer' && !destInv) { setError('Selecione o local de destino'); return; }
 
     setSaving(true);
     setError('');
@@ -198,58 +228,12 @@ export const MovementModal = ({
       const { id: prodId } = extractProduct(row.product);
       const invIRI = row._inventoryIRI || (currentInventory?.id ? `/inventories/${currentInventory.id}` : null);
 
-      if (op === 'in') {
-        /* Entrada: aumenta disponível + registra como purchase */
-        if (row.id) {
-          await productInvStore.actions.save({ id: row.id, available: curAvail + amount });
-        } else {
-          await productInvStore.actions.save({
-            inventory: invIRI,
-            product:   `/products/${prodId}`,
-            available: amount,
-          });
-        }
-        await createOrderRecord('purchase', prodId, invIRI, null);
-        onMoved({ rowId: row.id, delta: amount, op });
-
-      } else if (op === 'out') {
-        /* Saída: diminui disponível + registra como sale */
-        if (row.id) {
-          await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
-        }
-        await createOrderRecord('loss', prodId, null, invIRI);
-        onMoved({ rowId: row.id, delta: -amount, op });
-
-      } else if (op === 'transfer') {
-        /* Transferência: diminui origem, aumenta destino + registra como transfer */
-        const destIRI = `/inventories/${destInv.id}`;
-
-        if (row.id) {
-          await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
-        }
-
-        const destPiData = await productInvStore.actions.getItems({
-          'inventory': destIRI,
-          'product':   `/products/${prodId}`,
-        }).catch(() => []);
-
-        const destPi = (destPiData || [])[0];
-        if (destPi) {
-          await productInvStore.actions.save({
-            id: destPi.id,
-            available: parseFloat(destPi.available ?? 0) + amount,
-          });
-        } else {
-          await productInvStore.actions.save({
-            inventory: destIRI,
-            product:   `/products/${prodId}`,
-            available: amount,
-          });
-        }
-        /* um único order_product com outInventory (origem) e inInventory (destino) */
-        await createOrderRecord('transfer', prodId, destIRI, invIRI);
-        onMoved({ rowId: row.id, delta: -amount, op });
+      /* Saída (Perda): diminui disponível + registra */
+      if (row.id) {
+        await productInvStore.actions.save({ id: row.id, available: Math.max(0, curAvail - amount) });
       }
+      await createOrderRecord('loss', prodId, null, invIRI);
+      onMoved({ rowId: row.id, delta: -amount, op });
 
       resetAndClose();
     } catch (e) {
@@ -313,16 +297,12 @@ export const MovementModal = ({
               })}
             </View>
 
-            {/* Quantidade (oculto para Compra pois redireciona ao PurchaseForm) */}
-            {op !== 'in' && (
+            {/* Quantidade (somente para Perda; Compra e Transferência redirecionam para outras telas) */}
+            {op === 'out' && (
             <View style={movStyles.field}>
               <Text style={movStyles.fieldLabel}>Quantidade</Text>
               <TextInput
-                style={[
-                  movStyles.qtyInput,
-                  op === 'out'      && { borderColor: '#DC2626', color: '#DC2626' },
-                  op === 'transfer' && { borderColor: '#7C3AED', color: '#7C3AED' },
-                ]}
+                style={[movStyles.qtyInput, { borderColor: '#DC2626', color: '#DC2626' }]}
                 value={qty}
                 onChangeText={v => { setQty(v); setError(''); }}
                 keyboardType="numeric"
@@ -333,43 +313,22 @@ export const MovementModal = ({
             </View>
             )}
 
-            {/* Destino (transferência) */}
+            {/* Info transferência */}
             {op === 'transfer' && (
-              <View style={movStyles.field}>
-                <Text style={movStyles.fieldLabel}>Local de Destino</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-                  <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
-                    {inventories.map(inv => {
-                      const sel = destInv?.id === inv.id;
-                      return (
-                        <TouchableOpacity
-                          key={inv.id}
-                          style={[movStyles.destChip, sel && movStyles.destChipActive]}
-                          onPress={() => { setDestInv(inv); setError(''); }}
-                          activeOpacity={0.75}
-                        >
-                          <Text style={[movStyles.destChipText, sel && movStyles.destChipTextActive]}>
-                            {inv.inventory}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </ScrollView>
+              <View style={movStyles.previewBox}>
+                <MaterialCommunityIcons name="information-outline" size={14} color="#7C3AED" />
+                <Text style={[movStyles.previewText, { color: '#7C3AED' }]}>
+                  Você será direcionado para o carrinho de transferências com este produto pré-selecionado.
+                </Text>
               </View>
             )}
 
-            {/* Prévia do resultado */}
-            {!!qty && parseFloat(qty) > 0 && (
+            {/* Prévia do resultado (somente para Perda) */}
+            {op === 'out' && !!qty && parseFloat(qty) > 0 && (
               <View style={movStyles.previewBox}>
                 <MaterialCommunityIcons name="calculator-variant-outline" size={14} color="#64748B" />
                 <Text style={movStyles.previewText}>
-                  {op === 'in'
-                    ? `${fmtN(row?.available)} + ${fmtN(qty)} = ${fmtN(parseFloat(row?.available ?? 0) + parseFloat(qty))}`
-                    : op === 'out'
-                      ? `${fmtN(row?.available)} - ${fmtN(qty)} = ${fmtN(Math.max(0, parseFloat(row?.available ?? 0) - parseFloat(qty)))}`
-                      : `Saída: ${fmtN(Math.max(0, parseFloat(row?.available ?? 0) - parseFloat(qty)))} | Entrada no destino: +${fmtN(qty)}`
-                  }
+                  {`${fmtN(row?.available)} - ${fmtN(qty)} = ${fmtN(Math.max(0, parseFloat(row?.available ?? 0) - parseFloat(qty)))}`}
                 </Text>
               </View>
             )}
@@ -393,7 +352,9 @@ export const MovementModal = ({
           >
             {saving
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={movStyles.confirmText}>{op === 'in' ? 'Ir para Compra' : 'Confirmar'}</Text>
+              : <Text style={movStyles.confirmText}>
+                  {op === 'in' ? 'Ir para Compra' : op === 'transfer' ? 'Ir para Transferência' : 'Confirmar'}
+                </Text>
             }
           </TouchableOpacity>
         </View>
@@ -406,15 +367,13 @@ export const MovementModal = ({
    Modal de Edição Direta dos Saldos (mínimo/máximo/disponível)
    ═══════════════════════════════════════════════════════════════════════ */
 
-const EditStockModal = ({ visible, row, brandColors, productInvStore, onClose, onSaved }) => {
-  const [available, setAvailable] = useState('');
+export const EditStockModal = ({ visible, row, brandColors, productInvStore, onClose, onSaved }) => {
   const [minimum, setMinimum]     = useState('');
   const [maximum, setMaximum]     = useState('');
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
 
   const resetAndOpen = () => {
-    setAvailable(String(row?.available ?? 0));
     setMinimum(String(row?.minimum ?? 0));
     setMaximum(String(row?.maximum ?? 0));
     setError('');
@@ -426,17 +385,18 @@ const EditStockModal = ({ visible, row, brandColors, productInvStore, onClose, o
   const save = async () => {
     setSaving(true); setError('');
     try {
-      await productInvStore.actions.save({
-        id:        row.id,
-        available: parseFloat(String(available).replace(',', '.')) || 0,
-        minimum:   parseFloat(String(minimum).replace(',', '.'))   || 0,
-        maximum:   parseFloat(String(maximum).replace(',', '.'))   || 0,
-      });
-      onSaved({
-        available: parseFloat(String(available).replace(',', '.')) || 0,
-        minimum:   parseFloat(String(minimum).replace(',', '.'))   || 0,
-        maximum:   parseFloat(String(maximum).replace(',', '.'))   || 0,
-      });
+      const payload = {
+        minimum: parseFloat(String(minimum).replace(',', '.')) || 0,
+        maximum: parseFloat(String(maximum).replace(',', '.')) || 0,
+      };
+      if (row.id) {
+        payload.id = row.id;
+      } else {
+        payload.inventory = row._inventoryIRI;
+        payload.product   = row._productIRI;
+      }
+      const saved = await productInvStore.actions.save(payload);
+      onSaved(saved || { ...row, ...payload });
       onClose();
     } catch (e) {
       setError(e?.response?.data?.['hydra:description'] || e?.message || 'Erro ao salvar');
@@ -450,7 +410,7 @@ const EditStockModal = ({ visible, row, brandColors, productInvStore, onClose, o
       <View style={editStyles.container}>
         <View style={editStyles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={editStyles.title}>Editar Saldos</Text>
+            <Text style={editStyles.title}>Editar Limites</Text>
             <Text style={editStyles.subtitle} numberOfLines={1}>
               {row ? (extractProduct(row.product).name || `#${row.id}`) : ''}
             </Text>
@@ -468,18 +428,6 @@ const EditStockModal = ({ visible, row, brandColors, productInvStore, onClose, o
               </View>
             )}
             <View style={editStyles.fieldsRow}>
-              <View style={editStyles.field}>
-                <Text style={editStyles.label}>Disponível</Text>
-                <TextInput
-                  style={[editStyles.input, editStyles.inputHighlight]}
-                  value={available}
-                  onChangeText={setAvailable}
-                  keyboardType="numeric"
-                  placeholder="0"
-                  placeholderTextColor="#94A3B8"
-                  selectTextOnFocus
-                />
-              </View>
               <View style={editStyles.field}>
                 <Text style={editStyles.label}>Mínimo</Text>
                 <TextInput
@@ -955,6 +903,7 @@ const InventoryDetailPage = ({ route }) => {
         productInvStore={productInvStore}
         currentInventory={inventory}
         onOpenPurchase={openPurchaseFromDetail}
+        onOpenTransfer={openPurchaseFromDetail}
         onClose={() => setMovRow(null)}
         onMoved={(result) => { handleMoved(result); setMovRow(null); }}
       />

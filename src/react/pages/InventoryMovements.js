@@ -93,6 +93,12 @@ const MovementItem = ({ item }) => {
         <Text style={styles.itemDate}>
           {item._orderDate ? fmtDate(item._orderDate) : `Pedido #${iriToId(item._orderIRI) || item.id}`}
         </Text>
+        {!!item.comments && (
+          <View style={styles.itemComment}>
+            <MaterialCommunityIcons name="comment-text-outline" size={11} color="#94A3B8" />
+            <Text style={styles.itemCommentText} numberOfLines={2}>{item.comments}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.itemRight}>
         <Text style={[
@@ -482,6 +488,8 @@ const styles = StyleSheet.create({
   itemLocations: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   itemLocationText: { fontSize: 11, color: '#64748B', flex: 1 },
   itemDate: { fontSize: 10, color: '#CBD5E1', fontWeight: '500' },
+  itemComment: { flexDirection: 'row', alignItems: 'flex-start', gap: 4, marginTop: 1 },
+  itemCommentText: { fontSize: 11, color: '#94A3B8', fontStyle: 'italic', flex: 1 },
 
   itemRight: { alignItems: 'flex-end' },
   itemQty: { fontSize: 18, fontWeight: '800', color: '#1E293B' },

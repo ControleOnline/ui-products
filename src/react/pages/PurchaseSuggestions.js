@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Platform, useWindowDimensions, ActivityIndicator,
+  Modal, FlatList,
 } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
+import { api } from '@controleonline/ui-common/src/api';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -16,9 +18,6 @@ const fmtN = v => {
   const n = parseFloat(String(v ?? 0).replace(',', '.'));
   return isNaN(n) ? '0' : n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 };
-
-const toIRI  = v => (typeof v === 'string' ? v : v?.['@id'] || null);
-const iriToId = iri => { const s = toIRI(iri); return s ? (parseInt(s.split('/').pop(), 10) || null) : null; };
 
 const PRODUCT_TYPE_LABELS = {
   product: 'Produto', service: 'Serviço', component: 'Componente',
@@ -39,50 +38,6 @@ const getCriticality = (available, minimum) => {
   return available / minimum < 0.3 ? 'critical' : 'low';
 };
 
-/* extrai ID numérico de qualquer formato (number, IRI string, objeto com id/@id) */
-const extractId = v => {
-  if (!v && v !== 0) return null;
-  if (typeof v === 'number') return String(v);
-  if (typeof v === 'string') {
-    const tail = v.split('/').pop();
-    return tail && !isNaN(tail) ? tail : null;
-  }
-  if (typeof v === 'object') {
-    if (v.id)    return String(v.id);
-    if (v['@id']) return extractId(v['@id']);
-  }
-  return null;
-};
-
-const extractCategoryId = product => {
-  /* productCategory pode ser objeto único OU array de relações */
-  const pc  = product?.productCategory;
-  const pcs = product?.productCategories;
-  const pcList  = Array.isArray(pc)  ? pc  : (pc  ? [pc]  : []);
-  const pcsList = Array.isArray(pcs) ? pcs : (pcs ? [pcs] : []);
-
-  const candidates = [
-    ...pcList.map(r  => r?.category),
-    ...pcsList.map(r => r?.category),
-    product?.category,
-    product?.categoryId,
-  ];
-
-  for (const c of candidates) {
-    const id = extractId(c);
-    if (id) return id;
-  }
-  return null;
-};
-
-function mergeDedup(arr) {
-  const seen = new Set();
-  const out  = [];
-  for (const item of arr) {
-    if (item?.id != null && !seen.has(item.id)) { seen.add(item.id); out.push(item); }
-  }
-  return out;
-}
 
 /* ─── SubComponentes ────────────────────────────────────────────────── */
 
@@ -116,20 +71,6 @@ const StockBar = ({ available, minimum }) => {
   );
 };
 
-/* ─── helper paginação (máx 50 por request) ────────────────────────── */
-const fetchAllPages = async (actionFn, params) => {
-  const PAGE_SIZE = 50;
-  const results = [];
-  let page = 1;
-  while (true) {
-    const batch = await actionFn({ ...params, itemsPerPage: PAGE_SIZE, page }).catch(() => null);
-    if (!Array.isArray(batch) || batch.length === 0) break;
-    results.push(...batch);
-    if (batch.length < PAGE_SIZE) break;
-    page++;
-  }
-  return results;
-};
 
 /* ─── Página ────────────────────────────────────────────────────────── */
 
@@ -138,16 +79,15 @@ const PurchaseSuggestionsPage = () => {
   const { width }  = useWindowDimensions();
   const maxW = Math.min(width, 860);
 
-  const peopleStore           = useStore('people');
-  const themeStore            = useStore('theme');
-  const productInvStore       = useStore('product_inventories');
-  const inventoriesStore      = useStore('inventories');
-  const productsStore         = useStore('products');
-  const categoriesStore       = useStore('categories');
-  const productCategoryStore  = useStore('product_category');
+  const peopleStore       = useStore('people');
+  const themeStore        = useStore('theme');
+  const printerStore      = useStore('printer');
+  const deviceConfigStore = useStore('device_config');
 
   const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
+  const { items: printers, item: selectedPrinter } = printerStore.getters;
+  const { item: deviceConfig }  = deviceConfigStore.getters;
 
   const brandColors = useMemo(
     () => resolveThemePalette({ ...themeColors, ...(currentCompany?.theme?.colors || {}) }, baseColors),
@@ -162,98 +102,119 @@ const PurchaseSuggestionsPage = () => {
   const loadingMoreRef = useRef(false);
   const runningRef     = useRef(false); /* guard contra chamadas duplicadas */
 
+  /* impressão */
+  const [printerModalVisible, setPrinterModalVisible] = useState(false);
+  const [printing,   setPrinting]   = useState(false);
+  const [printFeedback, setPrintFeedback] = useState(null); /* { ok: bool, msg: string } */
+
+  /* auto-seleciona impressora padrão do device_config */
+  useEffect(() => {
+    if (printers?.length > 0 && deviceConfig?.configs?.printer) {
+      const def = printers.find(p => p.device === deviceConfig.configs.printer);
+      if (def) printerStore.actions.setItem(def);
+    }
+  }, [deviceConfig, printers]);
+
+  const handleSelectPrinter = useCallback(async (printer) => {
+    await deviceConfigStore.actions.addDeviceConfigs({
+      configs: JSON.stringify({ printer: printer.device }),
+      people: `/people/${currentCompany.id}`,
+    }).catch(() => {});
+    printerStore.actions.setItem(printer);
+    setPrinterModalVisible(false);
+  }, [currentCompany?.id]);
+
+  const handlePrint = useCallback(async () => {
+    if (!selectedPrinter?.device || !currentCompany?.id || printing) return;
+    setPrinting(true);
+    setPrintFeedback(null);
+    try {
+      await api.post('/products/purchasing-suggestion/print', {
+        device: selectedPrinter.device,
+        people: currentCompany.id,
+      });
+      setPrintFeedback({ ok: true, msg: `Enviado para ${selectedPrinter.alias || selectedPrinter.device}` });
+    } catch (e) {
+      const msg = e?.response?.data?.['hydra:description'] || e?.response?.data?.message || e?.message || 'Erro ao imprimir';
+      setPrintFeedback({ ok: false, msg });
+    } finally {
+      setPrinting(false);
+      setTimeout(() => setPrintFeedback(null), 4000);
+    }
+  }, [selectedPrinter, currentCompany?.id, printing]);
+
+  /* botão de impressão no header */
+  useLayoutEffect(() => {
+    if (!printers?.length) return;
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingRight: 4 }}>
+          <TouchableOpacity
+            onPress={handlePrint}
+            disabled={printing || !selectedPrinter}
+            style={{ padding: 8 }}
+            activeOpacity={0.7}
+          >
+            {printing
+              ? <ActivityIndicator size="small" color="#64748B" />
+              : <MaterialCommunityIcons
+                  name="printer"
+                  size={22}
+                  color={selectedPrinter ? '#64748B' : '#CBD5E1'}
+                />
+            }
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setPrinterModalVisible(true)}
+            style={{ padding: 8 }}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="format-list-bulleted" size={22} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation, selectedPrinter, printing, printers, handlePrint]);
+
   /* ── carregamento ──────────────────────────────────────────────── */
   const loadData = useCallback(async () => {
     if (!currentCompany?.id || runningRef.current) return;
     runningRef.current = true;
     setLoading(true);
     try {
-      /* RODADA 1 — tudo independente em paralelo, máx 50 por request */
-      const [invData, catsData, prodsData, prodCatRelations] = await Promise.all([
-        fetchAllPages(inventoriesStore.actions.getItems,    { people: `/people/${currentCompany.id}` }),
-        fetchAllPages(categoriesStore.actions.getItems,     { company: currentCompany.id, context: 'products' }),
-        fetchAllPages(productsStore.actions.getItems,       { company: currentCompany.id, active: 1 }),
-        fetchAllPages(productCategoryStore.actions.getItems, {}),
-      ]);
-
-      /* mapas auxiliares */
-      const invMap = {};
-      (invData || []).forEach(inv => { if (inv.id) invMap[String(inv.id)] = inv.inventory; });
-      const catsMap = {};
-      (catsData || []).forEach(c => { if (c.id) catsMap[String(c.id)] = c.name || c.category || `Categoria ${c.id}`; });
-      const prodsMap = {};
-      (prodsData || []).forEach(p => { if (p?.id) prodsMap[String(p.id)] = p; });
-
-      /* RODADA 2 — product_inventories (depende de invData), máx 50 por request */
-      const piResults = await Promise.all(
-        (invData || []).map(inv =>
-          fetchAllPages(productInvStore.actions.getItems, { inventory: `/inventories/${inv.id}` })
-        )
-      );
-      const allPI = mergeDedup(piResults.flat());
-
-      /* filtra sugestões: estoque no mínimo ou abaixo, ou negativo */
-      const critical = allPI.filter(pi => {
-        const avail = parseFloat(pi.available ?? 0);
-        const min   = parseFloat(pi.minimum   ?? 0);
-        return avail < 0 || (min > 0 && avail <= min);
+      const response = await api.fetch('/products/purchasing-suggestion', {
+        params: { company: currentCompany.id },
       });
-      const prodCatMap = {};
-      (prodCatRelations || []).forEach(rel => {
-        const prodIRI = typeof rel.product === 'string' ? rel.product : rel.product?.['@id'] || '';
-        const catIRI  = typeof rel.category === 'string' ? rel.category : rel.category?.['@id'] || '';
-        const pId = String(iriToId(prodIRI) || '');
-        const cId = String(iriToId(catIRI)  || '');
-        if (pId && cId && !prodCatMap[pId]) prodCatMap[pId] = cId;
-      });
+      const raw = Array.isArray(response) ? response
+        : Array.isArray(response?.['hydra:member']) ? response['hydra:member']
+        : [];
 
-      /* enriquece */
-      const enriched = critical.map(pi => {
-        const prodIRI = toIRI(pi.product);
-        const prodId  = prodIRI ? String(iriToId(prodIRI)) : null;
-        const prod    = prodId ? prodsMap[prodId] : null;
-        const invIRI  = toIRI(pi.inventory);
-        const invId   = invIRI ? String(iriToId(invIRI)) : null;
-        const avail   = parseFloat(pi.available ?? 0);
-        const min     = parseFloat(pi.minimum   ?? 0);
-        const max     = parseFloat(pi.maximum   ?? 0);
-        /* catId vem da junction (prodCatMap), que é a fonte confiável */
-        const catId   = prodId ? (prodCatMap[prodId] || null) : null;
-        /* quantidade sugerida:
-           - estoque negativo: valor absoluto + mínimo
-           - até o máximo se definido, senão mínimo + buffer
-        */
-        const deficit = avail < 0
-          ? Math.abs(avail) + (min > 0 ? min : 0)
-          : max > avail
-            ? max - avail
-            : Math.max(1, min - avail + Math.ceil(min * 0.5));
+      const enriched = raw.map(item => {
+        const avail   = parseFloat(item.stock   ?? 0);
+        const min     = parseFloat(item.minimum  ?? 0);
+        const deficit = parseFloat(item.needed   ?? 0);
         return {
-          ...pi,
-          _prodId:   prodId,
-          _prodName: prod?.product || `Produto #${prodId}`,
-          _prodType: prod?.type    || null,
-          _invId:    invId,
-          _invName:  invMap[invId] || `Local #${invId}`,
+          id:        item.product_id,
+          _prodId:   String(item.product_id),
+          _prodName: item.product_name || `#${item.product_id}`,
+          _prodType: item.type   || null,
+          _prodUnit: item.unity  || '',
+          _sku:      item.sku    || '',
           _avail:    avail,
           _min:      min,
-          _max:      max,
           _deficit:  deficit,
           _level:    getCriticality(avail, min),
-          _catId:    catId,
-          _catName:  catId ? (catsMap[catId] || 'Sem Categoria') : 'Sem Categoria',
+          _catName:  PRODUCT_TYPE_LABELS[item.type] || 'Outros',
         };
       });
 
-      /* ordena: críticos primeiro, depois por déficit desc */
       enriched.sort((a, b) => {
         if (a._level !== b._level) return a._level === 'critical' ? -1 : 1;
         return b._deficit - a._deficit;
       });
 
       setItems(enriched);
-      setVisibleCount(50); /* reset paginação a cada carregamento */
-      /* pré-seleciona todos */
+      setVisibleCount(50);
       setSelected(new Set(enriched.map(e => e.id)));
     } catch (_) {
       setItems([]);
@@ -334,13 +295,13 @@ const PurchaseSuggestionsPage = () => {
   const goToPurchase = (preItems) => {
     navigation.navigate('PurchaseFormPage', {
       items: preItems.map(pi => ({
-        piId:           pi.id,
-        productId:      pi._prodId,
-        productName:    pi._prodName,
-        productType:    pi._prodType,
-        suggestedQty:   Math.ceil(pi._deficit),
-        inInventoryId:  pi._invId,
-        inInventoryName: pi._invName,
+        piId:            null,
+        productId:       pi._prodId,
+        productName:     pi._prodName,
+        productType:     pi._prodType,
+        suggestedQty:    Math.ceil(pi._deficit),
+        inInventoryId:   null,
+        inInventoryName: null,
       })),
     });
   };
@@ -358,6 +319,20 @@ const PurchaseSuggestionsPage = () => {
         onScroll={handleScroll}
       >
         <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 12 }}>
+
+          {/* ── Print feedback ─────────────────────────────────────── */}
+          {!!printFeedback && (
+            <View style={[styles.printFeedback, printFeedback.ok ? styles.printFeedbackOk : styles.printFeedbackErr]}>
+              <MaterialCommunityIcons
+                name={printFeedback.ok ? 'printer-check' : 'printer-alert'}
+                size={16}
+                color={printFeedback.ok ? '#16A34A' : '#DC2626'}
+              />
+              <Text style={[styles.printFeedbackText, { color: printFeedback.ok ? '#16A34A' : '#DC2626' }]}>
+                {printFeedback.msg}
+              </Text>
+            </View>
+          )}
 
           {/* ── Summary Card ──────────────────────────────────────── */}
           {!loading && items.length > 0 && (
@@ -485,10 +460,18 @@ const PurchaseSuggestionsPage = () => {
                               </Text>
                             </View>
                           )}
-                          <View style={styles.invChip}>
-                            <MaterialCommunityIcons name="warehouse" size={10} color="#64748B" />
-                            <Text style={styles.invChipText} numberOfLines={1}>{item._invName}</Text>
-                          </View>
+                          {!!item._sku && (
+                            <View style={styles.invChip}>
+                              <MaterialCommunityIcons name="barcode" size={10} color="#64748B" />
+                              <Text style={styles.invChipText} numberOfLines={1}>{item._sku}</Text>
+                            </View>
+                          )}
+                          {!!item._prodUnit && (
+                            <View style={styles.invChip}>
+                              <MaterialCommunityIcons name="scale" size={10} color="#64748B" />
+                              <Text style={styles.invChipText}>{item._prodUnit}</Text>
+                            </View>
+                          )}
                         </View>
 
                         {/* barra de estoque */}
@@ -558,6 +541,61 @@ const PurchaseSuggestionsPage = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* ── Modal seleção de impressora ───────────────────────────────── */}
+      <Modal
+        visible={printerModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setPrinterModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>Selecionar Impressora</Text>
+            {!!selectedPrinter && (
+              <View style={styles.modalCurrentPrinter}>
+                <MaterialCommunityIcons name="printer-check" size={14} color="#16A34A" />
+                <Text style={styles.modalCurrentText}>Atual: {selectedPrinter.alias || selectedPrinter.device}</Text>
+              </View>
+            )}
+            <FlatList
+              data={printers || []}
+              keyExtractor={p => p.device}
+              renderItem={({ item: p }) => {
+                const isActive = selectedPrinter?.device === p.device;
+                return (
+                  <TouchableOpacity
+                    style={[styles.printerItem, isActive && styles.printerItemActive]}
+                    onPress={() => handleSelectPrinter(p)}
+                    activeOpacity={0.75}
+                  >
+                    <MaterialCommunityIcons
+                      name="printer"
+                      size={18}
+                      color={isActive ? brandColors.primary : '#64748B'}
+                    />
+                    <Text style={[styles.printerName, isActive && { color: brandColors.primary, fontWeight: '700' }]}>
+                      {p.alias || p.device}
+                    </Text>
+                    {isActive && (
+                      <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              }}
+              ItemSeparatorComponent={() => <View style={styles.printerSep} />}
+            />
+            <TouchableOpacity
+              style={styles.modalCloseBtn}
+              onPress={() => setPrinterModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalCloseBtnText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -689,6 +727,52 @@ const styles = StyleSheet.create({
   },
   emptyTitle:    { fontSize: 18, fontWeight: '800', color: '#1E293B', marginBottom: 8, textAlign: 'center' },
   emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
+
+  /* print feedback banner */
+  printFeedback: {
+    width: '100%', flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 10,
+  },
+  printFeedbackOk:   { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#86EFAC' },
+  printFeedbackErr:  { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
+  printFeedbackText: { fontSize: 13, fontWeight: '600', flex: 1 },
+
+  /* modal impressora */
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingBottom: 32, paddingTop: 12, maxHeight: '70%',
+    ...Platform.select({
+      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 12 },
+      web:     { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
+    }),
+  },
+  modalHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0',
+    alignSelf: 'center', marginBottom: 16,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 12 },
+  modalCurrentPrinter: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#F0FDF4', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6,
+    marginBottom: 12,
+  },
+  modalCurrentText: { fontSize: 12, fontWeight: '600', color: '#16A34A' },
+  printerItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 14, paddingHorizontal: 4,
+  },
+  printerItemActive: { },
+  printerName: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  printerSep:  { height: 1, backgroundColor: '#F1F5F9' },
+  modalCloseBtn: {
+    marginTop: 16, paddingVertical: 14, borderRadius: 14,
+    backgroundColor: '#F1F5F9', alignItems: 'center',
+  },
+  modalCloseBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
 });
 
 export default PurchaseSuggestionsPage;
