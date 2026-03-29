@@ -10,6 +10,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
 
+/* ─── constantes de paginação ───────────────────────────────────────── */
+
+const PAGE_SIZE = 50; /* regra global: nunca trazer dados sem paginação */
+
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
 const fmtN = v => {
@@ -59,23 +63,18 @@ const fetchOrderStatus = async statusStore => {
 let _uid = 0;
 const uid = () => String(++_uid);
 
-/* ─── componente de linha de produto ────────────────────────────────── */
+/* ─── ProductRow ────────────────────────────────────────────────────── */
 
 const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
-  const [expanded, setExpanded] = useState(false);
-
   const selInv = inventories.find(i => String(i.id) === String(item.inInventoryId)) || null;
 
   return (
     <View style={rowStyles.card}>
-      {/* cabeçalho */}
       <View style={rowStyles.header}>
         <View style={{ flex: 1 }}>
           <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
           {item.productDescription ? (
-            <Text style={rowStyles.productDescription} numberOfLines={2}>
-              {item.productDescription}
-            </Text>
+            <Text style={rowStyles.productDescription} numberOfLines={2}>{item.productDescription}</Text>
           ) : null}
           {item.productType ? (
             <Text style={rowStyles.productType}>{item.productType}</Text>
@@ -86,9 +85,7 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
         </TouchableOpacity>
       </View>
 
-      {/* campos */}
       <View style={rowStyles.fields}>
-        {/* Quantidade */}
         <View style={rowStyles.fieldWrap}>
           <Text style={rowStyles.fieldLabel}>Quantidade *</Text>
           <TextInput
@@ -102,7 +99,6 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
           />
         </View>
 
-        {/* Preço unitário */}
         <View style={rowStyles.fieldWrap}>
           <Text style={rowStyles.fieldLabel}>Preço Unit. (R$)</Text>
           <TextInput
@@ -117,7 +113,6 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
         </View>
       </View>
 
-      {/* Local de Entrada */}
       <View style={rowStyles.invSection}>
         <Text style={rowStyles.fieldLabel}>Local de Entrada</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
@@ -131,11 +126,7 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
                   onPress={() => onChange({ inInventoryId: inv.id, inInventoryName: inv.inventory })}
                   activeOpacity={0.75}
                 >
-                  <MaterialCommunityIcons
-                    name="warehouse"
-                    size={12}
-                    color={sel ? brandColors.primary : '#94A3B8'}
-                  />
+                  <MaterialCommunityIcons name="warehouse" size={12} color={sel ? brandColors.primary : '#94A3B8'} />
                   <Text style={[rowStyles.invChipText, sel && { color: brandColors.primary, fontWeight: '700' }]}>
                     {inv.inventory}
                   </Text>
@@ -152,35 +143,183 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove }) => {
   );
 };
 
-/* ─── busca de produto ───────────────────────────────────────────────── */
+/* ─── SupplierSelector ──────────────────────────────────────────────── */
 
-const ProductSearch = ({ inventories, brandColors, onAdd }) => {
-  const productsStore = useStore('products');
-  const peopleStore   = useStore('people');
+const SupplierSelector = ({ brandColors, value, onSelect }) => {
+  const peopleStore    = useStore('people');
   const { currentCompany } = peopleStore.getters;
 
-  const [query, setQuery]     = useState('');
-  const [results, setResults] = useState([]);
+  const [open,       setOpen]       = useState(false);
+  const [query,      setQuery]      = useState('');
+  const [suppliers,  setSuppliers]  = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [page,       setPage]       = useState(1);
+  const [hasMore,    setHasMore]    = useState(false);
+  const reqRef = useRef(0);
+
+  const fetchSuppliers = useCallback(async (q, p) => {
+    const companyId = currentCompany?.id;
+    if (!companyId) return;
+
+    const reqId = ++reqRef.current;
+    setLoading(true);
+    try {
+      const params = {
+        'link.company':  `/people/${companyId}`,
+        'link.linkType': 'provider',
+        itemsPerPage:    PAGE_SIZE,
+        page:            p,
+      };
+      if (q.trim()) params.name = q.trim();
+
+      const data = await peopleStore.actions.getItems(params).catch(() => []);
+      if (reqId !== reqRef.current) return;
+
+      const items = Array.isArray(data) ? data : [];
+      setSuppliers(prev => p === 1 ? items : [...prev, ...items]);
+      setHasMore(items.length === PAGE_SIZE);
+    } finally {
+      if (reqId === reqRef.current) setLoading(false);
+    }
+  }, [currentCompany?.id, peopleStore.actions]);
+
+  /* dispara busca ao abrir ou ao digitar (debounce 300ms) */
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => { setPage(1); fetchSuppliers(query, 1); }, 300);
+    return () => clearTimeout(t);
+  }, [query, open, fetchSuppliers]);
+
+  const loadMore = useCallback(() => {
+    if (loading || !hasMore) return;
+    const next = page + 1;
+    setPage(next);
+    fetchSuppliers(query, next);
+  }, [loading, hasMore, page, query, fetchSuppliers]);
+
+  const select = useCallback(s => {
+    onSelect({ id: s.id, name: s.alias || s.name });
+    setOpen(false);
+    setQuery('');
+  }, [onSelect]);
+
+  const clear = useCallback(() => onSelect(null), [onSelect]);
+
+  /* selecionado */
+  if (value) {
+    return (
+      <View style={supplierStyles.selectedWrap}>
+        <MaterialCommunityIcons name="truck-outline" size={16} color="#15803D" />
+        <Text style={supplierStyles.selectedName} numberOfLines={1}>{value.name}</Text>
+        <TouchableOpacity onPress={clear} style={supplierStyles.clearBtn} activeOpacity={0.7}>
+          <MaterialCommunityIcons name="close-circle" size={17} color="#86EFAC" />
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  /* fechado */
+  if (!open) {
+    return (
+      <TouchableOpacity
+        style={[supplierStyles.triggerBtn, { borderColor: brandColors.primary + '44' }]}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.75}
+      >
+        <MaterialCommunityIcons name="truck-outline" size={16} color="#94A3B8" />
+        <Text style={supplierStyles.triggerText}>Fornecedor (opcional)</Text>
+        <MaterialCommunityIcons name="chevron-down" size={16} color="#94A3B8" />
+      </TouchableOpacity>
+    );
+  }
+
+  /* aberto */
+  return (
+    <View style={supplierStyles.dropdownWrap}>
+      <View style={[supplierStyles.searchBox, { borderColor: brandColors.primary }]}>
+        <MaterialCommunityIcons name="magnify" size={15} color="#94A3B8" style={{ marginRight: 6 }} />
+        <TextInput
+          style={supplierStyles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Buscar fornecedor..."
+          placeholderTextColor="#CBD5E1"
+          autoFocus
+        />
+        {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 6 }} />}
+        <TouchableOpacity onPress={() => { setOpen(false); setQuery(''); }} style={{ marginLeft: 6 }}>
+          <MaterialCommunityIcons name="close" size={15} color="#94A3B8" />
+        </TouchableOpacity>
+      </View>
+
+      {suppliers.length > 0 && (
+        <View style={supplierStyles.resultList}>
+          <ScrollView
+            style={{ maxHeight: 220 }}
+            keyboardShouldPersistTaps="handled"
+            onScroll={({ nativeEvent: { layoutMeasurement, contentOffset, contentSize } }) => {
+              if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 20) loadMore();
+            }}
+            scrollEventThrottle={200}
+          >
+            {suppliers.map(s => (
+              <TouchableOpacity
+                key={s.id}
+                style={supplierStyles.resultItem}
+                onPress={() => select(s)}
+                activeOpacity={0.75}
+              >
+                <Text style={supplierStyles.resultName}>{s.alias || s.name}</Text>
+                {s.alias && s.name !== s.alias && (
+                  <Text style={supplierStyles.resultAlias} numberOfLines={1}>{s.name}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+            {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ padding: 10 }} />}
+          </ScrollView>
+        </View>
+      )}
+
+      {!loading && suppliers.length === 0 && (
+        <View style={supplierStyles.emptyState}>
+          <MaterialCommunityIcons name="truck-off-outline" size={22} color="#CBD5E1" />
+          <Text style={supplierStyles.emptyText}>Nenhum fornecedor encontrado</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+/* ─── ProductSearch ─────────────────────────────────────────────────── */
+
+const ProductSearch = ({ inventories, brandColors, onAdd }) => {
+  const productsStore  = useStore('products');
+  const peopleStore    = useStore('people');
+  const { currentCompany } = peopleStore.getters;
+
+  const [query,    setQuery]    = useState('');
+  const [results,  setResults]  = useState([]);
   const [searching, setSearching] = useState(false);
-  const [open, setOpen]       = useState(false);
-  const searchRequestRef = useRef(0);
+  const [open,     setOpen]     = useState(false);
+  const searchRef  = useRef(0);
 
   const search = useCallback(async text => {
     const companyId = currentCompany?.id;
     if (!companyId) { setResults([]); return; }
     if (!text || text.length < 2) { setResults([]); return; }
-    const requestId = ++searchRequestRef.current;
+
+    const reqId = ++searchRef.current;
     setSearching(true);
     try {
       const data = await productsStore.actions.getItems({
-        product: text,
-        company: companyId,
-        people: `/people/${companyId}`,
-        active: 1,
+        product:        text,
+        company:        companyId,
+        people:         `/people/${companyId}`,
+        active:         1,
         'order[product]': 'ASC',
-        itemsPerPage: 30,
+        itemsPerPage:   PAGE_SIZE,
       }).catch(() => []);
-      if (requestId !== searchRequestRef.current) return;
+      if (reqId !== searchRef.current) return;
 
       const baseItems = Array.isArray(data) ? data : [];
       const safeResults = [];
@@ -191,7 +330,7 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
 
         if (!productCompanyId && product?.id) {
           const detailed = await productsStore.actions.get(product.id).catch(() => null);
-          if (requestId !== searchRequestRef.current) return;
+          if (reqId !== searchRef.current) return;
           if (detailed) {
             product = detailed;
             productCompanyId = getProductCompanyId(detailed);
@@ -203,31 +342,29 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
         }
       }
 
-      if (requestId !== searchRequestRef.current) return;
+      if (reqId !== searchRef.current) return;
       setResults(safeResults);
     } finally {
-      if (requestId === searchRequestRef.current) {
-        setSearching(false);
-      }
+      if (reqId === searchRef.current) setSearching(false);
     }
   }, [currentCompany?.id, productsStore.actions]);
 
   useEffect(() => {
-    const timer = setTimeout(() => search(query), 350);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => search(query), 350);
+    return () => clearTimeout(t);
   }, [query, search]);
 
   const pick = prod => {
     onAdd({
-      _key:          uid(),
-      productId:     prod.id,
-      productName:   prod.product || `#${prod.id}`,
+      _key:               uid(),
+      productId:          prod.id,
+      productName:        prod.product || `#${prod.id}`,
       productDescription: String(prod.description || '').trim() || null,
-      productType:   prod.type    || null,
-      qty:           '1',
-      price:         '',
-      inInventoryId: null,
-      inInventoryName: null,
+      productType:        prod.type || null,
+      qty:                '1',
+      price:              '',
+      inInventoryId:      null,
+      inInventoryName:    null,
     });
     setQuery('');
     setResults([]);
@@ -315,15 +452,19 @@ const PurchaseForm = () => {
   );
 
   const [inventories, setInventories] = useState([]);
-  const [items, setItems]             = useState([]);
-  const [saving, setSaving]           = useState(false);
-  const [error, setError]             = useState('');
-  const [done, setDone]               = useState(false);
+  const [supplier,    setSupplier]    = useState(null);   /* { id, name } */
+  const [items,       setItems]       = useState([]);
+  const [saving,      setSaving]      = useState(false);
+  const [error,       setError]       = useState('');
+  const [done,        setDone]        = useState(false);
 
-  /* pré-carrega inventários */
+  /* pré-carrega inventários — paginado (PAGE_SIZE) */
   useFocusEffect(useCallback(() => {
     if (!currentCompany?.id) return;
-    inventoriesStore.actions.getItems({ people: `/people/${currentCompany.id}` })
+    inventoriesStore.actions.getItems({
+      people:       `/people/${currentCompany.id}`,
+      itemsPerPage: PAGE_SIZE,
+    })
       .then(data => setInventories(data || []))
       .catch(() => {});
   }, [currentCompany?.id]));
@@ -333,15 +474,15 @@ const PurchaseForm = () => {
     const preItems = route.params?.items;
     if (preItems?.length) {
       setItems(preItems.map(p => ({
-        _key:          uid(),
-        productId:     p.productId,
-        productName:   p.productName   || `#${p.productId}`,
+        _key:               uid(),
+        productId:          p.productId,
+        productName:        p.productName   || `#${p.productId}`,
         productDescription: String(p.productDescription || p.description || '').trim() || null,
-        productType:   p.productType   || null,
-        qty:           String(p.suggestedQty || 1),
-        price:         '',
-        inInventoryId: p.inInventoryId || null,
-        inInventoryName: p.inInventoryName || null,
+        productType:        p.productType   || null,
+        qty:                String(p.suggestedQty || 1),
+        price:              '',
+        inInventoryId:      p.inInventoryId   || null,
+        inInventoryName:    p.inInventoryName || null,
       })));
     }
   }, [route.params?.items]);
@@ -365,7 +506,7 @@ const PurchaseForm = () => {
     return null;
   };
 
-  /* confirmação */
+  /* confirmação — sequencial para evitar deadlock no MySQL */
   const confirm = async () => {
     const msg = validate();
     if (msg) { setError(msg); return; }
@@ -380,18 +521,17 @@ const PurchaseForm = () => {
         provider:  `/people/${currentCompany.id}`,
         app:       'StockAdjustment',
       };
-      if (statusIRI) orderPayload.status = statusIRI;
+      if (statusIRI)     orderPayload.status = statusIRI;
+      if (supplier?.id)  orderPayload.client = `/people/${supplier.id}`;
 
       const order = await ordersStore.actions.save(orderPayload);
 
-      /* cria order_products e atualiza estoque sequencialmente (1 a 1)
-         para evitar deadlock no MySQL ao recalcular o preço do pedido */
+      /* 1 a 1 para evitar deadlock no recalculo de preço do pedido */
       for (const it of items) {
-        const qty     = parseFloat(String(it.qty).replace(',', '.'));
-        const invIRI  = `/inventories/${it.inInventoryId}`;
+        const qty    = parseFloat(String(it.qty).replace(',', '.'));
+        const invIRI = `/inventories/${it.inInventoryId}`;
         const prodIRI = `/products/${it.productId}`;
 
-        /* order_product */
         const opPayload = {
           order:       `/orders/${order.id}`,
           product:     prodIRI,
@@ -406,8 +546,9 @@ const PurchaseForm = () => {
 
         /* atualiza saldo no product_inventories */
         const piData = await productInvStore.actions.getItems({
-          inventory: invIRI,
-          product:   prodIRI,
+          inventory:    invIRI,
+          product:      prodIRI,
+          itemsPerPage: 1,
         }).catch(() => []);
 
         const pi = (piData || [])[0];
@@ -443,7 +584,8 @@ const PurchaseForm = () => {
           </View>
           <Text style={styles.successTitle}>Compra registrada!</Text>
           <Text style={styles.successSub}>
-            {items.length} {items.length === 1 ? 'produto adicionado' : 'produtos adicionados'} ao estoque.
+            {items.length} {items.length === 1 ? 'produto adicionado' : 'produtos adicionados'} ao estoque
+            {supplier ? ` via ${supplier.name}` : ''}.
           </Text>
           <TouchableOpacity
             style={[styles.successBtn, { backgroundColor: brandColors.primary }]}
@@ -454,7 +596,7 @@ const PurchaseForm = () => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.successBtnOutline}
-            onPress={() => { setDone(false); setItems([]); }}
+            onPress={() => { setDone(false); setItems([]); setSupplier(null); }}
             activeOpacity={0.75}
           >
             <Text style={[styles.successBtnOutlineText, { color: brandColors.primary }]}>Nova compra</Text>
@@ -484,6 +626,13 @@ const PurchaseForm = () => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
+          {/* fornecedor */}
+          <SupplierSelector
+            brandColors={brandColors}
+            value={supplier}
+            onSelect={setSupplier}
+          />
+
           {/* resumo */}
           {totalItems > 0 && (
             <View style={styles.summaryCard}>
@@ -579,17 +728,17 @@ const rowStyles = StyleSheet.create({
       web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
     }),
   },
-  header: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  productName: { fontSize: 14, fontWeight: '700', color: '#1E293B', lineHeight: 19 },
+  header:             { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  productName:        { fontSize: 14, fontWeight: '700', color: '#1E293B', lineHeight: 19 },
   productDescription: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 16 },
-  productType: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  productType:        { fontSize: 11, color: '#94A3B8', marginTop: 2 },
   removeBtn: {
     width: 28, height: 28, borderRadius: 14,
     backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center',
     marginLeft: 8,
   },
-  fields: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  fieldWrap: { flex: 1 },
+  fields:     { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  fieldWrap:  { flex: 1 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
   input: {
     borderWidth: 1.5, borderRadius: 10,
@@ -597,7 +746,7 @@ const rowStyles = StyleSheet.create({
     fontSize: 15, fontWeight: '700', color: '#1E293B',
     backgroundColor: '#F8FAFC',
   },
-  invSection: { marginTop: 2 },
+  invSection:  { marginTop: 2 },
   invChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6,
@@ -605,7 +754,55 @@ const rowStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   invChipText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  invHint: { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
+  invHint:     { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
+});
+
+/* ─── estilos SupplierSelector ──────────────────────────────────────── */
+
+const supplierStyles = StyleSheet.create({
+  triggerBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 12,
+    paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: '#F8FAFC', marginBottom: 12,
+  },
+  triggerText: { flex: 1, fontSize: 14, color: '#94A3B8', fontWeight: '600' },
+
+  selectedWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#F0FDF4', borderRadius: 12, borderWidth: 1.5, borderColor: '#86EFAC',
+    paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+  },
+  selectedName: { flex: 1, fontSize: 14, fontWeight: '700', color: '#15803D' },
+  clearBtn:     { padding: 2 },
+
+  dropdownWrap: { marginBottom: 12 },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1.5, borderRadius: 12,
+    paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: '#fff',
+  },
+  searchInput: { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
+
+  resultList: {
+    backgroundColor: '#fff', borderRadius: 12, marginTop: 4,
+    borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden',
+    ...Platform.select({
+      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      android: { elevation: 4 },
+      web:     { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
+    }),
+  },
+  resultItem: {
+    paddingHorizontal: 14, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
+  },
+  resultName:  { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  resultAlias: { fontSize: 12, color: '#64748B', marginTop: 2 },
+
+  emptyState: { backgroundColor: '#fff', borderRadius: 12, marginTop: 4, padding: 20, alignItems: 'center', gap: 8 },
+  emptyText:  { fontSize: 13, color: '#94A3B8' },
 });
 
 /* ─── estilos ProductSearch ─────────────────────────────────────────── */
@@ -625,11 +822,10 @@ const searchStyles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 10,
     backgroundColor: '#fff',
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
+  searchInput:  { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
   resultList: {
     backgroundColor: '#fff', borderRadius: 12, marginTop: 4,
-    borderWidth: 1, borderColor: '#F1F5F9',
-    overflow: 'hidden',
+    borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden',
     ...Platform.select({
       ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
       android: { elevation: 4 },
@@ -642,16 +838,16 @@ const searchStyles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
   },
   resultTextBlock: { flex: 1, minWidth: 0, marginRight: 8 },
-  resultName: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  resultName:        { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   resultDescription: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  resultType: { fontSize: 11, color: '#94A3B8', marginLeft: 8 },
+  resultType:        { fontSize: 11, color: '#94A3B8', marginLeft: 8 },
 });
 
 /* ─── estilos principal ─────────────────────────────────────────────── */
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  scroll:    { flex: 1 },
+  container:     { flex: 1, backgroundColor: '#F8FAFC' },
+  scroll:        { flex: 1 },
   scrollContent: { padding: 16, paddingBottom: 24 },
 
   summaryCard: {
@@ -664,10 +860,10 @@ const styles = StyleSheet.create({
       web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
     }),
   },
-  summaryItem: { flex: 1, alignItems: 'center' },
-  summaryLabel: { fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  summaryValue: { fontSize: 18, fontWeight: '800', color: '#1E293B' },
-  summaryDivider: { width: 1, height: 36, backgroundColor: '#F1F5F9' },
+  summaryItem:   { flex: 1, alignItems: 'center' },
+  summaryLabel:  { fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
+  summaryValue:  { fontSize: 18, fontWeight: '800', color: '#1E293B' },
+  summaryDivider:{ width: 1, height: 36, backgroundColor: '#F1F5F9' },
 
   errorBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -679,8 +875,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
     borderTopWidth: 1, borderTopColor: '#F1F5F9',
     ...Platform.select({
-      web: { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
+      web:     { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
+      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
       android: { elevation: 6 },
     }),
   },
@@ -690,22 +886,18 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
-  /* sucesso */
-  successWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  successWrap:       { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   successIcon: {
     width: 120, height: 120, borderRadius: 60,
     backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
   },
-  successTitle: { fontSize: 24, fontWeight: '800', color: '#16A34A', marginBottom: 8, textAlign: 'center' },
-  successSub:   { fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 32 },
-  successBtn: {
-    width: '100%', paddingVertical: 15, borderRadius: 14,
-    alignItems: 'center', marginBottom: 10,
-  },
-  successBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  successTitle:      { fontSize: 24, fontWeight: '800', color: '#16A34A', marginBottom: 8, textAlign: 'center' },
+  successSub:        { fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 32 },
+  successBtn:        { width: '100%', paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginBottom: 10 },
+  successBtnText:    { color: '#fff', fontWeight: '700', fontSize: 16 },
   successBtnOutline: {
-    width: '100%', paddingVertical: 13, borderRadius: 14, borderWidth: 1.5, borderColor: '#E2E8F0',
-    alignItems: 'center',
+    width: '100%', paddingVertical: 14, borderRadius: 14,
+    alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0',
   },
   successBtnOutlineText: { fontWeight: '700', fontSize: 15 },
 });
