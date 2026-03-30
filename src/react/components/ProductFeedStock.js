@@ -60,14 +60,20 @@ const mergeById = (base, incoming) => {
 };
 
 /* ─── Modal de cadastro rápido de insumo ─── */
-const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, brandColors }) => {
+const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, brandColors, units }) => {
   const [name, setName] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
 
   useEffect(() => {
-    if (visible) setName('');
-  }, [visible]);
+    if (visible) {
+      setName('');
+      /* pré-seleciona 'UN' se disponível */
+      const unUnit = (units || []).find(u => String(u.label).toUpperCase() === 'UN');
+      setSelectedUnitId(unUnit ? String(unUnit.id) : (units?.[0] ? String(units[0].id) : ''));
+    }
+  }, [visible, units]);
 
-  const canSave = !!name.trim() && !saving;
+  const canSave = !!name.trim() && !!selectedUnitId && !saving;
 
   return (
     <AnimatedModal visible={visible} onRequestClose={onClose} style={{ justifyContent: 'flex-end' }}>
@@ -85,19 +91,43 @@ const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, br
               <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
             </View>
           )}
+
           <Text style={styles.fieldLabel}>
             Nome <Text style={styles.required}>*</Text>
           </Text>
           <TextInput
             value={name}
             onChangeText={setName}
-            style={styles.input}
+            style={[styles.input, { marginBottom: 16 }]}
             placeholder="Ex: Farinha de trigo"
             placeholderTextColor="#CBD5E1"
             autoFocus={visible}
             returnKeyType="done"
-            onSubmitEditing={() => canSave && onSave(name.trim())}
           />
+
+          <Text style={styles.fieldLabel}>
+            Unidade de Medida <Text style={styles.required}>*</Text>
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.unitChipsRow}>
+            {(units || []).map(u => {
+              const active = String(u.id) === selectedUnitId;
+              return (
+                <TouchableOpacity
+                  key={String(u.id)}
+                  style={[styles.unitChip, active && { borderColor: brandColors?.primary || '#3B82F6', backgroundColor: '#EFF6FF' }]}
+                  onPress={() => setSelectedUnitId(String(u.id))}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.unitChipText, active && { color: brandColors?.primary || '#3B82F6', fontWeight: '700' }]}>
+                    {u.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+            {(!units || units.length === 0) && (
+              <Text style={styles.unitChipEmpty}>Nenhuma unidade cadastrada</Text>
+            )}
+          </ScrollView>
         </View>
         <View style={styles.formFooter}>
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -105,7 +135,7 @@ const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, br
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.saveBtn, { backgroundColor: brandColors?.primary || '#3B82F6' }, !canSave && { opacity: 0.55 }]}
-            onPress={() => canSave && onSave(name.trim())}
+            onPress={() => canSave && onSave(name.trim(), selectedUnitId)}
             disabled={!canSave}
           >
             <MaterialCommunityIcons name="plus-circle-outline" size={16} color="#fff" />
@@ -370,6 +400,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
   const store = useStore('product_group_product');
   const productsStore = useStore('products');
   const peopleStore = useStore('people');
+  const productUnitStore = useStore('product_unit');
 
   const { currentCompany } = peopleStore.getters;
 
@@ -402,6 +433,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
   const [quickRegVisible, setQuickRegVisible] = useState(false);
   const [quickRegSaving, setQuickRegSaving] = useState(false);
   const [quickRegError, setQuickRegError] = useState('');
+  const [unitOptions, setUnitOptions] = useState([]);
 
   /* ── Buscar insumos quando expandido ── */
   const fetchItems = useCallback(async () => {
@@ -580,9 +612,28 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
     setFieldErrors({});
   };
 
+  /* ── Carrega unidades quando o modal de cadastro rápido abre ── */
+  const openQuickReg = useCallback(async () => {
+    setSearchVisible(false);
+    setQuickRegError('');
+    if (currentCompany?.id && productUnitStore?.actions) {
+      try {
+        const res = await productUnitStore.actions.getItems({
+          people: `/people/${currentCompany.id}`,
+          itemsPerPage: 200,
+        });
+        const list = Array.isArray(res) ? res : (res?.['hydra:member'] || res?.member || []);
+        setUnitOptions(list.map(u => ({ id: u.id, label: u.productUnit || u.unit || String(u.id) })));
+      } catch {
+        setUnitOptions([]);
+      }
+    }
+    setQuickRegVisible(true);
+  }, [currentCompany?.id, productUnitStore]);
+
   /* ── Cadastro rápido de insumo ── */
-  const handleQuickRegSave = async (name) => {
-    if (!name || !currentCompany?.id) return;
+  const handleQuickRegSave = async (name, unitId) => {
+    if (!name || !unitId || !currentCompany?.id) return;
     setQuickRegSaving(true);
     setQuickRegError('');
     try {
@@ -590,6 +641,11 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         product: name,
         type: 'feedstock',
         company: `/people/${currentCompany.id}`,
+        productUnit: `/product_unities/${unitId}`,
+        description: '',
+        price: 0,
+        featured: false,
+        productCondition: 'new',
         active: true,
       });
       setQuickRegVisible(false);
@@ -799,7 +855,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         onSearch={handleSearchProducts}
         onLoadMore={handleLoadMoreProducts}
         excludeId={componentNumericId}
-        onQuickRegister={() => { setSearchVisible(false); setQuickRegVisible(true); }}
+        onQuickRegister={openQuickReg}
       />
 
       {/* Modal: cadastro rápido de insumo */}
@@ -810,6 +866,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         saving={quickRegSaving}
         error={quickRegError}
         brandColors={brandColors}
+        units={unitOptions}
       />
 
       {/* Modal: formulário add/editar */}
@@ -1054,6 +1111,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#EFF6FF',
   },
   quickRegBtnText: { fontSize: 13, fontWeight: '700', color: '#3B82F6' },
+  unitChipsRow: { flexDirection: 'row', gap: 8, paddingVertical: 4 },
+  unitChip: {
+    borderRadius: 999, borderWidth: 1, borderColor: '#CBD5E1',
+    paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#fff',
+  },
+  unitChipText: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  unitChipEmpty: { fontSize: 12, color: '#94A3B8', paddingVertical: 8 },
   searchFooterRegBtn: {
     flexDirection: 'row',
     alignItems: 'center',
