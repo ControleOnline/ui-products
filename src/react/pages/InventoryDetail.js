@@ -938,8 +938,8 @@ const styles = StyleSheet.create({
   noPiChip: { backgroundColor: '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
   noPiText: { fontSize: 9, fontWeight: '700', color: '#D97706', letterSpacing: 0.3 },
 
-  stockGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  stockCell: { backgroundColor: '#F8FAFC', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 5, alignItems: 'center', minWidth: 50 },
+  stockGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
+  stockCell: { backgroundColor: '#F8FAFC', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5, alignItems: 'center', minWidth: 48, flexShrink: 0 },
   stockCellLabel: { fontSize: 9, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
   stockCellValue: { fontSize: 12, fontWeight: '700', color: '#475569' },
 
