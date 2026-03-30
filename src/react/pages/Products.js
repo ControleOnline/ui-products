@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    alignItems: 'center',
+    alignItems: 'stretch',
   },
 
   countLabel: {
