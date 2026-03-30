@@ -567,79 +567,18 @@ const InventoryDetailPage = ({ route }) => {
 
       const invIRI = `/inventories/${inventory.id}`;
 
-      /* carrega em paralelo: PI records + produtos por defaultOut + defaultIn */
-      const [piData, prodsOut, prodsIn, invData] = await Promise.all([
-        productInvStore.actions.getItems({ 'inventory': invIRI }),
-        productsStore.actions.getItems({
-          company: currentCompany.id,
-          defaultOutInventory: invIRI,
-          active: 1,
-        }).catch(() => []),
-        productsStore.actions.getItems({
-          company: currentCompany.id,
-          defaultInInventory: invIRI,
-          active: 1,
-        }).catch(() => []),
+      /* produto já vem embutido no PI — apenas 2 requests paralelos */
+      const [piData, invData] = await Promise.all([
+        productInvStore.actions.getItems({ inventory: invIRI }),
         invStore.actions.getItems({ people: currentCompany.id, 'order[inventory]': 'ASC' }).catch(() => []),
       ]);
 
       /* inventários disponíveis para transferência (exclui o atual) */
       setAllInvs((invData || []).filter(i => i.id !== inventory.id));
 
-      /* mapa product_id → PI record */
-      const piById = new Map();
-      (piData || []).forEach(pi => {
-        const { id } = extractProduct(pi.product);
-        if (id) piById.set(String(id), pi);
-      });
-
-      /* mapa product_id → product object (dos linked por defaultIn/Out) */
-      const linkedProds = new Map();
-      [...(prodsOut || []), ...(prodsIn || [])].forEach(p => {
-        linkedProds.set(String(p.id), p);
-      });
-
-      /* produtos em PI que não vieram via defaultIn/Out (ex: compra manual)
-         precisam ser buscados individualmente para ter nome/tipo disponível */
-      const missingProdIds = (piData || [])
-        .map(pi => extractProduct(pi.product).id)
-        .filter(id => id && !linkedProds.has(String(id)));
-
-      if (missingProdIds.length > 0) {
-        const fetched = await Promise.all(
-          [...new Set(missingProdIds)].map(id =>
-            productsStore.actions.get(id).catch(() => null)
-          )
-        );
-        fetched.forEach(p => { if (p?.id) linkedProds.set(String(p.id), p); });
-      }
-
-      const merged = [];
-      const seen   = new Set();
-
-      /* primeiro: PI records enriquecidos com o objeto de produto */
-      (piData || []).forEach(pi => {
-        const { id } = extractProduct(pi.product);
-        const key = id ? String(id) : `pi_${pi.id}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const enrichedProduct = linkedProds.get(String(id)) || pi.product;
-        merged.push({ ...pi, product: enrichedProduct, _inventoryIRI: invIRI });
-      });
-
-      /* depois: produtos vinculados sem PI record ainda */
-      linkedProds.forEach((product, pid) => {
-        if (seen.has(pid)) return;
-        seen.add(pid);
-        merged.push({
-          id: null,
-          product,
-          available: 0, sales: 0, ordered: 0, transit: 0, minimum: 0, maximum: 0,
-          _inventoryIRI: invIRI,
-        });
-      });
-
-      setRows(merged);
+      setRows(
+        (piData || []).map(pi => ({ ...pi, _inventoryIRI: invIRI }))
+      );
     } catch (_) {
       setRows([]);
     } finally {
