@@ -457,7 +457,6 @@ const PurchaseForm = () => {
   const themeStore        = useStore('theme');
   const ordersStore       = useStore('orders');
   const orderProductStore = useStore('order_products');
-  const productInvStore   = useStore('product_inventories');
   const inventoriesStore  = useStore('inventories');
   const statusStore       = useStore('status');
 
@@ -574,28 +573,6 @@ const PurchaseForm = () => {
           };
           if (it.comment?.trim()) opPayload.comments = it.comment.trim();
           await orderProductStore.actions.save(opPayload);
-
-          /* diminui origem */
-          const piOutData = await productInvStore.actions.getItems({
-            inventory: outIRI, product: prodIRI, itemsPerPage: 1,
-          }).catch(() => []);
-          const piOut = (piOutData || [])[0];
-          if (piOut?.id) {
-            await productInvStore.actions.save({
-              id: piOut.id, available: Math.max(0, parseFloat(piOut.available ?? 0) - qty),
-            });
-          }
-
-          /* aumenta destino */
-          const piInData = await productInvStore.actions.getItems({
-            inventory: inIRI, product: prodIRI, itemsPerPage: 1,
-          }).catch(() => []);
-          const piIn = (piInData || [])[0];
-          if (piIn?.id) {
-            await productInvStore.actions.save({ id: piIn.id, available: parseFloat(piIn.available ?? 0) + qty });
-          } else {
-            await productInvStore.actions.save({ inventory: inIRI, product: prodIRI, available: qty });
-          }
         }
 
         setOrdersCreated(1);
@@ -635,16 +612,6 @@ const PurchaseForm = () => {
             if (p > 0) opPayload.unitPrice = p;
           }
           await orderProductStore.actions.save(opPayload);
-
-          const piData = await productInvStore.actions.getItems({
-            inventory: invIRI, product: prodIRI, itemsPerPage: 1,
-          }).catch(() => []);
-          const pi = (piData || [])[0];
-          if (pi?.id) {
-            await productInvStore.actions.save({ id: pi.id, available: parseFloat(pi.available ?? 0) + qty });
-          } else {
-            await productInvStore.actions.save({ inventory: invIRI, product: prodIRI, available: qty });
-          }
         }
 
         created++;
