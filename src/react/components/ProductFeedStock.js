@@ -59,6 +59,64 @@ const mergeById = (base, incoming) => {
   return Array.from(map.values());
 };
 
+/* ─── Modal de cadastro rápido de insumo ─── */
+const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, brandColors }) => {
+  const [name, setName] = useState('');
+
+  useEffect(() => {
+    if (visible) setName('');
+  }, [visible]);
+
+  const canSave = !!name.trim() && !saving;
+
+  return (
+    <AnimatedModal visible={visible} onRequestClose={onClose} style={{ justifyContent: 'flex-end' }}>
+      <View style={styles.formModal}>
+        <View style={styles.formHeader}>
+          <Text style={styles.formTitle}>Novo insumo</Text>
+          <TouchableOpacity onPress={onClose} style={styles.formClose}>
+            <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.formBody}>
+          {!!error && (
+            <View style={styles.errorBox}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#9e1b1b" style={{ marginRight: 6 }} />
+              <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
+            </View>
+          )}
+          <Text style={styles.fieldLabel}>
+            Nome <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            style={styles.input}
+            placeholder="Ex: Farinha de trigo"
+            placeholderTextColor="#CBD5E1"
+            autoFocus={visible}
+            returnKeyType="done"
+            onSubmitEditing={() => canSave && onSave(name.trim())}
+          />
+        </View>
+        <View style={styles.formFooter}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+            <Text style={styles.cancelBtnText}>Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: brandColors?.primary || '#3B82F6' }, !canSave && { opacity: 0.55 }]}
+            onPress={() => canSave && onSave(name.trim())}
+            disabled={!canSave}
+          >
+            <MaterialCommunityIcons name="plus-circle-outline" size={16} color="#fff" />
+            <Text style={styles.saveBtnText}>{saving ? 'Cadastrando...' : 'Cadastrar'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </AnimatedModal>
+  );
+};
+
 /* ─── Modal de busca de produto para insumo ─── */
 const FeedStockSearchModal = ({
   visible,
@@ -71,6 +129,7 @@ const FeedStockSearchModal = ({
   onSearch,
   onLoadMore,
   excludeId,
+  onQuickRegister,
 }) => {
   const [search, setSearch] = useState('');
   const onSearchRef = useRef(onSearch);
@@ -162,6 +221,12 @@ const FeedStockSearchModal = ({
               <Text style={styles.searchEmptyText}>
                 {requestQuery ? 'Nenhum insumo encontrado' : 'Nenhum insumo ativo disponível'}
               </Text>
+              {!!onQuickRegister && (
+                <TouchableOpacity style={styles.quickRegBtn} onPress={onQuickRegister} activeOpacity={0.8}>
+                  <MaterialCommunityIcons name="plus-circle-outline" size={15} color="#3B82F6" />
+                  <Text style={styles.quickRegBtnText}>Cadastrar novo insumo</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
           {!loading && filtered.map(p => {
@@ -192,6 +257,13 @@ const FeedStockSearchModal = ({
             </View>
           )}
         </ScrollView>
+
+        {!!onQuickRegister && filtered.length > 0 && (
+          <TouchableOpacity style={styles.searchFooterRegBtn} onPress={onQuickRegister} activeOpacity={0.8}>
+            <MaterialCommunityIcons name="plus-circle-outline" size={15} color="#3B82F6" />
+            <Text style={styles.quickRegBtnText}>Cadastrar novo insumo</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </AnimatedModal>
   );
@@ -325,6 +397,11 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [removing, setRemoving] = useState(false);
+
+  /* modal cadastro rápido de insumo */
+  const [quickRegVisible, setQuickRegVisible] = useState(false);
+  const [quickRegSaving, setQuickRegSaving] = useState(false);
+  const [quickRegError, setQuickRegError] = useState('');
 
   /* ── Buscar insumos quando expandido ── */
   const fetchItems = useCallback(async () => {
@@ -501,6 +578,34 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
     setFormDraft(null);
     setFormError('');
     setFieldErrors({});
+  };
+
+  /* ── Cadastro rápido de insumo ── */
+  const handleQuickRegSave = async (name) => {
+    if (!name || !currentCompany?.id) return;
+    setQuickRegSaving(true);
+    setQuickRegError('');
+    try {
+      const newProduct = await productsStore.actions.save({
+        product: name,
+        type: 'feedstock',
+        company: `/people/${currentCompany.id}`,
+        active: true,
+      });
+      setQuickRegVisible(false);
+      if (newProduct?.id) {
+        await searchAvailableProducts('', 1, false);
+        handleProductSelected(newProduct);
+      }
+    } catch (e) {
+      const raw =
+        e?.response?.data?.['hydra:description'] ||
+        e?.response?.data?.detail ||
+        e?.message || '';
+      setQuickRegError(raw || 'Falha ao cadastrar insumo.');
+    } finally {
+      setQuickRegSaving(false);
+    }
   };
 
   const handleChangeDraft = (field, value) => {
@@ -694,6 +799,17 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         onSearch={handleSearchProducts}
         onLoadMore={handleLoadMoreProducts}
         excludeId={componentNumericId}
+        onQuickRegister={() => { setSearchVisible(false); setQuickRegVisible(true); }}
+      />
+
+      {/* Modal: cadastro rápido de insumo */}
+      <QuickRegisterProductModal
+        visible={quickRegVisible}
+        onClose={() => { setQuickRegVisible(false); setQuickRegError(''); setSearchVisible(true); }}
+        onSave={handleQuickRegSave}
+        saving={quickRegSaving}
+        error={quickRegError}
+        brandColors={brandColors}
       />
 
       {/* Modal: formulário add/editar */}
@@ -925,6 +1041,32 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   searchResultType: { fontSize: 12, color: '#94A3B8' },
+  quickRegBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  quickRegBtnText: { fontSize: 13, fontWeight: '700', color: '#3B82F6' },
+  searchFooterRegBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 13,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
 
   /* ─── modal formulário ─── */
   formModal: {
