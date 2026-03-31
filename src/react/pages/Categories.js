@@ -84,6 +84,7 @@ const CategoriesPage = () => {
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
+  const context = 'products';
 
   useFocusEffect(
     useCallback(() => {
@@ -96,7 +97,7 @@ const CategoriesPage = () => {
       if (currentCompany?.id) {
         categoryActions
           .getItems({
-            context: 'products',
+            context: context,
             'order[name]': 'ASC',
             company: currentCompany.id,
           })
@@ -112,7 +113,7 @@ const CategoriesPage = () => {
   )
 
   const changeCategory = category => {
-    navigation.navigate('ProductsPage', { category })
+    navigation.navigate('ProductsPage', { category, context })
   }
 
   const openCreateModal = () => {
@@ -133,7 +134,7 @@ const CategoriesPage = () => {
   const reloadCategories = useCallback(async () => {
     if (!currentCompany?.id) return []
     const data = await categoryActions.getItems({
-      context: 'products',
+      context: context,
       'order[name]': 'ASC',
       company: currentCompany.id,
     })
@@ -233,7 +234,7 @@ const CategoriesPage = () => {
                   >
                     <View style={[styles.noCategoryCard, { aspectRatio: 3 / 4 }]}>
                       <MaterialCommunityIcons name="tag-off-outline" size={32} color="#94A3B8" />
-                      <Text style={styles.noCategoryName}>Sem{'\n'}Categoria</Text>
+                      <Text style={styles.noCategoryName}>Todos</Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -313,6 +314,7 @@ const CategoriesPage = () => {
           <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
             <View style={styles.modalBody}>
               <CategoryForm
+                context={context}
                 ref={formRef}
                 category={selectedCategory}
                 onClose={closeModal}
@@ -326,7 +328,7 @@ const CategoriesPage = () => {
                     entityId={selectedCategory.id}
                     attachments={selectedCategory.categoryFiles || []}
                     companyId={currentCompany?.id}
-                    context="products"
+                    context={context}
                     onChanged={async () => {
                       const refreshed = await reloadCategories()
                       const fresh = refreshed.find(c => c.id === selectedCategory.id)

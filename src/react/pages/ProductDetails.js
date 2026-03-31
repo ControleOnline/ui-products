@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useWindowDimensions, View, Text, Image, StyleSheet } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
@@ -25,7 +26,7 @@ const buildCoverUrl = (files, coverRelationId) => {
 };
 
 const ProductDetails = ({ route, navigation }) => {
-  const { ProductId } = route.params || {};
+  const { ProductId, context } = route.params || {};
   const { width } = useWindowDimensions();
   const productsStore = useStore('products');
   const [productSummary, setProductSummary] = useState(null);
@@ -53,6 +54,25 @@ const ProductDetails = ({ route, navigation }) => {
       setProductSummary(null);
     }
   }, [ProductId, productsStore?.actions]);
+
+  const contextTypes = [];
+
+  useFocusEffect(
+    useCallback(() => {
+      if (context == 'products') {
+        contextTypes.push('product')
+        contextTypes.push('manufactured')
+        contextTypes.push('custom')
+        contextTypes.push('service')
+      }
+
+      if (context == 'supplies') {
+        contextTypes.push('package')
+        contextTypes.push('component')
+        contextTypes.push('feedstock')
+      }
+    }
+    ))
 
   useEffect(() => {
     loadProductSummary();
@@ -109,12 +129,13 @@ const ProductDetails = ({ route, navigation }) => {
           }}
         >
           <Tab.Screen name="Dados">
-            {props => <ProductForm {...props} ProductId={ProductId} />}
+            {props => <ProductForm {...props} ProductId={ProductId} contextTypes={contextTypes} />}
           </Tab.Screen>
-
-          <Tab.Screen name="Grupos">
-            {props => <ProductGroups {...props} ProductId={ProductId} />}
-          </Tab.Screen>
+          {(productSummary?.type == 'custom' || productSummary?.type == 'manufactured' || productSummary?.type == 'service') &&
+            <Tab.Screen name="Grupos">
+              {props => <ProductGroups {...props} ProductId={ProductId} />}
+            </Tab.Screen>
+          }
 
           <Tab.Screen name="Estoque">
             {props => (

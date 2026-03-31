@@ -166,7 +166,7 @@ const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
   </View>
 );
 
-const ProductForm = ({ route, ProductId: propProductId }) => {
+const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
   const { category: routeCategory } = route.params || {};
@@ -196,6 +196,29 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
   const [controlarEstoque, setControlarEstoque] = useState(false);
 
   const isDesktop = width >= 768;
+
+  const getContextTypes = () => {
+    if (!contextTypes || contextTypes.length === 0) return [];
+
+    return contextTypes.map(ct => ({
+      value: ct,
+      label: ct.charAt(0).toUpperCase() + ct.slice(1)
+    }));
+  };
+
+  const typeOptions = useMemo(() => {
+    const fallback = ['product'];
+
+    const source =
+      contextTypes && contextTypes.length
+        ? contextTypes
+        : fallback;
+
+    return source.map(ct => ({
+      value: ct,
+      label: ct.charAt(0).toUpperCase() + ct.slice(1),
+    }));
+  }, [contextTypes]);
 
   const getData = useCallback(() => {
     if (ProductId) {
@@ -275,17 +298,17 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
 
     if (productUnitStore?.actions && !listsRequested.units) {
       setListsRequested(prev => ({ ...prev, units: true }));
-      productUnitStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => {});
+      productUnitStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => { });
     }
 
     if (queuesStore?.actions && !listsRequested.queues) {
       setListsRequested(prev => ({ ...prev, queues: true }));
-      queuesStore.actions.getItems({ company: peopleIRI, itemsPerPage: 200 }).catch(() => {});
+      queuesStore.actions.getItems({ company: peopleIRI, itemsPerPage: 200 }).catch(() => { });
     }
 
     if (inventoriesStore?.actions && !listsRequested.inventories) {
       setListsRequested(prev => ({ ...prev, inventories: true }));
-      inventoriesStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => {});
+      inventoriesStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => { });
     }
   }, [currentCompany?.id, listsRequested]);
 
@@ -297,7 +320,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
         company: currentCompany.id,
         'order[name]': 'ASC',
         itemsPerPage: 200,
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [currentCompany?.id]);
 
@@ -469,7 +492,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
       else delete payload.defaultInInventory;
     } else {
       payload.defaultOutInventory = null;
-      payload.defaultInInventory  = null;
+      payload.defaultInInventory = null;
     }
 
     // active → boolean
@@ -620,15 +643,7 @@ const ProductForm = ({ route, ProductId: propProductId }) => {
             value={product.type || 'product'}
             onChange={val => handleChange('type', val)}
             brandColors={brandColors}
-            options={[
-              { value: 'product', label: 'Produto' },
-              { value: 'service', label: 'Serviço' },
-              { value: 'component', label: 'Componente' },
-              { value: 'feedstock', label: 'Matéria Prima' },
-              { value: 'package', label: 'Embalagem' },
-              { value: 'custom', label: 'Custom' },
-              { value: 'manufactured', label: 'Fabricado' },
-            ]}
+            options={getContextTypes()}
           />
           <SelectField
             label="Condição"

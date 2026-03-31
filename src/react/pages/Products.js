@@ -12,14 +12,14 @@ import {
 } from 'react-native';
 
 const TYPE_FILTER_OPTIONS = [
-  { key: null,          label: 'Todos' },
-  { key: 'product',     label: 'Produto' },
-  { key: 'service',     label: 'Serviço' },
-  { key: 'manufactured',label: 'Fabricado' },
-  { key: 'component',   label: 'Componente' },
-  { key: 'feedstock',   label: 'Matéria Prima' },
-  { key: 'package',     label: 'Embalagem' },
-  { key: 'custom',      label: 'Custom' },
+  { key: null, label: 'Todos' },
+  { key: 'product', label: 'Produto' },
+  { key: 'service', label: 'Serviço' },
+  { key: 'manufactured', label: 'Fabricado' },
+  { key: 'component', label: 'Componente' },
+  { key: 'feedstock', label: 'Matéria Prima' },
+  { key: 'package', label: 'Embalagem' },
+  { key: 'custom', label: 'Custom' },
 ];
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
@@ -47,7 +47,7 @@ const SkeletonProductCard = () => (
 )
 
 const ProductsPage = ({ navigation, route }) => {
-  const { category } = route.params;
+  const { category, context } = route.params;
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -72,6 +72,26 @@ const ProductsPage = ({ navigation, route }) => {
 
   const themeStore = useStore('theme');
   const { colors: themeColors } = themeStore.getters;
+
+
+  const contextTypes = [];
+
+  useFocusEffect(
+    useCallback(() => {
+      if (context == 'products') {
+        contextTypes.push('product')
+        contextTypes.push('manufactured')
+        contextTypes.push('custom')
+        contextTypes.push('service')
+      }
+
+      if (context == 'supplies') {
+        contextTypes.push('package')
+        contextTypes.push('component')
+        contextTypes.push('feedstock')
+      }
+    }
+    ))
 
   const brandColors = useMemo(
     () => resolveThemePalette(
@@ -137,8 +157,7 @@ const ProductsPage = ({ navigation, route }) => {
       'order[product]': 'ASC',
       'order[description]': 'ASC',
       company: currentCompany?.id,
-      // Manager vê todos os tipos; vitrine filtra só os tipos de venda ao cliente
-      ...(isManager ? {} : { type: ['custom', 'product', 'manufactured', 'service'] }),
+      type: contextTypes
     };
 
     if (isNoCategory) {
@@ -227,7 +246,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   const handleProductPress = product => {
     if (!isManager) return;
-    navigation.navigate('ProductDetails', { ProductId: product.id, category });
+    navigation.navigate('ProductDetails', { ProductId: product.id, category, context });
   };
 
   const handleAddProduct = () => {
