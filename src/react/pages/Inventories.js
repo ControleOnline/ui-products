@@ -59,15 +59,13 @@ const InventoriesPage = () => {
     [themeColors, currentCompany?.id],
   );
 
-  const [loading, setLoading] = useState(true);
   const [inventories, setInventories] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedInventory, setSelectedInventory] = useState(null);
   const formRef = useRef(null);
 
   const loadInventories = useCallback(async () => {
-    if (!currentCompany?.id) { setLoading(false); return; }
-    setLoading(true);
+    if (!currentCompany?.id) return;
     try {
       const data = await inventoryActions.getItems({
         people: currentCompany.id,
@@ -76,8 +74,6 @@ const InventoriesPage = () => {
       setInventories(data || []);
     } catch (_) {
       setInventories([]);
-    } finally {
-      setLoading(false);
     }
   }, [currentCompany?.id]);
 
@@ -100,7 +96,7 @@ const InventoriesPage = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {!loading && !storeLoading && <StateStore store="inventories" />}
+      {!storeLoading && <StateStore store="inventories" />}
 
       <ScrollView
         style={styles.scroll}
@@ -134,7 +130,7 @@ const InventoriesPage = () => {
           </TouchableOpacity>
 
           {/* Skeleton */}
-          {loading && (
+          {storeLoading && (
             <View style={[styles.grid, { gap }]}>
               {Array.from({ length: columns * 2 }).map((_, i) => (
                 <SkeletonCard key={i} width={cardWidth} />
@@ -143,7 +139,7 @@ const InventoriesPage = () => {
           )}
 
           {/* Empty */}
-          {!loading && inventories.length === 0 && (
+          {!storeLoading && inventories.length === 0 && (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconWrap}>
                 <MaterialCommunityIcons name="warehouse" size={48} color="#CBD5E1" />
@@ -156,7 +152,7 @@ const InventoriesPage = () => {
           )}
 
           {/* Grid */}
-          {!loading && (
+          {!storeLoading && (
             <>
               {inventories.length > 0 && (
                 <Text style={styles.countLabel}>

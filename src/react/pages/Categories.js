@@ -80,7 +80,6 @@ const CategoriesPage = () => {
     [themeColors, currentCompany?.id],
   )
 
-  const [loading, setLoading] = useState(true)
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
@@ -88,11 +87,9 @@ const CategoriesPage = () => {
 
   useFocusEffect(
     useCallback(() => {
-      setLoading(true)
       const cached = JSON.parse(localStorage.getItem('categories') || '[]')
       if (cached.length > 0) {
         categoryActions.setItems(cached)
-        setLoading(false)
       }
       if (currentCompany?.id) {
         categoryActions
@@ -104,10 +101,7 @@ const CategoriesPage = () => {
           .then(data => {
             categoryActions.setItems(data || [])
             localStorage.setItem('categories', JSON.stringify(data || []))
-            setLoading(false)
           })
-      } else {
-        setLoading(false)
       }
     }, [currentCompany?.id, categoryActions])
   )
@@ -161,7 +155,7 @@ const CategoriesPage = () => {
 
   return (
     <SafeAreaView style={[orderStyles.container, styles.container]}>
-      {!loading && !storeLoading && <StateStore store="categories" />}
+      {!storeLoading && <StateStore store="categories" />}
 
       <ScrollView
         style={styles.scroll}
@@ -192,7 +186,7 @@ const CategoriesPage = () => {
             <Icon name="file-excel-o" size={18} color="#2E7D32" />
           </TouchableOpacity>
           {/* Skeleton loading */}
-          {loading && (
+          {storeLoading && (
             <View style={[styles.grid, { gap }]}>
               {Array.from({ length: skeletonCount }).map((_, i) => (
                 <SkeletonCard key={i} width={cardWidth} />
@@ -201,7 +195,7 @@ const CategoriesPage = () => {
           )}
 
           {/* Empty state */}
-          {!loading && items.length === 0 && (
+          {!storeLoading && items.length === 0 && (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconWrap}>
                 <MaterialCommunityIcons name="tag-off-outline" size={48} color="#CBD5E1" />
@@ -216,7 +210,7 @@ const CategoriesPage = () => {
           )}
 
           {/* Grid */}
-          {!loading && (
+          {!storeLoading && (
             <>
               {items.length > 0 && (
                 <Text style={styles.countLabel}>

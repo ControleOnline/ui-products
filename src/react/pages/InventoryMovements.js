@@ -142,6 +142,7 @@ const InventoryMovementsPage = ({ route }) => {
   const orderProdStore   = useStore('order_products');
   const ordersStore      = useStore('orders');
   const inventoriesStore = useStore('inventories');
+  const { isLoading: storeLoading } = orderProdStore.getters;
 
   const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
@@ -158,7 +159,6 @@ const InventoryMovementsPage = ({ route }) => {
   const preInventoryName = route.params?.inventoryName || null;
 
   const [movements, setMovements]     = useState([]);
-  const [loading, setLoading]         = useState(true);
   const [search, setSearch]           = useState('');
   const [filterType, setFilterType]   = useState(null);
   const [filterInvId, setFilterInvId] = useState(preInventoryId ? String(preInventoryId) : null);
@@ -167,7 +167,6 @@ const InventoryMovementsPage = ({ route }) => {
   /* ── carregamento ──────────────────────────────────────────────── */
   const loadMovements = useCallback(async () => {
     if (!currentCompany?.id) return;
-    setLoading(true);
     try {
       /* sempre carrega inventários para montar mapa id → nome */
       const invData = await inventoriesStore.actions.getItems({
@@ -240,8 +239,6 @@ const InventoryMovementsPage = ({ route }) => {
       setMovements(enriched);
     } catch (_) {
       setMovements([]);
-    } finally {
-      setLoading(false);
     }
   }, [currentCompany?.id, preInventoryId, preInventoryName]);
 
@@ -356,7 +353,7 @@ const InventoryMovementsPage = ({ route }) => {
       {/* Contador */}
       <View style={styles.countRow}>
         <Text style={styles.countText}>
-          {loading ? 'Carregando...' : (
+          {storeLoading ? 'Carregando...' : (
             `${filtered.length} ${filtered.length === 1 ? 'movimentação' : 'movimentações'}`
             + ((filterType || filterInvId || search) ? ` · filtrado${filtered.length !== 1 ? 's' : ''}` : '')
           )}
@@ -373,19 +370,19 @@ const InventoryMovementsPage = ({ route }) => {
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
           const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 200;
-          if (nearBottom && !loading && hasMore) setPage(p => p + 1);
+          if (nearBottom && !storeLoading && hasMore) setPage(p => p + 1);
         }}
       >
         <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 4 }}>
 
-          {loading && (
+          {storeLoading && (
             <View style={styles.empty}>
               <ActivityIndicator size="large" color={brandColors.primary} />
               <Text style={[styles.emptySubtitle, { marginTop: 16 }]}>Carregando histórico...</Text>
             </View>
           )}
 
-          {!loading && movements.length === 0 && (
+          {!storeLoading && movements.length === 0 && (
             <View style={styles.empty}>
               <View style={styles.emptyIconWrap}>
                 <MaterialCommunityIcons name="history" size={48} color="#CBD5E1" />
@@ -397,7 +394,7 @@ const InventoryMovementsPage = ({ route }) => {
             </View>
           )}
 
-          {!loading && movements.length > 0 && filtered.length === 0 && (
+          {!storeLoading && movements.length > 0 && filtered.length === 0 && (
             <View style={styles.empty}>
               <MaterialCommunityIcons name="magnify-close" size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>Sem resultados</Text>
@@ -405,7 +402,7 @@ const InventoryMovementsPage = ({ route }) => {
             </View>
           )}
 
-          {!loading && displayed.length > 0 && (
+          {!storeLoading && displayed.length > 0 && (
             <View style={styles.card}>
               {displayed.map((item, idx) => (
                 <View key={item.id} style={idx < displayed.length - 1 && styles.itemDivider}>

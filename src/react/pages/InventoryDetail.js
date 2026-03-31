@@ -493,6 +493,7 @@ const InventoryDetailPage = ({ route }) => {
 
   const productsStore   = useStore('products');
   const productInvStore = useStore('product_inventories');
+  const { isLoading: storeLoading } = productInvStore.getters;
   const peopleStore     = useStore('people');
   const invStore        = useStore('inventories');
   const themeStore      = useStore('theme');
@@ -531,7 +532,6 @@ const InventoryDetailPage = ({ route }) => {
   }, [navigation, inventory.id, isNoInventory]);
 
   /* ── estado ── */
-  const [loading, setLoading]   = useState(true);
   const [rows, setRows]         = useState([]);
   const [allInvs, setAllInvs]   = useState([]);   /* para transferências */
   const [search, setSearch]     = useState('');
@@ -543,8 +543,7 @@ const InventoryDetailPage = ({ route }) => {
   /* ─── carregamento mesclado ─────────────────────────────────────── */
 
   const loadRows = useCallback(async () => {
-    if (!currentCompany?.id) { setLoading(false); return; }
-    setLoading(true);
+    if (!currentCompany?.id) return;
     try {
       if (isNoInventory) {
         /* Produtos sem local: defaultIn e defaultOut ambos ausentes */
@@ -581,8 +580,6 @@ const InventoryDetailPage = ({ route }) => {
       );
     } catch (_) {
       setRows([]);
-    } finally {
-      setLoading(false);
     }
   }, [currentCompany?.id, inventory.id, isNoInventory]);
 
@@ -668,7 +665,7 @@ const InventoryDetailPage = ({ route }) => {
       </View>
 
       {/* Busca */}
-      {!loading && rows.length > 0 && (
+      {!storeLoading && rows.length > 0 && (
         <View style={styles.searchBar}>
           <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
           <TextInput
@@ -693,14 +690,14 @@ const InventoryDetailPage = ({ route }) => {
         <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 8 }}>
 
           {/* Skeleton */}
-          {loading && (
+          {storeLoading && (
             <View style={styles.card}>
               {Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)}
             </View>
           )}
 
           {/* Empty */}
-          {!loading && rows.length === 0 && (
+          {!storeLoading && rows.length === 0 && (
             <View style={styles.empty}>
               <View style={styles.emptyIconWrap}>
                 <MaterialCommunityIcons
@@ -721,7 +718,7 @@ const InventoryDetailPage = ({ route }) => {
           )}
 
           {/* Lista */}
-          {!loading && filteredRows.length > 0 && (
+          {!storeLoading && filteredRows.length > 0 && (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardHeaderLabel}>
@@ -823,7 +820,7 @@ const InventoryDetailPage = ({ route }) => {
             </View>
           )}
 
-          {!loading && rows.length > 0 && filteredRows.length === 0 && (
+          {!storeLoading && rows.length > 0 && filteredRows.length === 0 && (
             <View style={styles.empty}>
               <MaterialCommunityIcons name="magnify-close" size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
               <Text style={styles.emptyTitle}>Nenhum resultado</Text>

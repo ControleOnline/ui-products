@@ -52,8 +52,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   const productsStore = useStore('products');
   const actions = productsStore.actions;
-  const isLoading = productsStore.isLoading;
-  const storeLoading = productsStore.getters?.isLoading;
+  const { isLoading: storeLoading } = productsStore.getters;
   const error = productsStore.error;
 
   const ordersStore = useStore('orders');
@@ -102,7 +101,6 @@ const ProductsPage = ({ navigation, route }) => {
   );
 
   const [categoryProducts, setCategoryProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState(null);
   const [visibleCount, setVisibleCount] = useState(50);
 
@@ -168,7 +166,6 @@ const ProductsPage = ({ navigation, route }) => {
        * conjunto de productIds que TEM categoria, depois filtrar client-side.
        */
       if (!categoryProducts || categoryProducts.length === 0) {
-        setLoading(true);
         Promise.all([
           actions.getItems({ ...baseParams, itemsPerPage: 1000 }).catch(() => []),
           productCategoryActions.getItems({ itemsPerPage: 2000 }).catch(() => []),
@@ -185,11 +182,8 @@ const ProductsPage = ({ navigation, route }) => {
               p => p?.id && !withCategoryIds.has(String(p.id))
             );
             setCategoryProducts(withoutCategory);
-            setLoading(false);
           })
-          .catch(() => setLoading(false));
-      } else {
-        setLoading(false);
+          .catch(() => {});
       }
       return;
     }
@@ -208,7 +202,6 @@ const ProductsPage = ({ navigation, route }) => {
         categories[index]?.products?.length > 0
       ) {
         setCategoryProducts(categories[index]['products']);
-        setLoading(false);
       } else {
         actions
           .getItems({
@@ -219,16 +212,9 @@ const ProductsPage = ({ navigation, route }) => {
           .then(data => {
             if (data && Object.keys(data).length > 0)
               changeCategoryProduct(data, true);
-            setLoading(false);
           })
-          .catch(() => setLoading(false));
+          .catch(() => {});
       }
-    } else if (categories && categories.length > 0) {
-      setLoading(false);
-    } else {
-      /* categories ainda não carregadas — aguarda sem travar na tela */
-      const timer = setTimeout(() => setLoading(false), 5000);
-      return () => clearTimeout(timer);
     }
   }, [category, categories, categoryProducts, isNoCategory]);
 
@@ -238,7 +224,6 @@ const ProductsPage = ({ navigation, route }) => {
         ordersActions.initQueue();
         const cats = JSON.parse(localStorage.getItem('categories') || '[]');
         setCategoryProducts([]);
-        setLoading(true);
         if (cats.length > 0) categoryActions.setItems(cats);
       };
     }, []),
@@ -259,10 +244,10 @@ const ProductsPage = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {!loading && !storeLoading && <StateStore store="products" />}
+      {!storeLoading && <StateStore store="products" />}
 
       {/* Skeleton */}
-      {loading && (
+      {storeLoading && (
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={[styles.scrollContent, isManager && { paddingBottom: 84 }]}
@@ -276,7 +261,7 @@ const ProductsPage = ({ navigation, route }) => {
       )}
 
       {/* Empty state */}
-      {!loading && categoryProducts.length === 0 && !error && (
+      {!storeLoading && categoryProducts.length === 0 && !error && (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
             <MaterialCommunityIcons
@@ -299,7 +284,7 @@ const ProductsPage = ({ navigation, route }) => {
       )}
 
       {/* Filtro por tipo — exibe sempre que há produtos carregados no manager */}
-      {!loading && categoryProducts.length > 0 && isManager && (
+      {!storeLoading && categoryProducts.length > 0 && isManager && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -325,7 +310,7 @@ const ProductsPage = ({ navigation, route }) => {
       )}
 
       {/* Product list */}
-      {!loading && categoryProducts.length > 0 && !error && (
+      {!storeLoading && categoryProducts.length > 0 && !error && (
         <FlatList
           data={productsData}
           keyExtractor={item => String(item.id)}
