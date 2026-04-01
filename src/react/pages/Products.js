@@ -157,7 +157,6 @@ const ProductsPage = ({ navigation, route }) => {
       actions
         .getItems({
           ...baseParams,
-          itemsPerPage: 1000,
         })
         .then(data => {
           setCategoryProducts(data || []);
