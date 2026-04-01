@@ -42,12 +42,11 @@ const buildCoverUrl = (files, coverRelationId) => {
  * Não é uma categoria real — é um filtro especial que mostra produtos
  * sem nenhuma categoria vinculada.
  */
-export const NO_CATEGORY_SENTINEL = {
-  id: '__no_category__',
-  '@id': '__no_category__',
-  name: 'Sem Categoria',
-  _isNoCategory: true,
-}
+export const ALL_PRODUCTS_SENTINEL = {
+  '@id': '__all_products__',
+  name: 'Todos os produtos',
+  _isAllProducts: true,
+};
 
 const SkeletonCard = ({ width }) => (
   <View style={{ width }}>
@@ -223,7 +222,7 @@ const CategoriesPage = () => {
                 <View style={{ width: cardWidth }}>
                   <TouchableOpacity
                     style={styles.cardTouchable}
-                    onPress={() => changeCategory(NO_CATEGORY_SENTINEL)}
+                    onPress={() => changeCategory(ALL_PRODUCTS_SENTINEL)}
                     activeOpacity={0.88}
                   >
                     <View style={[styles.noCategoryCard, { aspectRatio: 3 / 4 }]}>

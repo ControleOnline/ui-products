@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { NO_CATEGORY_SENTINEL } from './Categories';
+import { ALL_PRODUCTS_SENTINEL } from './Categories';
 import {
   FlatList,
   ScrollView,
@@ -21,6 +21,7 @@ const TYPE_FILTER_OPTIONS = [
   { key: 'package', label: 'Embalagem' },
   { key: 'custom', label: 'Custom' },
 ];
+
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
@@ -44,7 +45,7 @@ const SkeletonProductCard = () => (
       </View>
     </View>
   </View>
-)
+);
 
 const ProductsPage = ({ navigation, route }) => {
   const { category, context } = route.params;
@@ -63,40 +64,31 @@ const ProductsPage = ({ navigation, route }) => {
   const categoryActions = categoriesStore.actions;
   const { items: categories } = categoriesGetters;
 
-  const productCategoryStore = useStore('product_category');
-  const productCategoryActions = productCategoryStore.actions;
-
   const peopleStore = useStore('people');
   const { currentCompany } = peopleStore.getters;
 
   const themeStore = useStore('theme');
   const { colors: themeColors } = themeStore.getters;
 
-
   const contextTypes = [];
 
   useFocusEffect(
     useCallback(() => {
-      if (context == 'products') {
-        contextTypes.push('product')
-        contextTypes.push('manufactured')
-        contextTypes.push('custom')
-        contextTypes.push('service')
+      if (context === 'products') {
+        contextTypes.push('product', 'manufactured', 'custom', 'service');
       }
-
-      if (context == 'supplies') {
-        contextTypes.push('package')
-        contextTypes.push('component')
-        contextTypes.push('feedstock')
+      if (context === 'supplies') {
+        contextTypes.push('package', 'component', 'feedstock');
       }
-    }
-    ))
+    }, [])
+  );
 
   const brandColors = useMemo(
-    () => resolveThemePalette(
-      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
-      colors,
-    ),
+    () =>
+      resolveThemePalette(
+        { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
+        colors,
+      ),
     [themeColors, currentCompany?.id],
   );
 
@@ -106,37 +98,40 @@ const ProductsPage = ({ navigation, route }) => {
 
   const isManager = env.APP_TYPE === 'MANAGER';
 
-  // Filtra localmente sem nova requisição à API
+  const isAllProducts =
+    category?._isAllProducts === true ||
+    category?.['@id'] === '__all_products__';
+
   const visibleProducts = useMemo(() => {
     if (!typeFilter) return categoryProducts;
     return categoryProducts.filter(p => p.type === typeFilter);
   }, [categoryProducts, typeFilter]);
 
-  // Reseta paginação visual ao trocar filtro ou categoria
-  useEffect(() => { setVisibleCount(50); }, [typeFilter, category]);
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [typeFilter, category]);
 
-  // Fatia para scroll infinito (exibe 50 por vez)
   const productsData = useMemo(
     () => visibleProducts.slice(0, visibleCount),
     [visibleProducts, visibleCount],
   );
 
-  // Tipos presentes na lista atual (para exibir só os filtros relevantes)
   const availableTypes = useMemo(() => {
     const set = new Set(categoryProducts.map(p => p.type).filter(Boolean));
     return TYPE_FILTER_OPTIONS.filter(opt => opt.key === null || set.has(opt.key));
   }, [categoryProducts]);
 
-  /* detecta se a "categoria" selecionada é o sentinel de produtos sem categoria */
-  const isNoCategory = category?._isNoCategory === true ||
-    category?.['@id'] === '__no_category__';
-
   const changeCategoryProduct = (p, changeStorage = false) => {
-    /* não persiste o cache para o sentinel "Sem Categoria" */
-    if (isNoCategory) { setCategoryProducts(p); return; }
+    if (isAllProducts) {
+      setCategoryProducts(p);
+      return;
+    }
 
     const index = categories.findIndex(c => c['@id'] === category['@id']);
-    if (index < 0) { setCategoryProducts(p); return; }
+    if (index < 0) {
+      setCategoryProducts(p);
+      return;
+    }
 
     let c = [...categories];
     c[index]['products'] = p;
@@ -155,52 +150,30 @@ const ProductsPage = ({ navigation, route }) => {
       'order[product]': 'ASC',
       'order[description]': 'ASC',
       company: currentCompany?.id,
-      type: contextTypes
+      type: contextTypes,
     };
 
-    if (isNoCategory) {
-      /*
-       * Filtro "Sem Categoria": ExistsFilter do API Platform nao esta configurado
-       * no entity Product para productCategory, entao e ignorado pelo backend.
-       * Solucao: buscar todos os product_categories da empresa para montar o
-       * conjunto de productIds que TEM categoria, depois filtrar client-side.
-       */
-      if (!categoryProducts || categoryProducts.length === 0) {
-        Promise.all([
-          actions.getItems({ ...baseParams, itemsPerPage: 1000 }).catch(() => []),
-          productCategoryActions.getItems({ itemsPerPage: 2000 }).catch(() => []),
-        ])
-          .then(([allProducts, allRelations]) => {
-            const withCategoryIds = new Set(
-              (allRelations || []).map(r => {
-                const iri = typeof r.product === 'string' ? r.product : r.product?.['@id'] || '';
-                const match = iri.match(/\/products\/(\d+)/);
-                return match ? String(match[1]) : null;
-              }).filter(Boolean)
-            );
-            const withoutCategory = (allProducts || []).filter(
-              p => p?.id && !withCategoryIds.has(String(p.id))
-            );
-            setCategoryProducts(withoutCategory);
-          })
-          .catch(() => {});
-      }
+    if (isAllProducts) {
+      actions
+        .getItems({
+          ...baseParams,
+          itemsPerPage: 1000,
+        })
+        .then(data => {
+          setCategoryProducts(data || []);
+        })
+        .catch(() => { });
       return;
     }
 
-    /* fluxo normal com categoria real */
     if (
       categories &&
       categories.length > 0 &&
-      category['@id'] &&
-      (!categoryProducts || categoryProducts.length === 0)
+      category['@id']
     ) {
       const index = categories.findIndex(c => c['@id'] === category['@id']);
 
-      if (
-        index >= 0 &&
-        categories[index]?.products?.length > 0
-      ) {
+      if (index >= 0 && categories[index]?.products?.length > 0) {
         setCategoryProducts(categories[index]['products']);
       } else {
         actions
@@ -213,10 +186,10 @@ const ProductsPage = ({ navigation, route }) => {
             if (data && Object.keys(data).length > 0)
               changeCategoryProduct(data, true);
           })
-          .catch(() => {});
+          .catch(() => { });
       }
     }
-  }, [category, categories, categoryProducts, isNoCategory]);
+  }, [category]);
 
   useFocusEffect(
     useCallback(() => {
@@ -246,13 +219,9 @@ const ProductsPage = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       {!storeLoading && <StateStore store="products" />}
 
-      {/* Skeleton */}
       {storeLoading && (
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, isManager && { paddingBottom: 84 }]}
-        >
-          <View style={{ width: containerWidth, paddingHorizontal: 16, paddingTop: 12 }}>
+        <ScrollView style={styles.scroll}>
+          <View style={{ width: containerWidth, paddingHorizontal: 16 }}>
             {Array.from({ length: 5 }).map((_, i) => (
               <SkeletonProductCard key={i} />
             ))}
@@ -260,104 +229,46 @@ const ProductsPage = ({ navigation, route }) => {
         </ScrollView>
       )}
 
-      {/* Empty state */}
       {!storeLoading && categoryProducts.length === 0 && !error && (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconWrap}>
-            <MaterialCommunityIcons
-              name={isNoCategory ? 'tag-off-outline' : 'package-variant-closed'}
-              size={48}
-              color="#CBD5E1"
-            />
-          </View>
+          <MaterialCommunityIcons
+            name={isAllProducts ? 'view-grid-outline' : 'package-variant-closed'}
+            size={48}
+            color="#CBD5E1"
+          />
           <Text style={styles.emptyTitle}>
-            {isNoCategory ? 'Nenhum produto sem categoria' : 'Nenhum produto'}
+            {isAllProducts ? 'Nenhum produto cadastrado' : 'Nenhum produto'}
           </Text>
           <Text style={styles.emptySubtitle}>
-            {isNoCategory
-              ? 'Todos os produtos já estão categorizados.'
-              : isManager
-                ? 'Adicione o primeiro produto a esta categoria'
-                : 'Nenhum produto disponível nesta categoria'}
+            {isAllProducts
+              ? 'Nenhum produto foi cadastrado ainda.'
+              : 'Nenhum produto disponível nesta categoria'}
           </Text>
         </View>
       )}
 
-      {/* Filtro por tipo — exibe sempre que há produtos carregados no manager */}
-      {!storeLoading && categoryProducts.length > 0 && isManager && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.typeFilterBar}
-          style={styles.typeFilterScroll}
-        >
-          {availableTypes.map(opt => {
-            const active = typeFilter === opt.key;
-            return (
-              <TouchableOpacity
-                key={String(opt.key)}
-                style={[styles.typeFilterChip, active && styles.typeFilterChipActive]}
-                onPress={() => setTypeFilter(opt.key)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.typeFilterChipText, active && styles.typeFilterChipTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      {/* Product list */}
-      {!storeLoading && categoryProducts.length > 0 && !error && (
+      {!storeLoading && categoryProducts.length > 0 && (
         <FlatList
           data={productsData}
           keyExtractor={item => String(item.id)}
-          style={styles.scroll}
-          contentContainerStyle={[
-            styles.scrollContent,
-            { paddingHorizontal: 16, paddingTop: 12 },
-            isManager && { paddingBottom: 84 },
-          ]}
+          contentContainerStyle={{ padding: 16 }}
           onEndReached={() => {
-            if (visibleCount < visibleProducts.length) setVisibleCount(v => v + 50);
+            if (visibleCount < visibleProducts.length)
+              setVisibleCount(v => v + 50);
           }}
-          onEndReachedThreshold={0.3}
-          ListHeaderComponent={() => (
-            <Text style={styles.countLabel}>
-              {visibleProducts.length} {visibleProducts.length === 1 ? 'produto' : 'produtos'}
-              {typeFilter ? ` · ${TYPE_FILTER_OPTIONS.find(o => o.key === typeFilter)?.label}` : ''}
-            </Text>
-          )}
-          ListEmptyComponent={() =>
-            visibleProducts.length === 0 && typeFilter ? (
-              <View style={styles.filterEmptyWrap}>
-                <Text style={styles.filterEmptyText}>
-                  Nenhum produto do tipo "{TYPE_FILTER_OPTIONS.find(o => o.key === typeFilter)?.label}" nesta categoria.
-                </Text>
-              </View>
-            ) : null
-          }
-          renderItem={({ item: product }) => (
-            <TouchableOpacity
-              activeOpacity={isManager ? 0.75 : 1}
-              onPress={() => handleProductPress(product)}
-              disabled={!isManager}
-            >
-              <ProductItem product={product} category={category} />
+          renderItem={({ item }) => (
+            <TouchableOpacity onPress={() => handleProductPress(item)}>
+              <ProductItem product={item} category={category} />
             </TouchableOpacity>
           )}
         />
       )}
 
-      {/* Add product bar (MANAGER only) */}
       {isManager && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}
             onPress={handleAddProduct}
-            activeOpacity={0.85}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
             <Text style={styles.bottomBarButtonText}>Adicionar Produto</Text>
@@ -374,12 +285,6 @@ const skeletonStyles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     marginBottom: 12,
-    overflow: 'hidden',
-    ...Platform.select({
-      web: { boxShadow: '0 1px 6px rgba(0,0,0,0.07)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.07, shadowRadius: 4 },
-      android: { elevation: 2 },
-    }),
   },
   imageBlock: {
     width: 100,
@@ -389,7 +294,6 @@ const skeletonStyles = StyleSheet.create({
   body: {
     flex: 1,
     padding: 12,
-    justifyContent: 'space-between',
   },
   line: {
     backgroundColor: '#E2E8F0',
@@ -398,134 +302,44 @@ const skeletonStyles = StyleSheet.create({
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
   },
 });
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    alignItems: 'stretch',
-  },
-
-  countLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginBottom: 12,
-    letterSpacing: 0.3,
-  },
-
-  typeFilterScroll: {
-    flexGrow: 0,
-    flexShrink: 0,
-    height: 52,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#fff',
-  },
-  typeFilterBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  typeFilterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-  },
-  typeFilterChipActive: {
-    backgroundColor: '#0F172A',
-    borderColor: '#0F172A',
-  },
-  typeFilterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  typeFilterChipTextActive: {
-    color: '#fff',
-  },
-  filterEmptyWrap: {
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  filterEmptyText: {
-    fontSize: 14,
-    color: '#94A3B8',
-    textAlign: 'center',
-  },
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  scroll: { flex: 1 },
 
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIconWrap: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#334155',
-    marginBottom: 8,
-    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
     color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 20,
   },
 
   bottomBar: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
+    width: '100%',
+    padding: 16,
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    ...Platform.select({
-      web: { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
-      android: { elevation: 6 },
-    }),
   },
   bottomBarButton: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
+    padding: 14,
+    borderRadius: 12,
   },
   bottomBarButtonText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 16,
+    marginLeft: 8,
   },
 });
 
