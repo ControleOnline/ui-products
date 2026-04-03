@@ -1,4 +1,4 @@
-import * as actions from '@controleonline/ui-default/src/store/default/actions';
+﻿import * as actions from '@controleonline/ui-default/src/store/default/actions';
 import * as getters from '@controleonline/ui-default/src/store/default/getters';
 import mutations from '@controleonline/ui-default/src/store/default/mutations';
 import Formatter from '@controleonline/ui-common/src/utils/formatter.js';
@@ -14,6 +14,7 @@ export default {
     isLoading: false,
     error: '',
     totalItems: 0,
+    summary: {},
     messages: [],
     message: {},
     filters: {},
@@ -112,9 +113,9 @@ export default {
           {value: 'custom', label: 'Produto Customizado'},
           {value: 'manufactured', label: 'Produto Manufaturado'},
           {value: 'product', label: 'Produto'},
-          {value: 'service', label: 'Serviço'},
+          {value: 'service', label: 'ServiÃ§o'},
           {value: 'component', label: 'Componente'},
-          {value: 'feedstock', label: 'Matéria Prima'},
+          {value: 'feedstock', label: 'MatÃ©ria Prima'},
           {value: 'package', label: 'Embalagem'},
         ],
         label: 'type',
@@ -160,10 +161,10 @@ export default {
         label: 'featured',
         list: [
           {value: true, label: 'Sim'},
-          {value: false, label: 'Não'},
+          {value: false, label: 'NÃ£o'},
         ],
         format: function (value) {
-          return value ? 'Sim' : 'Não';
+          return value ? 'Sim' : 'NÃ£o';
         },
         saveFormat: function (value) {
           return !!value;
