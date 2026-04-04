@@ -1,5 +1,5 @@
-import React, {useState, useCallback} from 'react';
-import {View, Text, TouchableOpacity, ScrollView} from 'react-native';
+import React, {useState, useCallback, useMemo} from 'react';
+import {View, Text, TouchableOpacity, ScrollView, Alert} from 'react-native';
 import {
   useNavigation,
   useRoute,
@@ -7,14 +7,13 @@ import {
 } from '@react-navigation/native';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
-import CustomIngredients from './CustomIngredients';
 import {useStore} from '@store';
 import {env} from '@env';
 
 const CustomizeScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const {product} = route.params || {};
+  const {product, redirectToCart = false} = route.params || {};
   const {globalStyles, styles} = css();
   const [selectedItems, setSelectedItems] = useState({});
   const [saved, setSaved] = useState({});
@@ -27,14 +26,60 @@ const CustomizeScreen = () => {
   const productGroupActions = product_groupStore.actions;
   const {items: productGroups} = productGroupsGetters;
   const productsStore = useStore('products');
-  const productsActions = productsStore.actions;
+  const productsGetters = productsStore.getters;
   const productGroupProductStore = useStore('product_group_product');
   const productGroupProductActions = productGroupProductStore.actions;
+  const cartStore = useStore('cart');
+  const cartGetters = cartStore.getters;
 
   const order_productsStore = useStore('order_products');
   const orderProductsActions = order_productsStore.actions;
   const {item: order} = ordersGetters;
+  const {item: cart} = cartGetters;
   const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
+
+  const normalizeId = value => {
+    const clean = String(value || '').replace(/\D/g, '');
+    return clean || null;
+  };
+
+  const activeProduct = useMemo(() => {
+    if (product && typeof product === 'object') {
+      return product;
+    }
+    if (productsGetters?.item && typeof productsGetters.item === 'object') {
+      return productsGetters.item;
+    }
+    return null;
+  }, [product, productsGetters?.item]);
+
+  const activeProductId = useMemo(
+    () =>
+      normalizeId(
+        activeProduct?.id ||
+          activeProduct?.['@id'] ||
+          route.params?.productId ||
+          route.params?.id,
+      ),
+    [activeProduct?.id, activeProduct?.['@id'], route.params?.id, route.params?.productId],
+  );
+
+  const activeProductIri = useMemo(() => {
+    if (activeProduct?.['@id']) {
+      return activeProduct['@id'];
+    }
+    return activeProductId ? `/products/${activeProductId}` : null;
+  }, [activeProduct, activeProductId]);
+
+  const activeOrderIri = useMemo(() => {
+    if (order?.['@id']) {
+      return order['@id'];
+    }
+    if (cart?.['@id']) {
+      return cart['@id'];
+    }
+    return cart?.id ? `/orders/${cart.id}` : null;
+  }, [cart, order]);
 
   const parseCsv = value =>
     String(value || '')
@@ -57,32 +102,44 @@ const CustomizeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      product.selectedItems = {...selectedItems};
-    }, [selectedItems, product]),
+      if (activeProduct && typeof activeProduct === 'object') {
+        activeProduct.selectedItems = {...selectedItems};
+      }
+    }, [activeProduct, selectedItems]),
   );
 
   useFocusEffect(
     useCallback(() => {
       init();
-    }, []),
+    }, [activeProductId]),
   );
   useFocusEffect(
     useCallback(() => {
       if (Object.keys(saved).length == 0) {
         return;
       }
-      const updatedOrderProducts = order.orderProducs.map(op =>
+      const currentOrderProducts = Array.isArray(order?.orderProducts)
+        ? order.orderProducts
+        : [];
+      const updatedOrderProducts = currentOrderProducts.map(op =>
         op['@id'] === saved['@id']
           ? {...op, sub_products: getSubproducts()}
           : op,
       );
       setSaved({});
-      let currentOrder = {...order};
-      currentOrder.orderProducts = updatedOrderProducts;
-      ordersActions.setItem(currentOrder);
+      if (order && typeof order === 'object') {
+        const currentOrder = {...order};
+        currentOrder.orderProducts = updatedOrderProducts;
+        ordersActions.setItem(currentOrder);
+      }
+
+      if (redirectToCart) {
+        navigation.navigate('ShopCartPage');
+        return;
+      }
 
       navigation.pop(3);
-    }, [order, saved]),
+    }, [order, redirectToCart, saved]),
   );
 
   useFocusEffect(
@@ -107,8 +164,11 @@ const CustomizeScreen = () => {
   );
 
   const init = () => {
+    if (!activeProductId) {
+      return;
+    }
     productGroupActions.getItems({
-      product: product.id,
+      product: activeProductId,
       'product.productType': 'component',
     });
   };
@@ -253,10 +313,21 @@ const CustomizeScreen = () => {
   };
 
   const addHandle = () => {
+    if (!activeProductIri || !activeOrderIri) {
+      const message =
+        'Nao foi possivel identificar produto ou carrinho para adicionar.';
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(message);
+      } else {
+        Alert.alert('Atencao', message);
+      }
+      return;
+    }
+
     const orderProductData = {
-      product: product['@id'],
+      product: activeProductIri,
       sub_products: getSubproducts(),
-      order: order['@id'],
+      order: activeOrderIri,
       quantity: 1,
     };
 
@@ -296,9 +367,6 @@ const CustomizeScreen = () => {
             <Text style={styles.text}>
               {Formatter.formatMoney(option.value?.price, 'R$', 'pt-br')}
             </Text>
-            {isOptionSelected && (
-              <CustomIngredients productGroupProducts={option.value} />
-            )}
           </View>
         </TouchableOpacity>
       </View>
