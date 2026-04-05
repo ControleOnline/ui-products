@@ -62,6 +62,33 @@ export default {
       },
       {
         sortable: true,
+        name: 'sales',
+        align: 'right',
+        label: 'sales',
+        format: function (value) {
+          return value ?? 0;
+        },
+      },
+      {
+        sortable: true,
+        name: 'purchases',
+        align: 'right',
+        label: 'purchases',
+        format: function (value) {
+          return value ?? 0;
+        },
+      },
+      {
+        sortable: true,
+        name: 'transit',
+        align: 'right',
+        label: 'transit',
+        format: function (value) {
+          return value ?? 0;
+        },
+      },
+      {
+        sortable: true,
         name: 'minimum',
         align: 'right',
         label: 'minimum',
