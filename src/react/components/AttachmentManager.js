@@ -1,5 +1,6 @@
 import React, {useMemo, useState} from 'react';
 import {Platform, Text, TouchableOpacity, View, Image, ScrollView} from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import {useStore} from '@store';
 import {env} from '@env';
 import {uploadFileToApi, toFileIri} from '@controleonline/ui-products/src/react/services/fileUpload';
@@ -58,18 +59,26 @@ const AttachmentManager = ({
     setCoverId(coverRelationId || null);
   }, [coverRelationId]);
 
-  const selectFileOnWeb = () =>
-    new Promise(resolve => {
-      if (Platform.OS !== 'web' || typeof document === 'undefined') {
-        resolve(null);
-        return;
-      }
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = event => resolve(event?.target?.files?.[0] || null);
-      input.click();
+  const selectFile = () => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      return new Promise(resolve => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = event => resolve(event?.target?.files?.[0] || null);
+        input.click();
+      });
+    }
+
+    return DocumentPicker.getDocumentAsync({
+      type: 'image/*',
+      copyToCacheDirectory: true,
+      multiple: false,
+    }).then(result => {
+      if (result.canceled) return null;
+      return result.assets?.[0] || null;
     });
+  };
 
   const handleUpload = async () => {
     setError('');
@@ -79,7 +88,7 @@ const AttachmentManager = ({
       return;
     }
 
-    const file = await selectFileOnWeb();
+    const file = await selectFile();
     if (!file) return;
 
     try {

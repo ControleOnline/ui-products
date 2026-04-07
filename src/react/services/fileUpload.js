@@ -1,3 +1,4 @@
+import {Platform} from 'react-native';
 import {APP_ENV} from '@controleonline/../../config/env.js';
 
 const extractId = value => {
@@ -19,7 +20,17 @@ export const uploadFileToApi = async ({file, context = 'products', peopleId}) =>
   if (!apiEntryPoint) throw new Error('API_ENTRYPOINT nao configurado.');
 
   const formData = new FormData();
-  formData.append('file', file);
+
+  if (Platform.OS === 'web') {
+    formData.append('file', file);
+  } else {
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name || 'imagem.jpg',
+      type: file.mimeType || 'image/jpeg',
+    });
+  }
+
   formData.append('context', context);
   if (peopleId) formData.append('people', String(extractId(peopleId)));
 
