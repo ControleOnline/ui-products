@@ -11,6 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
 import { api } from '@controleonline/ui-common/src/api';
+import { getPrinterOptions } from '@controleonline/ui-common/src/react/utils/printerDevices';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -87,11 +88,23 @@ const PurchaseSuggestionsPage = () => {
   const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
   const { items: printers, item: selectedPrinter } = printerStore.getters;
-  const { item: deviceConfig }  = deviceConfigStore.getters;
+  const {
+    item: deviceConfig,
+    items: companyDeviceConfigs = [],
+  } = deviceConfigStore.getters;
 
   const brandColors = useMemo(
     () => resolveThemePalette({ ...themeColors, ...(currentCompany?.theme?.colors || {}) }, baseColors),
     [themeColors, currentCompany?.id],
+  );
+  const printerOptions = useMemo(
+    () =>
+      getPrinterOptions({
+        printers,
+        deviceConfigs: companyDeviceConfigs,
+        companyId: currentCompany?.id,
+      }),
+    [companyDeviceConfigs, currentCompany?.id, printers],
   );
 
   const [items, setItems]           = useState([]);
@@ -109,11 +122,11 @@ const PurchaseSuggestionsPage = () => {
 
   /* auto-seleciona impressora padrão do device_config */
   useEffect(() => {
-    if (printers?.length > 0 && deviceConfig?.configs?.printer) {
-      const def = printers.find(p => p.device === deviceConfig.configs.printer);
+    if (printerOptions?.length > 0 && deviceConfig?.configs?.printer) {
+      const def = printerOptions.find(p => p.device === deviceConfig.configs.printer);
       if (def) printerStore.actions.setItem(def);
     }
-  }, [deviceConfig, printers]);
+  }, [deviceConfig, printerOptions, printerStore.actions]);
 
   const handleSelectPrinter = useCallback(async (printer) => {
     await deviceConfigStore.actions.addDeviceConfigs({
@@ -145,7 +158,7 @@ const PurchaseSuggestionsPage = () => {
 
   /* botão de impressão no header */
   useLayoutEffect(() => {
-    if (!printers?.length) return;
+    if (!printerOptions?.length) return;
     navigation.setOptions({
       headerRight: () => (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingRight: 4 }}>
@@ -174,7 +187,7 @@ const PurchaseSuggestionsPage = () => {
         </View>
       ),
     });
-  }, [navigation, selectedPrinter, printing, printers, handlePrint]);
+  }, [navigation, selectedPrinter, printing, printerOptions, handlePrint]);
 
   /* ── carregamento ──────────────────────────────────────────────── */
   const loadData = useCallback(async () => {
@@ -224,7 +237,16 @@ const PurchaseSuggestionsPage = () => {
     }
   }, [currentCompany?.id]);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => {
+    loadData();
+
+    if (currentCompany?.id) {
+      printerStore.actions.getPrinters({ people: currentCompany.id }).catch(() => {});
+      deviceConfigStore.actions
+        .getItems({ people: `/people/${currentCompany.id}` })
+        .catch(() => {});
+    }
+  }, [currentCompany?.id, deviceConfigStore.actions, loadData, printerStore.actions]));
 
   /* ── scroll infinito ───────────────────────────────────────────── */
   const handleScroll = useCallback(({ nativeEvent }) => {
@@ -560,7 +582,7 @@ const PurchaseSuggestionsPage = () => {
               </View>
             )}
             <FlatList
-              data={printers || []}
+              data={printerOptions || []}
               keyExtractor={p => p.device}
               renderItem={({ item: p }) => {
                 const isActive = selectedPrinter?.device === p.device;
