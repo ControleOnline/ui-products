@@ -1,12 +1,12 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useWindowDimensions, View, Text, Image, StyleSheet } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
+import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { env } from '@env';
 
@@ -30,6 +30,7 @@ const ProductDetails = ({ route, navigation }) => {
   const { width } = useWindowDimensions();
   const productsStore = useStore('products');
   const [productSummary, setProductSummary] = useState(null);
+  const [isLoadingSummary, setIsLoadingSummary] = useState(Boolean(ProductId));
 
   const themeStore = useStore('theme');
   const brandColors = useMemo(
@@ -44,35 +45,33 @@ const ProductDetails = ({ route, navigation }) => {
   const loadProductSummary = useCallback(async () => {
     if (!ProductId) {
       setProductSummary(null);
+      setIsLoadingSummary(false);
       return;
     }
+
+    setIsLoadingSummary(true);
     try {
       const data = await productsStore?.actions?.get(ProductId);
-      if (data) setProductSummary(data);
+      setProductSummary(data || null);
     } catch (e) {
       // Mantem tela utilizavel mesmo se o resumo falhar.
       setProductSummary(null);
+    } finally {
+      setIsLoadingSummary(false);
     }
   }, [ProductId, productsStore?.actions]);
 
-  const contextTypes = [];
-
-  useFocusEffect(
-    useCallback(() => {
-      if (context == 'products') {
-        contextTypes.push('product')
-        contextTypes.push('manufactured')
-        contextTypes.push('custom')
-        contextTypes.push('service')
-      }
-
-      if (context == 'supplies') {
-        contextTypes.push('package')
-        contextTypes.push('component')
-        contextTypes.push('feedstock')
-      }
+  const contextTypes = useMemo(() => {
+    if (context === 'products') {
+      return ['product', 'manufactured', 'custom', 'service'];
     }
-    ))
+
+    if (context === 'supplies') {
+      return ['package', 'component', 'feedstock'];
+    }
+
+    return [];
+  }, [context]);
 
   useEffect(() => {
     loadProductSummary();
@@ -131,6 +130,20 @@ const ProductDetails = ({ route, navigation }) => {
           <Tab.Screen name="Dados">
             {props => <ProductForm {...props} ProductId={ProductId} contextTypes={contextTypes} />}
           </Tab.Screen>
+
+          {ProductId ? (
+            <Tab.Screen name="Fornecedores">
+              {props => (
+                <ProductSuppliersTab
+                  {...props}
+                  product={productSummary}
+                  isLoading={isLoadingSummary}
+                  onRefresh={loadProductSummary}
+                />
+              )}
+            </Tab.Screen>
+          ) : null}
+
           {(productSummary?.type == 'custom' || productSummary?.type == 'manufactured' || productSummary?.type == 'service') &&
             <Tab.Screen name="Grupos">
               {props => <ProductGroups {...props} ProductId={ProductId} />}
