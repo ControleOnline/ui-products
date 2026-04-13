@@ -11,7 +11,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
 import { api } from '@controleonline/ui-common/src/api';
-import { getPrinterOptions } from '@controleonline/ui-common/src/react/utils/printerDevices';
+import {
+  findPrinterOptionByValue,
+  getDeviceTypeLabel,
+  getPrinterOptionValue,
+  getPrinterOptions,
+} from '@controleonline/ui-common/src/react/utils/printerDevices';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -123,14 +128,17 @@ const PurchaseSuggestionsPage = () => {
   /* auto-seleciona impressora padrão do device_config */
   useEffect(() => {
     if (printerOptions?.length > 0 && deviceConfig?.configs?.printer) {
-      const def = printerOptions.find(p => p.device === deviceConfig.configs.printer);
+      const def = findPrinterOptionByValue(
+        printerOptions,
+        deviceConfig.configs.printer,
+      );
       if (def) printerStore.actions.setItem(def);
     }
   }, [deviceConfig, printerOptions, printerStore.actions]);
 
   const handleSelectPrinter = useCallback(async (printer) => {
     await deviceConfigStore.actions.addDeviceConfigs({
-      configs: JSON.stringify({ printer: printer.device }),
+      configs: JSON.stringify({ printer: getPrinterOptionValue(printer) }),
       people: `/people/${currentCompany.id}`,
     }).catch(() => {});
     printerStore.actions.setItem(printer);
@@ -579,14 +587,20 @@ const PurchaseSuggestionsPage = () => {
             {!!selectedPrinter && (
               <View style={styles.modalCurrentPrinter}>
                 <MaterialCommunityIcons name="printer-check" size={14} color="#16A34A" />
-                <Text style={styles.modalCurrentText}>Atual: {selectedPrinter.alias || selectedPrinter.device}</Text>
+                <Text style={styles.modalCurrentText}>
+                  {`Atual: ${selectedPrinter.alias || selectedPrinter.device} (${getDeviceTypeLabel(
+                    selectedPrinter?.type,
+                  )} • ${selectedPrinter.device})`}
+                </Text>
               </View>
             )}
             <FlatList
               data={printerOptions || []}
-              keyExtractor={p => p.device}
+              keyExtractor={p => getPrinterOptionValue(p) || p.device}
               renderItem={({ item: p }) => {
-                const isActive = selectedPrinter?.device === p.device;
+                const isActive =
+                  getPrinterOptionValue(selectedPrinter) ===
+                  getPrinterOptionValue(p);
                 return (
                   <TouchableOpacity
                     style={[styles.printerItem, isActive && styles.printerItemActive]}
@@ -599,7 +613,7 @@ const PurchaseSuggestionsPage = () => {
                       color={isActive ? brandColors.primary : '#64748B'}
                     />
                     <Text style={[styles.printerName, isActive && { color: brandColors.primary, fontWeight: '700' }]}>
-                      {p.alias || p.device}
+                      {`${p.alias || p.device} (${getDeviceTypeLabel(p?.type)} • ${p.device})`}
                     </Text>
                     {isActive && (
                       <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
