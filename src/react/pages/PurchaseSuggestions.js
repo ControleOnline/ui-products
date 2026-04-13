@@ -144,6 +144,7 @@ const PurchaseSuggestionsPage = () => {
     try {
       await api.post('/products/purchasing-suggestion/print', {
         device: selectedPrinter.device,
+        type: selectedPrinter?.type || deviceConfig?.type || '',
         people: currentCompany.id,
       });
       setPrintFeedback({ ok: true, msg: `Enviado para ${selectedPrinter.alias || selectedPrinter.device}` });
