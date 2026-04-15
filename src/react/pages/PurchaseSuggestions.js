@@ -11,12 +11,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
 import { api } from '@controleonline/ui-common/src/api';
-import {
-  findPrinterOptionByValue,
-  getDeviceTypeLabel,
-  getPrinterOptionValue,
-  getPrinterOptions,
-} from '@controleonline/ui-common/src/react/utils/printerDevices';
+import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -87,29 +82,13 @@ const PurchaseSuggestionsPage = () => {
 
   const peopleStore       = useStore('people');
   const themeStore        = useStore('theme');
-  const printerStore      = useStore('printer');
-  const deviceConfigStore = useStore('device_config');
 
   const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
-  const { items: printers, item: selectedPrinter } = printerStore.getters;
-  const {
-    item: deviceConfig,
-    items: companyDeviceConfigs = [],
-  } = deviceConfigStore.getters;
 
   const brandColors = useMemo(
     () => resolveThemePalette({ ...themeColors, ...(currentCompany?.theme?.colors || {}) }, baseColors),
     [themeColors, currentCompany?.id],
-  );
-  const printerOptions = useMemo(
-    () =>
-      getPrinterOptions({
-        printers,
-        deviceConfigs: companyDeviceConfigs,
-        companyId: currentCompany?.id,
-      }),
-    [companyDeviceConfigs, currentCompany?.id, printers],
   );
 
   const [items, setItems]           = useState([]);
@@ -120,83 +99,48 @@ const PurchaseSuggestionsPage = () => {
   const loadingMoreRef = useRef(false);
   const runningRef     = useRef(false); /* guard contra chamadas duplicadas */
 
-  /* impressão */
-  const [printerModalVisible, setPrinterModalVisible] = useState(false);
-  const [printing,   setPrinting]   = useState(false);
   const [printFeedback, setPrintFeedback] = useState(null); /* { ok: bool, msg: string } */
 
-  /* auto-seleciona impressora padrão do device_config */
-  useEffect(() => {
-    if (printerOptions?.length > 0 && deviceConfig?.configs?.printer) {
-      const def = findPrinterOptionByValue(
-        printerOptions,
-        deviceConfig.configs.printer,
-      );
-      if (def) printerStore.actions.setItem(def);
-    }
-  }, [deviceConfig, printerOptions, printerStore.actions]);
+  const showPrintFeedback = useCallback((ok, msg) => {
+    setPrintFeedback({ok, msg});
+    setTimeout(() => setPrintFeedback(null), 4000);
+  }, []);
 
-  const handleSelectPrinter = useCallback(async (printer) => {
-    await deviceConfigStore.actions.addDeviceConfigs({
-      configs: JSON.stringify({ printer: getPrinterOptionValue(printer) }),
-      people: `/people/${currentCompany.id}`,
-    }).catch(() => {});
-    printerStore.actions.setItem(printer);
-    setPrinterModalVisible(false);
-  }, [currentCompany?.id]);
+  const handlePrintSuccess = useCallback(completedRequest => {
+    const targetDeviceId = String(completedRequest?.targetDeviceId || '').trim();
+    showPrintFeedback(
+      true,
+      targetDeviceId
+        ? `Enviado para ${targetDeviceId}`
+        : 'Impressao solicitada com sucesso.',
+    );
+  }, [showPrintFeedback]);
 
-  const handlePrint = useCallback(async () => {
-    if (!selectedPrinter?.device || !currentCompany?.id || printing) return;
-    setPrinting(true);
-    setPrintFeedback(null);
-    try {
-      await api.post('/products/purchasing-suggestion/print', {
-        device: selectedPrinter.device,
-        type: selectedPrinter?.type || deviceConfig?.type || '',
-        people: currentCompany.id,
-      });
-      setPrintFeedback({ ok: true, msg: `Enviado para ${selectedPrinter.alias || selectedPrinter.device}` });
-    } catch (e) {
-      const msg = e?.response?.data?.['hydra:description'] || e?.response?.data?.message || e?.message || 'Erro ao imprimir';
-      setPrintFeedback({ ok: false, msg });
-    } finally {
-      setPrinting(false);
-      setTimeout(() => setPrintFeedback(null), 4000);
-    }
-  }, [selectedPrinter, currentCompany?.id, printing]);
+  const handlePrintError = useCallback(completedRequest => {
+    showPrintFeedback(
+      false,
+      completedRequest?.error || 'Erro ao imprimir',
+    );
+  }, [showPrintFeedback]);
 
   /* botão de impressão no header */
   useLayoutEffect(() => {
-    if (!printerOptions?.length) return;
     navigation.setOptions({
       headerRight: () => (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, paddingRight: 4 }}>
-          <TouchableOpacity
-            onPress={handlePrint}
-            disabled={printing || !selectedPrinter}
-            style={{ padding: 8 }}
-            activeOpacity={0.7}
-          >
-            {printing
-              ? <ActivityIndicator size="small" color="#64748B" />
-              : <MaterialCommunityIcons
-                  name="printer"
-                  size={22}
-                  color={selectedPrinter ? '#64748B' : '#CBD5E1'}
-                />
-            }
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => setPrinterModalVisible(true)}
-            style={{ padding: 8 }}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="format-list-bulleted" size={22} color="#64748B" />
-          </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', paddingRight: 4 }}>
+          <PrintButton
+            job={{type: 'purchasing-suggestion'}}
+            store="products"
+            compact
+            iconColor="#64748B"
+            printerSelection={{enabled: true}}
+            onSuccess={handlePrintSuccess}
+            onError={handlePrintError}
+          />
         </View>
       ),
     });
-  }, [navigation, selectedPrinter, printing, printerOptions, handlePrint]);
+  }, [handlePrintError, handlePrintSuccess, navigation]);
 
   /* ── carregamento ──────────────────────────────────────────────── */
   const loadData = useCallback(async () => {
@@ -248,14 +192,7 @@ const PurchaseSuggestionsPage = () => {
 
   useFocusEffect(useCallback(() => {
     loadData();
-
-    if (currentCompany?.id) {
-      printerStore.actions.getPrinters({ people: currentCompany.id }).catch(() => {});
-      deviceConfigStore.actions
-        .getItems({ people: `/people/${currentCompany.id}` })
-        .catch(() => {});
-    }
-  }, [currentCompany?.id, deviceConfigStore.actions, loadData, printerStore.actions]));
+  }, [loadData]));
 
   /* ── scroll infinito ───────────────────────────────────────────── */
   const handleScroll = useCallback(({ nativeEvent }) => {
@@ -572,67 +509,6 @@ const PurchaseSuggestionsPage = () => {
           </TouchableOpacity>
         </View>
       )}
-
-      {/* ── Modal seleção de impressora ───────────────────────────────── */}
-      <Modal
-        visible={printerModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPrinterModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Selecionar Impressora</Text>
-            {!!selectedPrinter && (
-              <View style={styles.modalCurrentPrinter}>
-                <MaterialCommunityIcons name="printer-check" size={14} color="#16A34A" />
-                <Text style={styles.modalCurrentText}>
-                  {`Atual: ${selectedPrinter.alias || selectedPrinter.device} (${getDeviceTypeLabel(
-                    selectedPrinter?.type,
-                  )} • ${selectedPrinter.device})`}
-                </Text>
-              </View>
-            )}
-            <FlatList
-              data={printerOptions || []}
-              keyExtractor={p => getPrinterOptionValue(p) || p.device}
-              renderItem={({ item: p }) => {
-                const isActive =
-                  getPrinterOptionValue(selectedPrinter) ===
-                  getPrinterOptionValue(p);
-                return (
-                  <TouchableOpacity
-                    style={[styles.printerItem, isActive && styles.printerItemActive]}
-                    onPress={() => handleSelectPrinter(p)}
-                    activeOpacity={0.75}
-                  >
-                    <MaterialCommunityIcons
-                      name="printer"
-                      size={18}
-                      color={isActive ? brandColors.primary : '#64748B'}
-                    />
-                    <Text style={[styles.printerName, isActive && { color: brandColors.primary, fontWeight: '700' }]}>
-                      {`${p.alias || p.device} (${getDeviceTypeLabel(p?.type)} • ${p.device})`}
-                    </Text>
-                    {isActive && (
-                      <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-              ItemSeparatorComponent={() => <View style={styles.printerSep} />}
-            />
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setPrinterModalVisible(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.modalCloseBtnText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 };
