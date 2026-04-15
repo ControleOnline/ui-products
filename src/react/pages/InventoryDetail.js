@@ -558,7 +558,7 @@ const InventoryDetailPage = ({ route }) => {
         setRows((data || []).map(p => ({
           id: null,
           product: p,
-          available: 0, sales: 0, ordered: 0, transit: 0, minimum: 0, maximum: 0,
+          available: 0, sales: 0, purchases: 0, transit: 0, minimum: 0, maximum: 0,
           _noInventory: true,
         })));
         return;
@@ -768,7 +768,7 @@ const InventoryDetailPage = ({ route }) => {
                         <View style={styles.stockGrid}>
                           {[
                             { label: 'Vendas',   val: row.sales },
-                            { label: 'Pedidos',  val: row.ordered },
+                            { label: 'Pedidos',  val: row.purchases },
                             { label: 'Trânsito', val: row.transit },
                             { label: 'Mínimo',   val: row.minimum },
                             { label: 'Máximo',   val: row.maximum },
