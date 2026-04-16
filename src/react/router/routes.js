@@ -1,4 +1,4 @@
-
+import { env } from '@env';
 import Products from '@controleonline/ui-products/src/react/pages/Products';
 import Categories from '@controleonline/ui-products/src/react/pages/Categories';
 import CustomizeScreen from '@controleonline/ui-products/src/react/pages/CustomizeScreen';
@@ -9,6 +9,8 @@ import InventoryMovements from '@controleonline/ui-products/src/react/pages/Inve
 import PurchaseSuggestions from '@controleonline/ui-products/src/react/pages/PurchaseSuggestions';
 import PurchaseForm from '@controleonline/ui-products/src/react/pages/PurchaseForm';
 
+const isPosApp = String(env.APP_TYPE || '').toUpperCase() === 'POS';
+
 const ordersRoutes = [
   {
     name: 'ProductsPage',
@@ -17,6 +19,8 @@ const ordersRoutes = [
       headerShown: true,
       headerBackVisible: true,
       title: 'Escolher Produtos',
+      showBottomCart: isPosApp,
+      showBottomToolBar: isPosApp,
     },
     initialParams: { store: 'products' },
   },
@@ -49,6 +53,8 @@ const ordersRoutes = [
       headerShown: true,
       headerBackVisible: false,
       title: 'Customizar',
+      showBottomCart: isPosApp,
+      showBottomToolBar: isPosApp,
     },
     initialParams: { store: 'products' },
   },
@@ -113,4 +119,3 @@ const ordersRoutes = [
 ];
 
 export default ordersRoutes;
-

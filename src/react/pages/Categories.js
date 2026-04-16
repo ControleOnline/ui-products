@@ -27,6 +27,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
 import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports'
+import {
+  readCachedCategories,
+  writeCachedCategories,
+} from '@controleonline/ui-products/src/react/utils/categoryCache'
 import { File, Paths } from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
 import Icon from 'react-native-vector-icons/FontAwesome'
@@ -122,6 +126,7 @@ const CategoriesPage = () => {
   const [selectedMenuModel, setSelectedMenuModel] = useState('')
   const navigation = useNavigation()
   const { width } = useWindowDimensions()
+  const isManagerApp = env.APP_TYPE === 'MANAGER'
 
   const categoriesStore = useStore('categories')
   const { items, isLoading: storeLoading } = categoriesStore.getters
@@ -200,9 +205,11 @@ const CategoriesPage = () => {
 
   useFocusEffect(
     useCallback(() => {
-      const cached = JSON.parse(localStorage.getItem('categories') || '[]')
+      const cached = readCachedCategories(currentCompany?.id)
       if (cached.length > 0) {
         categoryActions.setItems(cached)
+      } else {
+        categoryActions.setItems([])
       }
       if (currentCompany?.id) {
         categoryActions
@@ -213,12 +220,14 @@ const CategoriesPage = () => {
           })
           .then(data => {
             categoryActions.setItems(data || [])
-            localStorage.setItem('categories', JSON.stringify(data || []))
+            writeCachedCategories(currentCompany.id, data || [])
           })
 
-        loadMenuModels()
+        if (isManagerApp) {
+          loadMenuModels()
+        }
       }
-    }, [currentCompany?.id, categoryActions, loadMenuModels])
+    }, [currentCompany?.id, categoryActions, isManagerApp, loadMenuModels])
   )
 
   const changeCategory = category => {
@@ -247,7 +256,7 @@ const CategoriesPage = () => {
       'order[name]': 'ASC',
       company: currentCompany.id,
     })
-    localStorage.setItem('categories', JSON.stringify(data || []))
+    writeCachedCategories(currentCompany.id, data || [])
     return data || []
   }, [currentCompany?.id, categoryActions])
 
@@ -414,159 +423,163 @@ const CategoriesPage = () => {
         ]}
       >
         <View style={{ width: containerWidth, paddingHorizontal: gap / 2, paddingTop: 16, paddingBottom: 0 }}>
-          <Modal
-            visible={showImportModal}
-            animationType="slide"
-            transparent={false}
-          >
-            <ImportsPage
-              context={{
-                "context": "product",
-                "title": "Importação de Produtos",
-                "searchPlaceholder": "Buscar importações de produtos..."
-              }}
-              onClose={() => setShowImportModal(false)}
-            />
-          </Modal>
-          <Modal
-            visible={showMenuModelModal}
-            animationType="slide"
-            transparent
-            onRequestClose={() => setShowMenuModelModal(false)}
-          >
-            <View style={styles.pickerModalOverlay}>
-              <View style={styles.pickerModalContent}>
-                <View style={styles.pickerModalHeader}>
-                  <Text style={styles.pickerModalTitle}>Selecionar modelo do cardapio</Text>
-                  <TouchableOpacity
-                    onPress={() => setShowMenuModelModal(false)}
-                    style={styles.pickerModalClose}
-                  >
-                    <MaterialCommunityIcons name="close" size={20} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView style={styles.pickerModalBody}>
-                  {isLoadingMenuModels ? (
-                    <View style={styles.pickerState}>
-                      <ActivityIndicator size="small" color={brandColors.primary} />
-                      <Text style={styles.pickerStateText}>Carregando modelos...</Text>
+          {isManagerApp && (
+            <>
+              <Modal
+                visible={showImportModal}
+                animationType="slide"
+                transparent={false}
+              >
+                <ImportsPage
+                  context={{
+                    "context": "product",
+                    "title": "Importação de Produtos",
+                    "searchPlaceholder": "Buscar importações de produtos..."
+                  }}
+                  onClose={() => setShowImportModal(false)}
+                />
+              </Modal>
+              <Modal
+                visible={showMenuModelModal}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowMenuModelModal(false)}
+              >
+                <View style={styles.pickerModalOverlay}>
+                  <View style={styles.pickerModalContent}>
+                    <View style={styles.pickerModalHeader}>
+                      <Text style={styles.pickerModalTitle}>Selecionar modelo do cardapio</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowMenuModelModal(false)}
+                        style={styles.pickerModalClose}
+                      >
+                        <MaterialCommunityIcons name="close" size={20} color="#64748B" />
+                      </TouchableOpacity>
                     </View>
-                  ) : menuModels.length > 0 ? (
-                    menuModels.map(model => {
-                      const isSelected = model?.['@id'] === selectedMenuModel
 
-                      return (
-                        <TouchableOpacity
-                          key={model?.['@id'] || model?.id}
-                          style={[
-                            styles.modelOption,
-                            isSelected && styles.modelOptionSelected,
-                          ]}
-                          activeOpacity={0.85}
-                          onPress={() => {
-                            setSelectedMenuModel(model?.['@id'] || '')
-                            setShowMenuModelModal(false)
-                          }}
-                        >
-                          <View style={styles.modelOptionCopy}>
-                            <Text
+                    <ScrollView style={styles.pickerModalBody}>
+                      {isLoadingMenuModels ? (
+                        <View style={styles.pickerState}>
+                          <ActivityIndicator size="small" color={brandColors.primary} />
+                          <Text style={styles.pickerStateText}>Carregando modelos...</Text>
+                        </View>
+                      ) : menuModels.length > 0 ? (
+                        menuModels.map(model => {
+                          const isSelected = model?.['@id'] === selectedMenuModel
+
+                          return (
+                            <TouchableOpacity
+                              key={model?.['@id'] || model?.id}
                               style={[
-                                styles.modelOptionTitle,
-                                isSelected && styles.modelOptionTitleSelected,
+                                styles.modelOption,
+                                isSelected && styles.modelOptionSelected,
                               ]}
-                              numberOfLines={1}
+                              activeOpacity={0.85}
+                              onPress={() => {
+                                setSelectedMenuModel(model?.['@id'] || '')
+                                setShowMenuModelModal(false)
+                              }}
                             >
-                              {model?.model || 'Modelo sem nome'}
-                            </Text>
-                            <Text style={styles.modelOptionSubtitle}>
-                              Contexto: menu
-                            </Text>
-                          </View>
-                          {isSelected ? (
-                            <MaterialCommunityIcons
-                              name="check-circle"
-                              size={22}
-                              color={brandColors.primary}
-                            />
-                          ) : (
-                            <MaterialCommunityIcons
-                              name="radiobox-blank"
-                              size={22}
-                              color="#CBD5E1"
-                            />
-                          )}
-                        </TouchableOpacity>
-                      )
-                    })
+                              <View style={styles.modelOptionCopy}>
+                                <Text
+                                  style={[
+                                    styles.modelOptionTitle,
+                                    isSelected && styles.modelOptionTitleSelected,
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {model?.model || 'Modelo sem nome'}
+                                </Text>
+                                <Text style={styles.modelOptionSubtitle}>
+                                  Contexto: menu
+                                </Text>
+                              </View>
+                              {isSelected ? (
+                                <MaterialCommunityIcons
+                                  name="check-circle"
+                                  size={22}
+                                  color={brandColors.primary}
+                                />
+                              ) : (
+                                <MaterialCommunityIcons
+                                  name="radiobox-blank"
+                                  size={22}
+                                  color="#CBD5E1"
+                                />
+                              )}
+                            </TouchableOpacity>
+                          )
+                        })
+                      ) : (
+                        <View style={styles.pickerState}>
+                          <MaterialCommunityIcons
+                            name="file-document-outline"
+                            size={36}
+                            color="#CBD5E1"
+                          />
+                          <Text style={styles.pickerStateText}>
+                            Nenhum modelo de cardapio encontrado para esta empresa.
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+              <View style={styles.topActionsRow}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.importButton]}
+                  onPress={openImport}
+                  activeOpacity={0.85}
+                >
+                  <Icon name="file-excel-o" size={18} color="#2E7D32" />
+                  <Text style={[styles.actionButtonText, styles.importButtonText]}>
+                    Importar CSV
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.modelButton]}
+                  onPress={openMenuModelPicker}
+                  activeOpacity={0.85}
+                  disabled={!currentCompany?.id}
+                >
+                  {isLoadingMenuModels ? (
+                    <ActivityIndicator size="small" color="#7C3AED" />
                   ) : (
-                    <View style={styles.pickerState}>
-                      <MaterialCommunityIcons
-                        name="file-document-outline"
-                        size={36}
-                        color="#CBD5E1"
-                      />
-                      <Text style={styles.pickerStateText}>
-                        Nenhum modelo de cardapio encontrado para esta empresa.
-                      </Text>
-                    </View>
+                    <MaterialCommunityIcons name="file-document-edit-outline" size={18} color="#7C3AED" />
                   )}
-                </ScrollView>
-              </View>
-            </View>
-          </Modal>
-          <View style={styles.topActionsRow}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.importButton]}
-              onPress={openImport}
-              activeOpacity={0.85}
-            >
-              <Icon name="file-excel-o" size={18} color="#2E7D32" />
-              <Text style={[styles.actionButtonText, styles.importButtonText]}>
-                Importar CSV
-              </Text>
-            </TouchableOpacity>
+                  <View style={styles.modelButtonCopy}>
+                    <Text style={styles.modelButtonLabel}>Modelo</Text>
+                    <Text style={styles.modelButtonValue} numberOfLines={1}>
+                      {selectedMenuModelLabel}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.modelButton]}
-              onPress={openMenuModelPicker}
-              activeOpacity={0.85}
-              disabled={!currentCompany?.id}
-            >
-              {isLoadingMenuModels ? (
-                <ActivityIndicator size="small" color="#7C3AED" />
-              ) : (
-                <MaterialCommunityIcons name="file-document-edit-outline" size={18} color="#7C3AED" />
-              )}
-              <View style={styles.modelButtonCopy}>
-                <Text style={styles.modelButtonLabel}>Modelo</Text>
-                <Text style={styles.modelButtonValue} numberOfLines={1}>
-                  {selectedMenuModelLabel}
-                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    styles.catalogButton,
+                    { backgroundColor: brandColors.primary, borderColor: brandColors.primary },
+                    (isDownloadingCatalog || !currentCompany?.id) && styles.disabledActionButton,
+                  ]}
+                  onPress={downloadCatalog}
+                  activeOpacity={0.85}
+                  disabled={isDownloadingCatalog || !currentCompany?.id}
+                >
+                  {isDownloadingCatalog ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <MaterialCommunityIcons name="file-download-outline" size={18} color="#fff" />
+                  )}
+                  <Text style={[styles.actionButtonText, styles.catalogButtonText]}>
+                    {isDownloadingCatalog ? 'Baixando...' : 'Baixar cardapio'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionButton,
-                styles.catalogButton,
-                { backgroundColor: brandColors.primary, borderColor: brandColors.primary },
-                (isDownloadingCatalog || !currentCompany?.id) && styles.disabledActionButton,
-              ]}
-              onPress={downloadCatalog}
-              activeOpacity={0.85}
-              disabled={isDownloadingCatalog || !currentCompany?.id}
-            >
-              {isDownloadingCatalog ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <MaterialCommunityIcons name="file-download-outline" size={18} color="#fff" />
-              )}
-              <Text style={[styles.actionButtonText, styles.catalogButtonText]}>
-                {isDownloadingCatalog ? 'Baixando...' : 'Baixar cardapio'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+            </>
+          )}
           {/* Skeleton loading */}
           {storeLoading && (
             <View style={[styles.grid, { gap }]}>

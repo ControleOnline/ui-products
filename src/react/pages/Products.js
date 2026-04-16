@@ -31,6 +31,10 @@ import { env } from '@env';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
+import {
+  readCachedCategories,
+  writeCachedCategories,
+} from '@controleonline/ui-products/src/react/utils/categoryCache';
 
 const SkeletonProductCard = () => (
   <View style={skeletonStyles.card}>
@@ -139,7 +143,7 @@ const ProductsPage = ({ navigation, route }) => {
     categoryActions.setItems(c);
 
     if (changeStorage)
-      localStorage.setItem('categories', JSON.stringify(c));
+      writeCachedCategories(currentCompany?.id, c);
   };
 
   useEffect(() => {
@@ -194,11 +198,11 @@ const ProductsPage = ({ navigation, route }) => {
     useCallback(() => {
       return () => {
         ordersActions.initQueue();
-        const cats = JSON.parse(localStorage.getItem('categories') || '[]');
+        const cats = readCachedCategories(currentCompany?.id);
         setCategoryProducts([]);
         if (cats.length > 0) categoryActions.setItems(cats);
       };
-    }, []),
+    }, [categoryActions, currentCompany?.id, ordersActions]),
   );
 
   const handleProductPress = product => {
