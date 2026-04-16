@@ -405,15 +405,23 @@ const ProductsPage = ({ navigation, route }) => {
 
   const handleProductPress = product => {
     if (!isManager) return;
-    navigation.navigate('ProductDetails', {
-      ProductId: product.id,
-      ...buildCategoryRouteParams(),
+    navigation.navigate({
+      name: 'ProductDetails',
+      params: {
+        ProductId: product.id,
+        ...buildCategoryRouteParams(),
+      },
+      merge: false,
     });
   };
 
   const handleAddProduct = () => {
     if (!isManager) return;
-    navigation.navigate('ProductDetails', buildCategoryRouteParams());
+    navigation.navigate({
+      name: 'ProductDetails',
+      params: buildCategoryRouteParams(),
+      merge: false,
+    });
   };
 
   const maxContentWidth = 860;

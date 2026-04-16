@@ -237,7 +237,11 @@ const CategoriesPage = () => {
         : normalizeEntityId(category)
 
     categoryActions.setItem(category || {})
-    navigation.navigate('ProductsPage', { categoryId, context })
+    navigation.navigate({
+      name: 'ProductsPage',
+      params: { categoryId, context },
+      merge: false,
+    })
   }
 
   const openCreateModal = () => {

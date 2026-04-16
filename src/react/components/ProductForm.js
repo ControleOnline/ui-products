@@ -169,7 +169,6 @@ const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
 const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
-  const { category: routeCategory } = route.params || {};
   const routeCategoryIdParam = route.params?.categoryId || '';
   const ProductId = propProductId || routeProductId;
   const { width } = useWindowDimensions();
@@ -193,8 +192,6 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const storedCategory = categoryGetters.item;
   const selectedRouteCategoryId =
     extractId(routeCategoryIdParam) ||
-    extractId(routeCategory?.id) ||
-    extractId(routeCategory?.['@id']) ||
     extractId(storedCategory?.id) ||
     extractId(storedCategory?.['@id']) ||
     '';
