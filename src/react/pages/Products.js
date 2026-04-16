@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ALL_PRODUCTS_SENTINEL } from './Categories';
 import {
   FlatList,
@@ -31,10 +31,129 @@ import { env } from '@env';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
+import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
 import {
   readCachedCategories,
   writeCachedCategories,
 } from '@controleonline/ui-products/src/react/utils/categoryCache';
+import {
+  ADD_PRODUCT_SELECTION_CHANGE_EVENT,
+  clearPendingAddProducts,
+  listPendingAddProducts,
+  resolvePendingAddProductId,
+} from '@controleonline/ui-orders/src/react/utils/addProductSession';
+import {
+  mergeOrderWithOrderProducts,
+  withOrderProductQuantity,
+} from '@controleonline/ui-orders/src/utils/orderState';
+
+const resolveRouteCategoryId = value => {
+  if (!value) return '';
+
+  if (typeof value === 'object') {
+    if (value?._isAllProducts || value?.['@id'] === ALL_PRODUCTS_SENTINEL['@id']) {
+      return ALL_PRODUCTS_SENTINEL['@id'];
+    }
+
+    return String(value?.id || value?.['@id'] || '').replace(/\D+/g, '').trim();
+  }
+
+  const normalized = String(value || '').trim();
+  if (normalized === ALL_PRODUCTS_SENTINEL['@id']) {
+    return normalized;
+  }
+
+  return normalized.replace(/\D+/g, '').trim();
+};
+
+const getPendingOrderProductKey = productId => `pending-add-product-${productId}`;
+
+const buildPendingOrderProduct = ({ product, quantity, order }) => {
+  const productId = resolvePendingAddProductId(product);
+  const unitPrice = Number(product?.price || 0);
+
+  return withOrderProductQuantity(
+    {
+      id: getPendingOrderProductKey(productId),
+      '@id': `/pending_order_products/${productId}`,
+      __localPendingSelection: true,
+      product,
+      price: unitPrice,
+      value: unitPrice,
+      total: unitPrice * Math.max(0, Number(quantity || 0)),
+      order:
+        order?.['@id'] ||
+        (order?.id ? `/orders/${order.id}` : null),
+    },
+    quantity,
+  );
+};
+
+const applyPendingSelectionToOrder = ({ order, product, quantity }) => {
+  if (!order || !product) {
+    return order;
+  }
+
+  const productId = resolvePendingAddProductId(product);
+  if (!productId) {
+    return order;
+  }
+
+  const pendingKey = getPendingOrderProductKey(productId);
+  const currentOrderProducts = Array.isArray(order?.orderProducts)
+    ? order.orderProducts
+    : [];
+  const nextOrderProducts = currentOrderProducts.filter(orderProduct => {
+    const orderProductKey = String(
+      orderProduct?.id || orderProduct?.['@id'] || '',
+    );
+    return orderProductKey !== pendingKey;
+  });
+
+  if (Number(quantity || 0) > 0) {
+    nextOrderProducts.push(
+      buildPendingOrderProduct({
+        product,
+        quantity,
+        order,
+      }),
+    );
+  }
+
+  return mergeOrderWithOrderProducts(order, nextOrderProducts);
+};
+
+const resolveSelectedCategory = ({
+  routeCategory,
+  storedCategory,
+  categories,
+  routeCategoryId,
+}) => {
+  const normalizedRouteCategoryId = resolveRouteCategoryId(routeCategoryId || routeCategory);
+
+  if (routeCategory && typeof routeCategory === 'object') {
+    return routeCategory;
+  }
+
+  if (
+    storedCategory &&
+    typeof storedCategory === 'object' &&
+    (
+      storedCategory?._isAllProducts ||
+      resolveRouteCategoryId(storedCategory) === normalizedRouteCategoryId
+    )
+  ) {
+    return storedCategory;
+  }
+
+  if (normalizedRouteCategoryId === ALL_PRODUCTS_SENTINEL['@id']) {
+    return ALL_PRODUCTS_SENTINEL;
+  }
+
+  return (Array.isArray(categories) ? categories : []).find(currentCategory => {
+    return resolveRouteCategoryId(currentCategory) === normalizedRouteCategoryId;
+  }) || null;
+};
 
 const SkeletonProductCard = () => (
   <View style={skeletonStyles.card}>
@@ -52,7 +171,8 @@ const SkeletonProductCard = () => (
 );
 
 const ProductsPage = ({ navigation, route }) => {
-  const { category, context } = route.params;
+  const routeParams = route.params || {};
+  const context = routeParams.context;
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -66,7 +186,7 @@ const ProductsPage = ({ navigation, route }) => {
   const categoriesStore = useStore('categories');
   const categoriesGetters = categoriesStore.getters;
   const categoryActions = categoriesStore.actions;
-  const { items: categories } = categoriesGetters;
+  const { items: categories, item: storedCategory } = categoriesGetters;
 
   const peopleStore = useStore('people');
   const { currentCompany } = peopleStore.getters;
@@ -74,18 +194,17 @@ const ProductsPage = ({ navigation, route }) => {
   const themeStore = useStore('theme');
   const { colors: themeColors } = themeStore.getters;
 
-  const contextTypes = [];
+  const contextTypes = useMemo(() => {
+    if (context === 'products') {
+      return ['product', 'manufactured', 'custom', 'service'];
+    }
 
-  useFocusEffect(
-    useCallback(() => {
-      if (context === 'products') {
-        contextTypes.push('product', 'manufactured', 'custom', 'service');
-      }
-      if (context === 'supplies') {
-        contextTypes.push('package', 'component', 'feedstock');
-      }
-    }, [])
-  );
+    if (context === 'supplies') {
+      return ['package', 'component', 'feedstock'];
+    }
+
+    return [];
+  }, [context]);
 
   const brandColors = useMemo(
     () =>
@@ -99,12 +218,38 @@ const ProductsPage = ({ navigation, route }) => {
   const [categoryProducts, setCategoryProducts] = useState([]);
   const [typeFilter, setTypeFilter] = useState(null);
   const [visibleCount, setVisibleCount] = useState(50);
+  const currentOrderRef = useRef(ordersStore.getters?.item || null);
 
   const isManager = env.APP_TYPE === 'MANAGER';
+  const category = useMemo(
+    () =>
+      resolveSelectedCategory({
+        routeCategory:
+          typeof routeParams.category === 'object' ? routeParams.category : null,
+        storedCategory,
+        categories,
+        routeCategoryId: routeParams.categoryId || routeParams.category,
+      }),
+    [categories, routeParams.category, routeParams.categoryId, storedCategory],
+  );
+  const categoryId = useMemo(
+    () => resolveRouteCategoryId(category),
+    [category],
+  );
 
   const isAllProducts =
     category?._isAllProducts === true ||
     category?.['@id'] === '__all_products__';
+
+  useEffect(() => {
+    currentOrderRef.current = ordersStore.getters?.item || null;
+  }, [ordersStore.getters?.item]);
+
+  useEffect(() => {
+    if (category && storedCategory !== category) {
+      categoryActions.setItem(category);
+    }
+  }, [category, categoryActions, storedCategory]);
 
   const visibleProducts = useMemo(() => {
     if (!typeFilter) return categoryProducts;
@@ -114,6 +259,49 @@ const ProductsPage = ({ navigation, route }) => {
   useEffect(() => {
     setVisibleCount(50);
   }, [typeFilter, category]);
+
+  const flushPendingAddProducts = useCallback(() => {
+    const currentOrderId = String(
+      currentOrderRef.current?.id ||
+      currentOrderRef.current?.['@id'] ||
+      '',
+    ).replace(/\D+/g, '');
+    const pendingSelections = listPendingAddProducts();
+
+    if (currentOrderId && pendingSelections.length > 0) {
+      const payload = pendingSelections.map(selection => ({
+        product: selection.productId,
+        quantity: selection.quantity,
+      }));
+
+      ordersActions.addToQueue(() => ordersActions.addProducts(currentOrderId, payload));
+    }
+
+    clearPendingAddProducts();
+    ordersActions.initQueue();
+  }, [ordersActions]);
+
+  const handlePendingSelectionChange = useCallback(
+    payload => {
+      const currentOrder = currentOrderRef.current;
+      if (!currentOrder) return;
+
+      const nextOrder = applyPendingSelectionToOrder({
+        order: currentOrder,
+        product: payload?.product,
+        quantity: payload?.quantity,
+      });
+
+      currentOrderRef.current = nextOrder;
+      ordersActions.syncOrder?.(nextOrder);
+    },
+    [ordersActions],
+  );
+
+  useEffect(() => {
+    eventBus.on(ADD_PRODUCT_SELECTION_CHANGE_EVENT, handlePendingSelectionChange);
+    return () => eventBus.off(ADD_PRODUCT_SELECTION_CHANGE_EVENT, handlePendingSelectionChange);
+  }, [handlePendingSelectionChange]);
 
   const productsData = useMemo(
     () => visibleProducts.slice(0, visibleCount),
@@ -131,7 +319,7 @@ const ProductsPage = ({ navigation, route }) => {
       return;
     }
 
-    const index = categories.findIndex(c => c['@id'] === category['@id']);
+    const index = categories.findIndex(c => resolveRouteCategoryId(c) === categoryId);
     if (index < 0) {
       setCategoryProducts(p);
       return;
@@ -147,7 +335,10 @@ const ProductsPage = ({ navigation, route }) => {
   };
 
   useEffect(() => {
-    if (!category) return;
+    if (!category) {
+      setCategoryProducts([]);
+      return;
+    }
 
     const baseParams = {
       active: 1,
@@ -172,9 +363,9 @@ const ProductsPage = ({ navigation, route }) => {
     if (
       categories &&
       categories.length > 0 &&
-      category['@id']
+      categoryId
     ) {
-      const index = categories.findIndex(c => c['@id'] === category['@id']);
+      const index = categories.findIndex(c => resolveRouteCategoryId(c) === categoryId);
 
       if (index >= 0 && categories[index]?.products?.length > 0) {
         setCategoryProducts(categories[index]['products']);
@@ -183,7 +374,8 @@ const ProductsPage = ({ navigation, route }) => {
           .getItems({
             ...baseParams,
             itemsPerPage: 50,
-            'productCategory.category': category['@id'],
+            'productCategory.category':
+              category?.['@id'] || `/categories/${categoryId}`,
           })
           .then(data => {
             if (data && Object.keys(data).length > 0)
@@ -192,27 +384,42 @@ const ProductsPage = ({ navigation, route }) => {
           .catch(() => { });
       }
     }
-  }, [category]);
+  }, [actions, category, categoryId, categories, contextTypes, currentCompany?.id, isAllProducts]);
 
   useFocusEffect(
     useCallback(() => {
+      clearPendingAddProducts();
+
       return () => {
-        ordersActions.initQueue();
+        flushPendingAddProducts();
         const cats = readCachedCategories(currentCompany?.id);
         setCategoryProducts([]);
         if (cats.length > 0) categoryActions.setItems(cats);
       };
-    }, [categoryActions, currentCompany?.id, ordersActions]),
+    }, [categoryActions, currentCompany?.id, flushPendingAddProducts]),
   );
+
+  const buildCategoryRouteParams = useCallback(() => {
+    const params = { context };
+
+    if (categoryId) {
+      params.categoryId = categoryId;
+    }
+
+    return params;
+  }, [categoryId, context]);
 
   const handleProductPress = product => {
     if (!isManager) return;
-    navigation.navigate('ProductDetails', { ProductId: product.id, category, context });
+    navigation.navigate('ProductDetails', {
+      ProductId: product.id,
+      ...buildCategoryRouteParams(),
+    });
   };
 
   const handleAddProduct = () => {
     if (!isManager) return;
-    navigation.navigate('ProductDetails', { category });
+    navigation.navigate('ProductDetails', buildCategoryRouteParams());
   };
 
   const maxContentWidth = 860;

@@ -231,7 +231,13 @@ const CategoriesPage = () => {
   )
 
   const changeCategory = category => {
-    navigation.navigate('ProductsPage', { category, context })
+    const categoryId =
+      category?._isAllProducts || category?.['@id'] === ALL_PRODUCTS_SENTINEL['@id']
+        ? ALL_PRODUCTS_SENTINEL['@id']
+        : normalizeEntityId(category)
+
+    categoryActions.setItem(category || {})
+    navigation.navigate('ProductsPage', { categoryId, context })
   }
 
   const openCreateModal = () => {

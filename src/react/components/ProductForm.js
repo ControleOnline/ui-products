@@ -170,6 +170,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
   const { category: routeCategory } = route.params || {};
+  const routeCategoryIdParam = route.params?.categoryId || '';
   const ProductId = propProductId || routeProductId;
   const { width } = useWindowDimensions();
 
@@ -189,6 +190,14 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const { getters: inventoriesGetters } = inventoriesStore;
 
   const { currentCompany } = peopleGetters;
+  const storedCategory = categoryGetters.item;
+  const selectedRouteCategoryId =
+    extractId(routeCategoryIdParam) ||
+    extractId(routeCategory?.id) ||
+    extractId(routeCategory?.['@id']) ||
+    extractId(storedCategory?.id) ||
+    extractId(storedCategory?.['@id']) ||
+    '';
 
   const [product, setProduct] = useState(null);
   const [actionStatus, setActionStatus] = useState('');
@@ -245,10 +254,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         }
 
         if (!existingCategoryId) {
-          existingCategoryId =
-            extractId(routeCategory?.id) ||
-            extractId(routeCategory?.['@id']) ||
-            '';
+          existingCategoryId = selectedRouteCategoryId;
         }
         setSelectedCategoryId(existingCategoryId ? String(existingCategoryId) : '');
       });
@@ -268,13 +274,9 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
           featured: false,
         };
       });
-      const routeCategoryId =
-        routeCategory?.id ||
-        routeCategory?.['@id']?.toString?.().replace(/\D/g, '') ||
-        '';
-      if (routeCategoryId) setSelectedCategoryId(String(routeCategoryId));
+      if (selectedRouteCategoryId) setSelectedCategoryId(String(selectedRouteCategoryId));
     }
-  }, [ProductId, currentCompany, routeCategory, productCategoryActions, productActions]);
+  }, [ProductId, currentCompany, productCategoryActions, productActions, selectedRouteCategoryId]);
 
   useEffect(() => {
     getData();
