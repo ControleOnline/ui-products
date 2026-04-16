@@ -124,16 +124,11 @@ const applyPendingSelectionToOrder = ({ order, product, quantity }) => {
 };
 
 const resolveSelectedCategory = ({
-  routeCategory,
   storedCategory,
   categories,
   routeCategoryId,
 }) => {
-  const normalizedRouteCategoryId = resolveRouteCategoryId(routeCategoryId || routeCategory);
-
-  if (routeCategory && typeof routeCategory === 'object') {
-    return routeCategory;
-  }
+  const normalizedRouteCategoryId = resolveRouteCategoryId(routeCategoryId);
 
   if (
     storedCategory &&
@@ -221,16 +216,15 @@ const ProductsPage = ({ navigation, route }) => {
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
 
   const isManager = env.APP_TYPE === 'MANAGER';
+  const categoryRouteValue = routeParams.categoryId || routeParams.category;
   const category = useMemo(
     () =>
       resolveSelectedCategory({
-        routeCategory:
-          typeof routeParams.category === 'object' ? routeParams.category : null,
         storedCategory,
         categories,
-        routeCategoryId: routeParams.categoryId || routeParams.category,
+        routeCategoryId: categoryRouteValue,
       }),
-    [categories, routeParams.category, routeParams.categoryId, storedCategory],
+    [categories, categoryRouteValue, storedCategory],
   );
   const categoryId = useMemo(
     () => resolveRouteCategoryId(category),
