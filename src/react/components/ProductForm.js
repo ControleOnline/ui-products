@@ -1,14 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  ScrollView,
-  useWindowDimensions,
-  TextInput,
-  Text,
-  TouchableOpacity,
-  Switch,
-  StyleSheet,
-} from 'react-native';
+import { View, ScrollView, useWindowDimensions, TextInput, Text, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
@@ -17,6 +8,22 @@ import { useNavigation } from '@react-navigation/native';
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import styles from './ProductForm.styles';
+
+import {
+  inlineStyle_71_8,
+  inlineStyle_76_10,
+  inlineStyle_78_20,
+  inlineStyle_84_14,
+  inlineStyle_85_16,
+  inlineStyle_144_12,
+  inlineStyle_150_12,
+  inlineStyle_545_10,
+  inlineStyle_673_18,
+  inlineStyle_675_20,
+} from './ProductForm.styles';
+
+import { inlineStyle_92_14 } from './ProductForm.styles';
 
 const normalizeRelationId = value => {
   if (!value && value !== 0) return '';
@@ -76,21 +83,20 @@ const normalizeProductForForm = data => {
 };
 
 const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
-  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+  <View style={inlineStyle_71_8({
+    height: height,
+    mb: mb,
+    width: width,
+  })} />
 );
 
 const SkeletonTab = () => (
-  <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-    <View style={{ height: 180, borderRadius: 16, backgroundColor: '#E2E8F0', marginBottom: 16 }} />
+  <ScrollView contentContainerStyle={inlineStyle_92_14} showsVerticalScrollIndicator={false}>
+    <View style={inlineStyle_76_10} />
     {[1, 2, 3, 4].map(i => (
-      <View key={i} style={{
-        backgroundColor: '#fff', borderRadius: 12, marginBottom: 10,
-        padding: 16,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05, shadowRadius: 4, elevation: 1,
-      }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-          <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: '#E2E8F0', marginRight: 8 }} />
+      <View key={i} style={inlineStyle_78_20}>
+        <View style={inlineStyle_84_14}>
+          <View style={inlineStyle_85_16} />
           <SkeletonLine width="35%" height={13} mb={0} />
         </View>
         <SkeletonLine height={40} mb={8} />
@@ -149,13 +155,13 @@ const SelectField = ({ label, value, options, onChange, placeholder = 'Seleciona
 const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
   <View style={[styles.sectionCard, hasError && styles.sectionCardError]}>
     <TouchableOpacity style={styles.sectionCardHeader} onPress={onToggle} activeOpacity={0.7}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+      <View style={inlineStyle_144_12}>
         {icon && (
           <MaterialCommunityIcons
             name={hasError ? 'alert-circle' : icon}
             size={16}
             color={hasError ? '#EF4444' : '#94A3B8'}
-            style={{ marginRight: 6 }}
+            style={inlineStyle_150_12}
           />
         )}
         <Text style={[styles.sectionCardTitle, hasError && styles.sectionCardTitleError]}>{title}</Text>
@@ -550,7 +556,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   }, []);
 
   if (!product) return (
-    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+    <View style={inlineStyle_545_10}>
       <SkeletonTab />
     </View>
   );
@@ -559,7 +565,6 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     <SafeAreaView style={styles.safeArea}>
       {!productsStore.getters?.isLoading && <StateStore store="products" />}
       {!categoriesStore.getters?.isLoading && <StateStore store="categories" />}
-
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
         {!!actionStatus && (
@@ -678,9 +683,9 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
             <Switch value={Boolean(product.featured)} onValueChange={val => handleChange('featured', val)} />
           </View>
           <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
+            <View style={inlineStyle_673_18}>
               <Text style={styles.switchLabel}>Controlar Estoque</Text>
-              <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+              <Text style={inlineStyle_675_20}>
                 Define local de entrada e saída para este produto
               </Text>
             </View>
@@ -761,7 +766,6 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         )}
 
       </ScrollView>
-
       <View style={styles.saveBar}>
         <TouchableOpacity
           onPress={handleSave}
@@ -775,54 +779,5 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
-  scrollContent: { padding: 16, paddingBottom: 100 },
-
-  sectionCard: { backgroundColor: '#fff', borderRadius: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2, overflow: 'hidden' },
-  sectionCardError: { borderWidth: 1.5, borderColor: '#FCA5A5' },
-  sectionCardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14 },
-  sectionCardBody: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 14 },
-  sectionCardTitle: { fontSize: 13, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6 },
-  sectionCardTitleError: { color: '#EF4444' },
-
-  saveBar: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  saveButton: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, padding: 16, borderRadius: 14 },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
-  fieldWrap: { marginBottom: 12 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
-  textInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, fontSize: 15, color: '#0F172A' },
-  textInputMultiline: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, fontSize: 15, color: '#0F172A', minHeight: 88, textAlignVertical: 'top' },
-
-  selectButton: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  selectText: { fontSize: 15, color: '#0F172A', flex: 1 },
-  selectPlaceholder: { fontSize: 15, color: '#CBD5E1', flex: 1 },
-
-  pickerModalContainer: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, maxHeight: '80%' },
-  pickerModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  pickerModalTitle: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-  pickerModalClose: { padding: 4 },
-  pickerModalList: { maxHeight: 360 },
-  pickerOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  pickerOptionActive: { backgroundColor: '#F0FDF4' },
-  pickerOptionText: { fontSize: 15, color: '#334155' },
-
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  switchRowLast: { borderBottomWidth: 0, marginBottom: 8 },
-  switchLabel: { fontSize: 15, color: '#334155', fontWeight: '500', flex: 1 },
-
-  displayField: { backgroundColor: '#F1F5F9', borderRadius: 10, padding: 13 },
-  displayFieldText: { fontSize: 15, color: '#64748B' },
-
-  statusBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 12 },
-  statusBannerSuccess: { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
-  statusBannerError: { backgroundColor: '#FFF3F3', borderColor: '#FECACA' },
-  statusBannerText: { fontSize: 13, fontWeight: '600', flex: 1 },
-
-  infoBox: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 16 },
-  infoBoxText: { color: '#94A3B8', fontSize: 14, flex: 1 },
-});
 
 export default ProductForm;

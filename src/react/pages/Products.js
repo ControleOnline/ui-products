@@ -1,26 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ALL_PRODUCTS_SENTINEL } from './Categories';
-import {
-  FlatList,
-  ScrollView,
-  View,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  Platform,
-  useWindowDimensions,
-} from 'react-native';
 
-const TYPE_FILTER_OPTIONS = [
-  { key: null, label: 'Todos' },
-  { key: 'product', label: 'Produto' },
-  { key: 'service', label: 'Serviço' },
-  { key: 'manufactured', label: 'Fabricado' },
-  { key: 'component', label: 'Componente' },
-  { key: 'feedstock', label: 'Matéria Prima' },
-  { key: 'package', label: 'Embalagem' },
-  { key: 'custom', label: 'Custom' },
-];
+import {
+  FlatList, ScrollView, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
@@ -32,20 +14,28 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
+
 import {
   readCachedCategories,
   writeCachedCategories,
 } from '@controleonline/ui-products/src/react/utils/categoryCache';
+
 import {
   ADD_PRODUCT_SELECTION_CHANGE_EVENT,
   clearPendingAddProducts,
   listPendingAddProducts,
   resolvePendingAddProductId,
 } from '@controleonline/ui-orders/src/react/utils/addProductSession';
+
+import { skeletonStyles, styles } from './Products.styles'
+
 import {
   mergeOrderWithOrderProducts,
   withOrderProductQuantity,
 } from '@controleonline/ui-orders/src/utils/orderState';
+
+import { inlineStyle_413_16 } from './Products.styles';
+import { inlineStyle_449_10 } from './Products.styles';
 
 const resolveRouteCategoryId = value => {
   if (!value) return '';
@@ -211,7 +201,7 @@ const ProductsPage = ({ navigation, route }) => {
   );
 
   const [categoryProducts, setCategoryProducts] = useState([]);
-  const [typeFilter, setTypeFilter] = useState(null);
+  const [typeFilter] = useState(null);
   const [visibleCount, setVisibleCount] = useState(50);
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
 
@@ -301,11 +291,6 @@ const ProductsPage = ({ navigation, route }) => {
     () => visibleProducts.slice(0, visibleCount),
     [visibleProducts, visibleCount],
   );
-
-  const availableTypes = useMemo(() => {
-    const set = new Set(categoryProducts.map(p => p.type).filter(Boolean));
-    return TYPE_FILTER_OPTIONS.filter(opt => opt.key === null || set.has(opt.key));
-  }, [categoryProducts]);
 
   const changeCategoryProduct = (p, changeStorage = false) => {
     if (isAllProducts) {
@@ -430,17 +415,17 @@ const ProductsPage = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.container}>
       {!storeLoading && <StateStore store="products" />}
-
       {storeLoading && (
         <ScrollView style={styles.scroll}>
-          <View style={{ width: containerWidth, paddingHorizontal: 16 }}>
+          <View style={inlineStyle_413_16({
+            containerWidth: containerWidth,
+          })}>
             {Array.from({ length: 5 }).map((_, i) => (
               <SkeletonProductCard key={i} />
             ))}
           </View>
         </ScrollView>
       )}
-
       {!storeLoading && categoryProducts.length === 0 && !error && (
         <View style={styles.emptyContainer}>
           <MaterialCommunityIcons
@@ -458,12 +443,11 @@ const ProductsPage = ({ navigation, route }) => {
           </Text>
         </View>
       )}
-
       {!storeLoading && categoryProducts.length > 0 && (
         <FlatList
           data={productsData}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={{ padding: 16 }}
+          contentContainerStyle={inlineStyle_449_10}
           onEndReached={() => {
             if (visibleCount < visibleProducts.length)
               setVisibleCount(v => v + 50);
@@ -475,7 +459,6 @@ const ProductsPage = ({ navigation, route }) => {
           )}
         />
       )}
-
       {isManager && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
@@ -490,69 +473,5 @@ const ProductsPage = ({ navigation, route }) => {
     </SafeAreaView>
   );
 };
-
-const skeletonStyles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  imageBlock: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#E2E8F0',
-  },
-  body: {
-    flex: 1,
-    padding: 12,
-  },
-  line: {
-    backgroundColor: '#E2E8F0',
-    borderRadius: 6,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-});
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  scroll: { flex: 1 },
-
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#94A3B8',
-  },
-
-  bottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  bottomBarButton: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    padding: 14,
-    borderRadius: 12,
-  },
-  bottomBarButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-});
 
 export default ProductsPage;

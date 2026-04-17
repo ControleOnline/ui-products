@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { View, ScrollView, Image } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { env } from '@env'
+import { inlineStyle_63_16, inlineStyle_67_18 } from './Carousel.styles';
+import { inlineStyle_56_10 } from './Carousel.styles';
 
 const buildUrl = fileId => {
   const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
@@ -52,7 +54,7 @@ const Carousel = ({ images = [], style = {} }) => {
           pagingEnabled={visible.length > 1}
           showsHorizontalScrollIndicator={false}
           scrollEnabled={visible.length > 1}
-          contentContainerStyle={{ alignItems: 'stretch' }}
+          contentContainerStyle={inlineStyle_56_10}
         >
           {visible.map((item, index) => {
             const imageId = String(item?.id || item?.file?.id || index)
@@ -60,23 +62,25 @@ const Carousel = ({ images = [], style = {} }) => {
             return (
               <View
                 key={imageId}
-                style={{ width: containerWidth, height: '100%' }}
+                style={inlineStyle_63_16({
+                  containerWidth: containerWidth,
+                })}
               >
                 <Image
                   source={{ uri: imageUrl }}
-                  style={{ width: '100%', height: '100%' }}
+                  style={inlineStyle_67_18}
                   resizeMode="cover"
                   onError={() => {
                     setFailedIds(prev => ({ ...prev, [imageId]: true }))
                   }}
                 />
               </View>
-            )
+            );
           })}
         </ScrollView>
       )}
     </View>
-  )
+  );
 }
 
 export default Carousel

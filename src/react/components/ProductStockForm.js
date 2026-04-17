@@ -1,20 +1,25 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useStore } from '@store';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
+import styles from './ProductStockForm.styles';
+
 import {
   MovementModal,
   EditStockModal,
 } from '@controleonline/ui-products/src/react/pages/InventoryDetail';
+
+import {
+  inlineStyle_40_8,
+  inlineStyle_49_24,
+  inlineStyle_242_87,
+  inlineStyle_269_89,
+} from './ProductStockForm.styles';
+
+import { inlineStyle_57_14 } from './ProductStockForm.styles';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -24,6 +29,7 @@ const fmtN = v => {
 };
 
 const toIRI = v => (typeof v === 'string' ? v : v?.['@id'] || null);
+
 const iriToId = iri => {
   const s = toIRI(iri);
   if (!s) return null;
@@ -42,16 +48,20 @@ const resolveInvIRI = field => {
 /* ─── skeleton ─────────────────────────────────────────────────────── */
 
 const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
-  <View style={{ width, height, borderRadius: 7, backgroundColor: '#E2E8F0', marginBottom: mb }} />
+  <View style={inlineStyle_40_8({
+    height: height,
+    mb: mb,
+    width: width,
+  })} />
 );
 
 const StockTabSkeleton = () => (
-  <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+  <ScrollView contentContainerStyle={inlineStyle_57_14} showsVerticalScrollIndicator={false}>
     {[1, 2, 3].map(i => (
       <View key={i} style={styles.card}>
         <SkeletonLine width="40%" height={13} mb={14} />
         {[1, 2, 3].map(j => (
-          <View key={j} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
+          <View key={j} style={inlineStyle_49_24}>
             <SkeletonLine width="50%" height={13} mb={0} />
             <SkeletonLine width="25%" height={13} mb={0} />
           </View>
@@ -244,7 +254,7 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
 
           {mergedRows.length === 0 ? (
             <View style={styles.emptyBlock}>
-              <MaterialCommunityIcons name="archive-outline" size={32} color="#CBD5E1" style={{ marginBottom: 8 }} />
+              <MaterialCommunityIcons name="archive-outline" size={32} color="#CBD5E1" style={inlineStyle_242_87} />
               <Text style={styles.emptyCardText}>Nenhum local de estoque cadastrado.</Text>
             </View>
           ) : (
@@ -268,13 +278,11 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
 
               return (
                 <View key={inv.id} style={[styles.snapshotCard, { backgroundColor: cardBg }]}>
-
                   {/* cabeçalho */}
                   <View style={styles.snapshotCardHeader}>
-                    <MaterialCommunityIcons name="warehouse" size={16} color={iconColor} style={{ marginRight: 6 }} />
+                    <MaterialCommunityIcons name="warehouse" size={16} color={iconColor} style={inlineStyle_269_89} />
                     <Text style={[styles.snapshotCardTitle, { color: titleColor }]}>{inv.inventory}</Text>
                   </View>
-
                   {/* badges padrão */}
                   {(isDefaultIn || isDefaultOut) && (
                     <View style={styles.badgesRow}>
@@ -292,7 +300,6 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
                       )}
                     </View>
                   )}
-
                   {/* grid de valores — sempre exibido, zeros em vermelho quando sem estoque */}
                   <View style={styles.snapshotGrid}>
                     <View style={[styles.snapshotCell, availCellBg && { backgroundColor: availCellBg }]}>
@@ -322,7 +329,6 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
                       <Text style={styles.snapshotCellValue}>{fmtN(piRow?.maximum ?? 0)}</Text>
                     </View>
                   </View>
-
                   {/* botões de ação */}
                   <View style={styles.actionRow}>
                     {hasPi && (
@@ -344,7 +350,6 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
                       <Text style={styles.editBtnText}>Limites</Text>
                     </TouchableOpacity>
                   </View>
-
                 </View>
               );
             })
@@ -352,7 +357,6 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
         </View>
 
       </ScrollView>
-
       {/* Modal de movimentação */}
       <MovementModal
         visible={!!movRow}
@@ -370,7 +374,6 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
           setMovInv(null);
         }}
       />
-
       {/* Modal de edição de limites */}
       <EditStockModal
         visible={!!editRow}
@@ -385,137 +388,5 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
 };
 
 /* ─── estilos ───────────────────────────────────────────────────────── */
-
-const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: '#F8FAFC' },
-  scrollContent: { padding: 16, paddingBottom: 40 },
-  emptyContainer: { padding: 16 },
-  emptyText:     { fontSize: 14, color: '#64748B' },
-
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-  },
-  sectionHeader: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 14,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-
-  emptyBlock:    { alignItems: 'center', paddingVertical: 24 },
-  emptyCardText: { fontSize: 13, color: '#94A3B8', textAlign: 'center' },
-
-  snapshotCard: {
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  snapshotCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  snapshotCardTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    flex: 1,
-  },
-
-  badgesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-
-  noPiText: {
-    fontSize: 11,
-    color: '#CBD5E1',
-    marginBottom: 10,
-    fontStyle: 'italic',
-  },
-
-  snapshotGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-  },
-  snapshotCell: {
-    width: '30%',
-    flexGrow: 1,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
-    alignItems: 'center',
-  },
-  snapshotCellWarn: {
-    backgroundColor: '#FEF2F2',
-  },
-  snapshotCellLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: 4,
-  },
-  snapshotCellValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-
-  actionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 2,
-  },
-  movBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  movBtnText: { fontSize: 12, fontWeight: '700' },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  editBtnText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
-});
 
 export default ProductStockForm;

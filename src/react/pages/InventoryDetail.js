@@ -1,15 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Platform,
-  useWindowDimensions,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Platform, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -17,6 +7,23 @@ import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedM
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
+import { skeletonStyles, styles, movStyles, editStyles } from './InventoryDetail.styles'
+
+import {
+  inlineStyle_68_10,
+  inlineStyle_238_68,
+  inlineStyle_241_16,
+  inlineStyle_250_56,
+  inlineStyle_400_62,
+  inlineStyle_403_16,
+  inlineStyle_413_56,
+  inlineStyle_515_12,
+  inlineStyle_644_14,
+  inlineStyle_661_75,
+  inlineStyle_670_60,
+  inlineStyle_681_14,
+  inlineStyle_816_85,
+} from './InventoryDetail.styles';
 
 /* ─── helpers ──────────────────────────────────────────────────────── */
 
@@ -74,7 +81,7 @@ const iriToId = iri => {
 
 const SkeletonRow = () => (
   <View style={skeletonStyles.row}>
-    <View style={{ flex: 1, gap: 6 }}>
+    <View style={inlineStyle_68_10}>
       <View style={[skeletonStyles.line, { width: '60%', height: 13 }]} />
       <View style={[skeletonStyles.line, { width: '35%', height: 10 }]} />
     </View>
@@ -84,6 +91,7 @@ const SkeletonRow = () => (
 
 /* cache de status de order para evitar query repetida */
 let _orderStatusIRI = null;
+
 const fetchOrderStatus = async statusStore => {
   if (_orderStatusIRI) return _orderStatusIRI;
   const data = await statusStore.actions.getItems({ context: 'order', realStatus: 'pending' }).catch(() => []);
@@ -244,10 +252,10 @@ export const MovementModal = ({
   };
 
   return (
-    <AnimatedModal visible={visible} onRequestClose={resetAndClose} style={{ justifyContent: 'flex-end' }}>
+    <AnimatedModal visible={visible} onRequestClose={resetAndClose} style={inlineStyle_238_68}>
       <View style={movStyles.container}>
         <View style={movStyles.header}>
-          <View style={{ flex: 1 }}>
+          <View style={inlineStyle_241_16}>
             <Text style={movStyles.title}>Movimentação</Text>
             <Text style={movStyles.subtitle} numberOfLines={1}>{productName}</Text>
           </View>
@@ -256,7 +264,7 @@ export const MovementModal = ({
           </TouchableOpacity>
         </View>
 
-        <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={inlineStyle_250_56}>
           <View style={movStyles.body}>
             {!!error && (
               <View style={movStyles.errorBanner}>
@@ -406,10 +414,10 @@ export const EditStockModal = ({ visible, row, brandColors, productInvStore, onC
   };
 
   return (
-    <AnimatedModal visible={visible} onRequestClose={onClose} style={{ justifyContent: 'flex-end' }}>
+    <AnimatedModal visible={visible} onRequestClose={onClose} style={inlineStyle_400_62}>
       <View style={editStyles.container}>
         <View style={editStyles.header}>
-          <View style={{ flex: 1 }}>
+          <View style={inlineStyle_403_16}>
             <Text style={editStyles.title}>Editar Limites</Text>
             <Text style={editStyles.subtitle} numberOfLines={1}>
               {row ? (extractProduct(row.product).name || `#${row.id}`) : ''}
@@ -419,7 +427,7 @@ export const EditStockModal = ({ visible, row, brandColors, productInvStore, onC
             <MaterialCommunityIcons name="close" size={18} color="#64748B" />
           </TouchableOpacity>
         </View>
-        <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={inlineStyle_413_56}>
           <View style={editStyles.body}>
             {!!error && (
               <View style={editStyles.errorBanner}>
@@ -521,7 +529,7 @@ const InventoryDetailPage = ({ route }) => {
               inventoryId:   inventory.id,
               inventoryName: inventory.inventory,
             })}
-            style={{ paddingHorizontal: 12 }}
+            style={inlineStyle_515_12}
             activeOpacity={0.7}
           >
             <MaterialCommunityIcons name="history" size={22} color="#64748B" />
@@ -637,7 +645,6 @@ const InventoryDetailPage = ({ route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-
       {/* Cabeçalho */}
       <View style={styles.invHeader}>
         <View style={[styles.invIconWrap, isNoInventory
@@ -650,7 +657,7 @@ const InventoryDetailPage = ({ route }) => {
             color={isNoInventory ? '#94A3B8' : invConf.color}
           />
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={inlineStyle_644_14}>
           <Text style={styles.invName}>{inventory.inventory}</Text>
           {!isNoInventory && (
             <View style={[styles.typeChip, { backgroundColor: invConf.bg }]}>
@@ -663,11 +670,10 @@ const InventoryDetailPage = ({ route }) => {
           <Text style={styles.totalCount}>{rows.length}</Text>
         </View>
       </View>
-
       {/* Busca */}
       {!storeLoading && rows.length > 0 && (
         <View style={styles.searchBar}>
-          <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+          <MaterialCommunityIcons name="magnify" size={18} color="#94A3B8" style={inlineStyle_661_75} />
           <TextInput
             style={styles.searchInput}
             value={search}
@@ -676,18 +682,19 @@ const InventoryDetailPage = ({ route }) => {
             placeholderTextColor="#CBD5E1"
           />
           {!!search && (
-            <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 4 }}>
+            <TouchableOpacity onPress={() => setSearch('')} style={inlineStyle_670_60}>
               <MaterialCommunityIcons name="close-circle" size={16} color="#94A3B8" />
             </TouchableOpacity>
           )}
         </View>
       )}
-
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: 84 }]}
       >
-        <View style={{ width: maxW, paddingHorizontal: 16, paddingTop: 8 }}>
+        <View style={inlineStyle_681_14({
+          maxW: maxW,
+        })}>
 
           {/* Skeleton */}
           {storeLoading && (
@@ -822,14 +829,13 @@ const InventoryDetailPage = ({ route }) => {
 
           {!storeLoading && rows.length > 0 && filteredRows.length === 0 && (
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="magnify-close" size={40} color="#CBD5E1" style={{ marginBottom: 12 }} />
+              <MaterialCommunityIcons name="magnify-close" size={40} color="#CBD5E1" style={inlineStyle_816_85} />
               <Text style={styles.emptyTitle}>Nenhum resultado</Text>
               <Text style={styles.emptySubtitle}>Nenhum produto para "{search}".</Text>
             </View>
           )}
         </View>
       </ScrollView>
-
       {/* ── Modal Movimentação ────────────────────────────────────────── */}
       <MovementModal
         visible={!!movRow}
@@ -843,7 +849,6 @@ const InventoryDetailPage = ({ route }) => {
         onClose={() => setMovRow(null)}
         onMoved={(result) => { handleMoved(result); setMovRow(null); }}
       />
-
       {/* ── Modal Editar Saldos ───────────────────────────────────────── */}
       <EditStockModal
         visible={!!editRow}
@@ -853,203 +858,16 @@ const InventoryDetailPage = ({ route }) => {
         onClose={() => setEditRow(null)}
         onSaved={handleEditSaved}
       />
-
     </SafeAreaView>
   );
 };
 
 /* ─── Estilos skeleton ──────────────────────────────────────────────── */
 
-const skeletonStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12,
-  },
-  line: { borderRadius: 6, backgroundColor: '#E2E8F0' },
-});
-
 /* ─── Estilos da página ─────────────────────────────────────────────── */
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-
-  invHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-    ...Platform.select({
-      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.05)' },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4 },
-      android: { elevation: 2 },
-    }),
-  },
-  invIconWrap:  { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  invName:      { fontSize: 16, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
-  typeChip:     { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  typeChipText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
-  totalBadge:   { alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
-  totalLabel:   { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3 },
-  totalCount:   { fontSize: 20, fontWeight: '800', color: '#1E293B' },
-
-  searchBar: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-    paddingHorizontal: 16, paddingVertical: 8,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: '#0F172A', paddingVertical: 6 },
-
-  scroll: { flex: 1 },
-  scrollContent: { alignItems: 'center' },
-
-  card: {
-    width: '100%', backgroundColor: '#fff', borderRadius: 16, marginTop: 12, overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 },
-      android: { elevation: 2 },
-      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.06)' },
-    }),
-  },
-  cardHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-  },
-  cardHeaderLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.6 },
-  cardHeaderCount: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
-
-  productRow: {
-    flexDirection: 'row', alignItems: 'flex-start',
-    paddingHorizontal: 16, paddingVertical: 14, gap: 12,
-  },
-  productRowDivider: { borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  rowLeft: { flex: 1 },
-  productName: { fontSize: 14, fontWeight: '700', color: '#1E293B', marginBottom: 2 },
-  productDescription: { fontSize: 11, color: '#64748B', marginBottom: 4 },
-  productMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 },
-  miniChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  miniChipText: { fontSize: 9, fontWeight: '700', letterSpacing: 0.3 },
-  skuText: { fontSize: 11, color: '#94A3B8', fontWeight: '500' },
-  noPiChip: { backgroundColor: '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 },
-  noPiText: { fontSize: 9, fontWeight: '700', color: '#D97706', letterSpacing: 0.3 },
-
-  stockGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  stockCell: { backgroundColor: '#F8FAFC', borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5, alignItems: 'center', minWidth: 48, flexShrink: 0 },
-  stockCellLabel: { fontSize: 9, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 2 },
-  stockCellValue: { fontSize: 12, fontWeight: '700', color: '#475569' },
-
-  rowRight: { alignItems: 'center', gap: 6 },
-  availBadge: { backgroundColor: '#F0FDF4', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center', minWidth: 56 },
-  availBadgeLow: { backgroundColor: '#FFF7ED' },
-  availValue: { fontSize: 18, fontWeight: '800', color: '#16A34A' },
-  availValueLow: { color: '#D97706' },
-  availLabel: { fontSize: 9, fontWeight: '700', color: '#86EFAC', textTransform: 'uppercase', letterSpacing: 0.3 },
-  availLabelLow: { color: '#FCD34D' },
-  actionBtns: { flexDirection: 'row', gap: 6 },
-  actionBtn: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-
-  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  emptyIconWrap: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: '#334155', marginBottom: 8, textAlign: 'center' },
-  emptySubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
-});
 
 /* ─── Estilos modal movimentação ────────────────────────────────────── */
 
-const movStyles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '92%', width: '100%',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
-      android: { elevation: 10 },
-      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
-    }),
-  },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    paddingHorizontal: 24, paddingVertical: 20,
-    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-  },
-  title:    { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  body: { padding: 24, gap: 18 },
-
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
-  errorText:   { fontSize: 13, color: '#DC2626', flex: 1 },
-
-  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  balanceLabel: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  balanceValue: { fontSize: 22, fontWeight: '800', color: '#1E293B' },
-
-  opsRow: { flexDirection: 'row', gap: 8 },
-  opChip: {
-    flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12,
-    borderRadius: 12, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
-  },
-  opLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textAlign: 'center' },
-
-  field: { gap: 6 },
-  fieldLabel: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
-  qtyInput: {
-    borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10,
-    paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 24, fontWeight: '800', color: '#1E293B',
-    backgroundColor: '#F8FAFC', textAlign: 'center',
-  },
-
-  destChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC' },
-  destChipActive: { backgroundColor: '#EDE9FE', borderColor: '#7C3AED' },
-  destChipText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  destChipTextActive: { color: '#7C3AED' },
-
-  previewBox: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12 },
-  previewText: { fontSize: 13, color: '#475569', flex: 1 },
-
-  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center' },
-  cancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
-  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: '#1E293B' },
-  confirmText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-});
-
 /* ─── Estilos modal editar saldos ───────────────────────────────────── */
-
-const editStyles = StyleSheet.create({
-  container: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    maxHeight: '85%', width: '100%',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
-      android: { elevation: 10 },
-      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
-    }),
-  },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 24, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  title:    { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  subtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  body: { padding: 24, gap: 16 },
-  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#FECACA' },
-  errorText: { fontSize: 13, color: '#DC2626', flex: 1 },
-  fieldsRow: { flexDirection: 'row', gap: 12 },
-  field: { flex: 1, gap: 6 },
-  label: { fontSize: 12, fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 },
-  input: { borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12, fontSize: 18, fontWeight: '700', color: '#0F172A', backgroundColor: '#F8FAFC', textAlign: 'center' },
-  inputHighlight: { borderColor: '#16A34A', backgroundColor: '#F0FDF4', color: '#16A34A' },
-  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12 },
-  infoText: { fontSize: 12, color: '#64748B', flex: 1, lineHeight: 17 },
-  footer: { flexDirection: 'row', gap: 12, paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: '#94A3B8', alignItems: 'center' },
-  cancelText: { fontSize: 15, fontWeight: '600', color: '#64748B' },
-  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  saveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-});
-
 
 export default InventoryDetailPage;

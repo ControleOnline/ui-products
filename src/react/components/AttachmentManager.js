@@ -5,6 +5,26 @@ import {useStore} from '@store';
 import {env} from '@env';
 import {uploadFileToApi, toFileIri} from '@controleonline/ui-products/src/react/services/fileUpload';
 
+import {
+  inlineStyle_133_10,
+  inlineStyle_134_12,
+  inlineStyle_135_14,
+  inlineStyle_139_10,
+  inlineStyle_145_16,
+  inlineStyle_149_25,
+  inlineStyle_150_24,
+  inlineStyle_153_14,
+  inlineStyle_154_16,
+  inlineStyle_158_16,
+  inlineStyle_164_18,
+  inlineStyle_173_20,
+  inlineStyle_181_54,
+  inlineStyle_190_20,
+  inlineStyle_197_22,
+  inlineStyle_208_20,
+  inlineStyle_209_26,
+} from './AttachmentManager.styles';
+
 const getFileId = file => {
   const val = file?.id || file?.['@id'] || file;
   const match = String(val || '').match(/(\d+)$/);
@@ -130,83 +150,58 @@ const AttachmentManager = ({
   };
 
   return (
-    <View style={{width: '100%', marginTop: 8}}>
-      <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-        <Text style={{flex: 1, fontWeight: '600'}}>Imagens anexas</Text>
+    <View style={inlineStyle_133_10}>
+      <View style={inlineStyle_134_12}>
+        <Text style={inlineStyle_135_14}>Imagens anexas</Text>
         <TouchableOpacity
           onPress={handleUpload}
           disabled={uploading}
-          style={{
-            backgroundColor: '#000',
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            borderRadius: 6,
-          }}>
-          <Text style={{color: '#fff'}}>{uploading ? 'Enviando...' : '+ Anexar Imagem'}</Text>
+          style={inlineStyle_139_10}>
+          <Text style={inlineStyle_145_16}>{uploading ? 'Enviando...' : '+ Anexar Imagem'}</Text>
         </TouchableOpacity>
       </View>
-
-      {!!status && <Text style={{color: '#1b7f34', marginBottom: 6}}>{status}</Text>}
-      {!!error && <Text style={{color: '#b00020', marginBottom: 6}}>{error}</Text>}
-
+      {!!status && <Text style={inlineStyle_149_25}>{status}</Text>}
+      {!!error && <Text style={inlineStyle_150_24}>{error}</Text>}
       {sortedAttachments.length === 0 ? (
-        <View style={{borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10}}>
-          <Text style={{color: '#666'}}>Nenhuma imagem anexada.</Text>
+        <View style={inlineStyle_153_14}>
+          <Text style={inlineStyle_154_16}>Nenhuma imagem anexada.</Text>
         </View>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{flexDirection: 'row', gap: 10}}>
+          <View style={inlineStyle_158_16}>
             {sortedAttachments.map((row, idx) => {
               const imageUrl = buildImageUrl(row.file);
               return (
                 <View
                   key={row.id || idx}
-                  style={{
-                    width: 170,
-                    borderWidth: 1,
-                    borderColor: '#ddd',
-                    borderRadius: 8,
-                    padding: 8,
-                    backgroundColor: '#fff',
-                  }}>
+                  style={inlineStyle_164_18}>
                   <View
-                    style={{
-                      height: 120,
-                      backgroundColor: '#f5f5f5',
-                      borderRadius: 6,
-                      overflow: 'hidden',
-                      marginBottom: 8,
-                    }}>
+                    style={inlineStyle_173_20}>
                     {!!imageUrl && (
-                      <Image source={{uri: imageUrl}} style={{width: '100%', height: '100%'}} resizeMode="cover" />
+                      <Image source={{uri: imageUrl}} style={inlineStyle_181_54} resizeMode="cover" />
                     )}
                   </View>
-
                   <TouchableOpacity
                     onPress={async () => {
                       setCoverId(row.id);
                       if (onCoverChanged) await onCoverChanged(row);
                     }}
-                    style={{
-                      backgroundColor: String(coverId) === String(row.id) ? '#00695c' : '#efefef',
-                      paddingVertical: 6,
-                      borderRadius: 4,
-                      marginBottom: 6,
-                    }}>
+                    style={inlineStyle_190_20({
+                      coverId: coverId,
+                      row: row,
+                    })}>
                     <Text
-                      style={{
-                        textAlign: 'center',
-                        color: String(coverId) === String(row.id) ? '#fff' : '#111',
-                        fontSize: 12,
-                      }}>
+                      style={inlineStyle_197_22({
+                        coverId: coverId,
+                        row: row,
+                      })}>
                       {String(coverId) === String(row.id) ? 'Capa selecionada ✓' : 'Definir como capa'}
                     </Text>
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     onPress={() => handleRemove(row)}
-                    style={{backgroundColor: '#b00020', paddingVertical: 6, borderRadius: 4}}>
-                    <Text style={{textAlign: 'center', color: '#fff', fontSize: 12}}>Remover</Text>
+                    style={inlineStyle_208_20}>
+                    <Text style={inlineStyle_209_26}>Remover</Text>
                   </TouchableOpacity>
                 </View>
               );

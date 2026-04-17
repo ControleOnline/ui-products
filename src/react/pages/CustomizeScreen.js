@@ -1,14 +1,27 @@
 import React, {useState, useCallback, useMemo} from 'react';
 import {View, Text, TouchableOpacity, ScrollView, Alert} from 'react-native';
+
 import {
   useNavigation,
   useRoute,
   useFocusEffect,
 } from '@react-navigation/native';
+
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import css from '@controleonline/ui-products/src/react/css/products';
 import {useStore} from '@store';
 import {env} from '@env';
+
+import {
+  inlineStyle_344_8,
+  inlineStyle_352_10,
+  inlineStyle_354_16,
+  inlineStyle_355_18,
+  inlineStyle_361_12,
+  inlineStyle_378_27,
+  inlineStyle_401_10,
+  inlineStyle_402_18,
+} from './CustomizeScreen.styles';
 
 const CustomizeScreen = () => {
   const navigation = useNavigation();
@@ -341,29 +354,21 @@ const CustomizeScreen = () => {
     return (
       <View
         key={`${group.id}-${index}`}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          padding: 16,
-          backgroundColor: index % 2 ? 'rgba(0, 0, 0, 0.03)' : '#fff',
-        }}>
+        style={inlineStyle_344_8({
+          index: index,
+        })}>
         <TouchableOpacity
           onPress={() => handleToggleOption(group.id, option)}
-          style={{flexDirection: 'row', flex: 1, alignItems: 'center'}}
+          style={inlineStyle_352_10}
           disabled={option.disable}>
-          <View style={{flexDirection: 'row', alignItems: 'center', flex: 0.6}}>
-            <Text style={{marginRight: 8, color: '#007AFF', fontSize: 18}}>
+          <View style={inlineStyle_354_16}>
+            <Text style={inlineStyle_355_18}>
               {isOptionSelected ? '✓' : '○'}
             </Text>
             <Text style={styles.text}>{option.label}</Text>
           </View>
           <View
-            style={{
-              flex: 0.4,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-            }}>
+            style={inlineStyle_361_12}>
             <Text style={styles.text}>
               {Formatter.formatMoney(option.value?.price, 'R$', 'pt-br')}
             </Text>
@@ -375,7 +380,7 @@ const CustomizeScreen = () => {
 
   const renderGroup = group => {
     return (
-      <View key={group.id} style={{marginTop: 16, padding: 16}}>
+      <View key={group.id} style={inlineStyle_378_27}>
         <Text style={styles.text}>{group.productGroup}</Text>
         {group.required && <Text>Grupo obrigatório!</Text>}
         {group.minimum > 0 && group.maximum > 0 ? (
@@ -398,8 +403,8 @@ const CustomizeScreen = () => {
   };
 
   return (
-    <View style={{flex: 1, padding: 16}}>
-      <ScrollView style={{flex: 1}}>
+    <View style={inlineStyle_401_10}>
+      <ScrollView style={inlineStyle_402_18}>
         {productGroups.map(group => renderGroup(group))}
       </ScrollView>
       <TouchableOpacity

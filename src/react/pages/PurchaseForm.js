@@ -1,14 +1,30 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Platform, ActivityIndicator, KeyboardAvoidingView,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Platform, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors as baseColors } from '@controleonline/../../src/styles/colors';
+import { rowStyles, supplierStyles, searchStyles, styles } from './PurchaseForm.styles'
+
+import {
+  inlineStyle_158_73,
+  inlineStyle_167_68,
+  inlineStyle_168_76,
+  inlineStyle_176_12,
+  inlineStyle_196_72,
+  inlineStyle_221_14,
+  inlineStyle_266_70,
+  inlineStyle_267_16,
+  inlineStyle_408_75,
+  inlineStyle_417_72,
+  inlineStyle_418_94,
+  inlineStyle_704_8,
+  inlineStyle_743_76,
+  inlineStyle_744_22,
+  inlineStyle_795_16,
+} from './PurchaseForm.styles';
 
 /* ─── paginação global ──────────────────────────────────────────────── */
 
@@ -22,6 +38,7 @@ const fmtN = v => {
 };
 
 const toIRI   = v => (typeof v === 'string' ? v : v?.['@id'] || null);
+
 const getCompanyId = value => {
   if (!value) return null;
   if (typeof value === 'number') return value;
@@ -46,6 +63,7 @@ const getProductCompanyId = product => (
 );
 
 let _orderStatusIRI = null;
+
 const fetchOrderStatus = async statusStore => {
   if (_orderStatusIRI) return _orderStatusIRI;
   const data = await statusStore.actions.getItems({ context: 'order', realStatus: 'pending' }).catch(() => []);
@@ -157,7 +175,7 @@ const SupplierSelector = ({ brandColors, value, onSelect, showApplyToAll, onAppl
   return (
     <View>
       <View style={[supplierStyles.searchBox, { borderColor: brandColors.primary }]}>
-        <MaterialCommunityIcons name="magnify" size={14} color="#94A3B8" style={{ marginRight: 6 }} />
+        <MaterialCommunityIcons name="magnify" size={14} color="#94A3B8" style={inlineStyle_158_73} />
         <TextInput
           style={supplierStyles.searchInput}
           value={query}
@@ -166,16 +184,15 @@ const SupplierSelector = ({ brandColors, value, onSelect, showApplyToAll, onAppl
           placeholderTextColor="#CBD5E1"
           autoFocus
         />
-        {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 6 }} />}
-        <TouchableOpacity onPress={() => { setOpen(false); setQuery(''); }} style={{ marginLeft: 6 }}>
+        {loading && <ActivityIndicator size="small" color="#94A3B8" style={inlineStyle_167_68} />}
+        <TouchableOpacity onPress={() => { setOpen(false); setQuery(''); }} style={inlineStyle_168_76}>
           <MaterialCommunityIcons name="close" size={14} color="#94A3B8" />
         </TouchableOpacity>
       </View>
-
       {suppliers.length > 0 && (
         <View style={supplierStyles.resultList}>
           <ScrollView
-            style={{ maxHeight: 200 }}
+            style={inlineStyle_176_12}
             keyboardShouldPersistTaps="handled"
             onScroll={({ nativeEvent: { layoutMeasurement, contentOffset, contentSize } }) => {
               if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 20) loadMore();
@@ -195,11 +212,10 @@ const SupplierSelector = ({ brandColors, value, onSelect, showApplyToAll, onAppl
                 )}
               </TouchableOpacity>
             ))}
-            {loading && <ActivityIndicator size="small" color="#94A3B8" style={{ padding: 8 }} />}
+            {loading && <ActivityIndicator size="small" color="#94A3B8" style={inlineStyle_196_72} />}
           </ScrollView>
         </View>
       )}
-
       {!loading && suppliers.length === 0 && (
         <View style={supplierStyles.emptyState}>
           <MaterialCommunityIcons name="truck-off-outline" size={18} color="#CBD5E1" />
@@ -220,7 +236,7 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
     <View style={rowStyles.card}>
       {/* cabeçalho */}
       <View style={rowStyles.header}>
-        <View style={{ flex: 1 }}>
+        <View style={inlineStyle_221_14}>
           <Text style={rowStyles.productName} numberOfLines={2}>{item.productName || `Produto #${item.productId}`}</Text>
           {item.productDescription ? (
             <Text style={rowStyles.productDescription} numberOfLines={2}>{item.productDescription}</Text>
@@ -231,7 +247,6 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
           <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
         </TouchableOpacity>
       </View>
-
       {/* quantidade (+ preço só em compra) */}
       <View style={rowStyles.fields}>
         <View style={rowStyles.fieldWrap}>
@@ -261,12 +276,11 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
           </View>
         )}
       </View>
-
       {/* local de entrada / destino */}
       <View style={rowStyles.invSection}>
         <Text style={rowStyles.fieldLabel}>{isTransfer ? 'Local de Destino *' : 'Local de Entrada'}</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-          <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={inlineStyle_266_70}>
+          <View style={inlineStyle_267_16}>
             {inventories.map(inv => {
               const sel = String(item.inInventoryId) === String(inv.id);
               const selColor = isTransfer ? '#7C3AED' : brandColors.primary;
@@ -292,7 +306,6 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
           </Text>
         )}
       </View>
-
       {/* observação (apenas transferência) */}
       {isTransfer && (
         <View style={rowStyles.commentSection}>
@@ -308,7 +321,6 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
           />
         </View>
       )}
-
       {/* fornecedor (apenas compra) */}
       {!isTransfer && (
         <View style={rowStyles.supplierSection}>
@@ -407,7 +419,7 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
         </TouchableOpacity>
       ) : (
         <View style={searchStyles.searchBox}>
-          <MaterialCommunityIcons name="magnify" size={16} color="#94A3B8" style={{ marginRight: 6 }} />
+          <MaterialCommunityIcons name="magnify" size={16} color="#94A3B8" style={inlineStyle_408_75} />
           <TextInput
             style={searchStyles.searchInput}
             value={query}
@@ -416,13 +428,12 @@ const ProductSearch = ({ inventories, brandColors, onAdd }) => {
             placeholderTextColor="#CBD5E1"
             autoFocus
           />
-          {searching && <ActivityIndicator size="small" color="#94A3B8" style={{ marginLeft: 6 }} />}
-          <TouchableOpacity onPress={() => { setOpen(false); setQuery(''); setResults([]); }} style={{ marginLeft: 6 }}>
+          {searching && <ActivityIndicator size="small" color="#94A3B8" style={inlineStyle_417_72} />}
+          <TouchableOpacity onPress={() => { setOpen(false); setQuery(''); setResults([]); }} style={inlineStyle_418_94}>
             <MaterialCommunityIcons name="close" size={16} color="#94A3B8" />
           </TouchableOpacity>
         </View>
       )}
-
       {results.length > 0 && open && (
         <View style={searchStyles.resultList}>
           {results.map(prod => (
@@ -703,7 +714,7 @@ const PurchaseForm = () => {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={inlineStyle_704_8}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={80}
       >
@@ -742,8 +753,8 @@ const PurchaseForm = () => {
           {isTransfer && (
             <View style={styles.originCard}>
               <Text style={styles.originLabel}>Local de Origem *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
-                <View style={{ flexDirection: 'row', gap: 8, paddingBottom: 4 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={inlineStyle_743_76}>
+                <View style={inlineStyle_744_22}>
                   {inventories.map(inv => {
                     const sel = String(inv.id) === String(outInventoryId);
                     return (
@@ -794,7 +805,7 @@ const PurchaseForm = () => {
             </View>
           )}
 
-          <View style={{ height: 100 }} />
+          <View style={inlineStyle_795_16} />
         </ScrollView>
 
         {/* rodapé */}
@@ -838,207 +849,10 @@ const PurchaseForm = () => {
 
 /* ─── estilos ProductRow ────────────────────────────────────────────── */
 
-const rowStyles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff', borderRadius: 16, padding: 14, marginBottom: 10,
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6 },
-      android: { elevation: 2 },
-      web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
-    }),
-  },
-  header:             { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
-  productName:        { fontSize: 14, fontWeight: '700', color: '#1E293B', lineHeight: 19 },
-  productDescription: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 16 },
-  productType:        { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  removeBtn: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center', marginLeft: 8,
-  },
-  fields:    { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  fieldWrap: { flex: 1 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  input: {
-    borderWidth: 1.5, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9,
-    fontSize: 15, fontWeight: '700', color: '#1E293B', backgroundColor: '#F8FAFC',
-  },
-  invSection:     { marginTop: 2 },
-  invChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
-  },
-  invChipText:    { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  invHint:        { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
-  supplierSection: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 },
-  commentSection: { marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 },
-  commentInput: {
-    marginTop: 6, borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#1E293B',
-    backgroundColor: '#F8FAFC', textAlignVertical: 'top', minHeight: 60,
-  },
-});
-
 /* ─── estilos SupplierSelector ──────────────────────────────────────── */
-
-const supplierStyles = StyleSheet.create({
-  triggerBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderStyle: 'dashed', borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 8,
-    backgroundColor: '#FAFAFA', marginTop: 6,
-  },
-  triggerText: { flex: 1, fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-
-  selectedWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#F0FDF4', borderRadius: 8, borderWidth: 1, borderColor: '#86EFAC',
-    paddingHorizontal: 10, paddingVertical: 8, marginTop: 6,
-  },
-  selectedName: { flex: 1, fontSize: 12, fontWeight: '700', color: '#15803D' },
-  clearBtn:     { padding: 2 },
-
-  applyAllBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    marginTop: 5, paddingHorizontal: 4,
-  },
-  applyAllText: { fontSize: 11, color: '#2563EB', fontWeight: '600' },
-
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8,
-    backgroundColor: '#fff', marginTop: 6,
-  },
-  searchInput: { flex: 1, fontSize: 13, color: '#1E293B', padding: 0 },
-
-  resultList: {
-    backgroundColor: '#fff', borderRadius: 10, marginTop: 4,
-    borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden',
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
-      android: { elevation: 4 },
-      web:     { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
-    }),
-  },
-  resultItem:  { paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' },
-  resultName:  { fontSize: 13, fontWeight: '600', color: '#1E293B' },
-  resultAlias: { fontSize: 11, color: '#64748B', marginTop: 1 },
-
-  emptyState: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#F8FAFC', borderRadius: 8, padding: 10, marginTop: 4,
-  },
-  emptyText: { fontSize: 12, color: '#94A3B8' },
-});
 
 /* ─── estilos ProductSearch ─────────────────────────────────────────── */
 
-const searchStyles = StyleSheet.create({
-  wrap: { marginBottom: 10 },
-  addBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 14,
-    paddingHorizontal: 16, paddingVertical: 14,
-    backgroundColor: '#F8FAFC', justifyContent: 'center',
-  },
-  addBtnText: { fontSize: 14, fontWeight: '700' },
-  searchBox: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#E2E8F0', borderRadius: 12,
-    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#fff',
-  },
-  searchInput: { flex: 1, fontSize: 14, color: '#1E293B', padding: 0 },
-  resultList: {
-    backgroundColor: '#fff', borderRadius: 12, marginTop: 4,
-    borderWidth: 1, borderColor: '#F1F5F9', overflow: 'hidden',
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 8 },
-      android: { elevation: 4 },
-      web:     { boxShadow: '0 4px 16px rgba(0,0,0,0.08)' },
-    }),
-  },
-  resultItem: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
-  },
-  resultTextBlock:   { flex: 1, minWidth: 0, marginRight: 8 },
-  resultName:        { fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  resultDescription: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  resultType:        { fontSize: 11, color: '#94A3B8', marginLeft: 8 },
-});
-
 /* ─── estilos principal ─────────────────────────────────────────────── */
-
-const styles = StyleSheet.create({
-  container:     { flex: 1, backgroundColor: '#F8FAFC' },
-  scroll:        { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 24 },
-
-  summaryCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 16, padding: 16, marginBottom: 14,
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6 },
-      android: { elevation: 2 },
-      web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
-    }),
-  },
-  summaryItem:    { flex: 1, alignItems: 'center' },
-  summaryLabel:   { fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 4 },
-  summaryValue:   { fontSize: 18, fontWeight: '800', color: '#1E293B' },
-  summaryDivider: { width: 1, height: 36, backgroundColor: '#F1F5F9' },
-
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FEF2F2', borderRadius: 10, padding: 12, marginTop: 8,
-  },
-  errorText: { fontSize: 13, color: '#DC2626', flex: 1 },
-
-  footer: {
-    backgroundColor: '#fff', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
-    borderTopWidth: 1, borderTopColor: '#F1F5F9',
-    ...Platform.select({
-      web:     { boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' },
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.07, shadowRadius: 8 },
-      android: { elevation: 6 },
-    }),
-  },
-  confirmBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 15, borderRadius: 14,
-  },
-  confirmBtnText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-
-  originCard: {
-    backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12,
-    ...Platform.select({
-      ios:     { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 6 },
-      android: { elevation: 2 },
-      web:     { boxShadow: '0 2px 10px rgba(0,0,0,0.07)' },
-    }),
-  },
-  originLabel:       { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.4 },
-  originChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 8, borderWidth: 1.5, borderColor: '#E2E8F0', backgroundColor: '#F8FAFC',
-  },
-  originChipSelected: { backgroundColor: '#F5F3FF', borderColor: '#7C3AED' },
-  originChipText:    { fontSize: 12, fontWeight: '600', color: '#64748B' },
-  originHint:        { fontSize: 11, color: '#F97316', marginTop: 6, fontStyle: 'italic' },
-
-  successWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  successIcon: {
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: '#F0FDF4', alignItems: 'center', justifyContent: 'center', marginBottom: 24,
-  },
-  successTitle:          { fontSize: 24, fontWeight: '800', color: '#16A34A', marginBottom: 8, textAlign: 'center' },
-  successSub:            { fontSize: 15, color: '#64748B', textAlign: 'center', marginBottom: 32 },
-  successBtn:            { width: '100%', paddingVertical: 15, borderRadius: 14, alignItems: 'center', marginBottom: 10 },
-  successBtnText:        { color: '#fff', fontWeight: '700', fontSize: 16 },
-  successBtnOutline:     { width: '100%', paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#E2E8F0' },
-  successBtnOutlineText: { fontWeight: '700', fontSize: 15 },
-});
 
 export default PurchaseForm;
