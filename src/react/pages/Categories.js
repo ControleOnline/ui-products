@@ -9,8 +9,9 @@ import { env } from '@env'
 import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager'
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal'
-import { api } from '@controleonline/ui-common/src/api'
-import { resolveAppDomain } from '@controleonline/ui-common/src/utils/appDomain'
+import {
+  downloadMenuCatalog as downloadCompanyMenuCatalog,
+} from '@controleonline/ui-common/src/react/utils/menuCatalogDownload'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
@@ -21,8 +22,6 @@ import {
   writeCachedCategories,
 } from '@controleonline/ui-products/src/react/utils/categoryCache'
 
-import { File, Paths } from 'expo-file-system'
-import * as Sharing from 'expo-sharing'
 import Icon from 'react-native-vector-icons/FontAwesome'
 import { skeletonStyles, styles } from './Categories.styles'
 
@@ -55,36 +54,6 @@ const slugifyFileName = value => {
     .replace(/^-+|-+$/g, '')
 
   return normalized || 'catalogo'
-}
-
-const extractFilenameFromDisposition = value => {
-  const utf8Match = String(value || '').match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match?.[1]) {
-    return decodeURIComponent(utf8Match[1]).trim()
-  }
-
-  const fallbackMatch = String(value || '').match(/filename="?([^";]+)"?/i)
-  return fallbackMatch?.[1]?.trim() || null
-}
-
-const extractDownloadErrorMessage = async response => {
-  const fallback = 'Nao foi possivel baixar o cardapio.'
-
-  try {
-    const payload = await response.text()
-    if (!payload) {
-      return fallback
-    }
-
-    try {
-      const parsed = JSON.parse(payload)
-      return parsed?.error || parsed?.description || parsed?.message || fallback
-    } catch (error) {
-      return payload
-    }
-  } catch (error) {
-    return fallback
-  }
 }
 
 const normalizeEntityId = value => {
@@ -323,69 +292,18 @@ const CategoriesPage = () => {
       return
     }
 
-    const apiEntrypoint = String(env.API_ENTRYPOINT || '').replace(/\/$/, '')
-    if (!apiEntrypoint) {
-      Alert.alert('Configuracao invalida', 'API_ENTRYPOINT nao configurado.')
-      return
-    }
-
-    const baseFileName = `cardapio-${slugifyFileName(
-      currentCompany?.alias || currentCompany?.name || currentCompany?.id,
-    )}.pdf`
-
-    const headers = {
-      Accept: 'application/pdf',
-      'App-Domain': resolveAppDomain(env.DOMAIN),
-    }
-
-    const token = await api.getToken()
-    if (token) {
-      headers['API-TOKEN'] = token
-    }
-
     setIsDownloadingCatalog(true)
 
     try {
-      const response = await fetch(
-        `${apiEntrypoint}/products/menu/download?company=${encodeURIComponent(String(currentCompany.id))}&model=${encodeURIComponent(modelIri)}`,
-        {
-          method: 'GET',
-          headers,
-        },
-      )
+      const downloadResult = await downloadCompanyMenuCatalog({
+        companyId: currentCompany.id,
+        companyName:
+          currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
+        modelReference: modelIri,
+      })
 
-      if (!response.ok) {
-        throw new Error(await extractDownloadErrorMessage(response))
-      }
-
-      const fileName =
-        extractFilenameFromDisposition(response.headers.get('content-disposition')) ||
-        baseFileName
-      const blob = await response.blob()
-
-      if (Platform.OS === 'web') {
-        const objectUrl = URL.createObjectURL(blob)
-        const anchor = document.createElement('a')
-        anchor.href = objectUrl
-        anchor.download = fileName
-        document.body.appendChild(anchor)
-        anchor.click()
-        anchor.remove()
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
-        return
-      }
-
-      const file = new File(Paths.cache, fileName)
-      file.create({ intermediates: true, overwrite: true })
-      file.write(new Uint8Array(await blob.arrayBuffer()))
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: 'Compartilhar cardapio',
-        })
-      } else {
-        Alert.alert('Cardapio salvo', `Arquivo salvo em ${file.uri}`)
+      if (downloadResult?.savedUri && !downloadResult?.shared && Platform.OS !== 'web') {
+        Alert.alert('Cardapio salvo', `Arquivo salvo em ${downloadResult.savedUri}`)
       }
     } catch (error) {
       Alert.alert(
