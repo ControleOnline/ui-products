@@ -1,14 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { View, ScrollView, Image } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { env } from '@env'
+import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl'
 import { inlineStyle_63_16, inlineStyle_67_18 } from './Carousel.styles';
 import { inlineStyle_56_10 } from './Carousel.styles';
-
-const buildUrl = fileId => {
-  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
-  return `${env.API_ENTRYPOINT}/files/${fileId}/download?app-domain=${encodeURIComponent(host)}`
-}
 
 /*
  * Carousel — exibe uma ou mais imagens com paginação horizontal.
@@ -58,7 +53,7 @@ const Carousel = ({ images = [], style = {} }) => {
         >
           {visible.map((item, index) => {
             const imageId = String(item?.id || item?.file?.id || index)
-            const imageUrl = buildUrl(item.file.id)
+            const imageUrl = resolveFileImageUrl(item.file)
             return (
               <View
                 key={imageId}

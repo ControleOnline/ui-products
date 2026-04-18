@@ -3,12 +3,12 @@ import { useWindowDimensions, View, Text, Image } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
+import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
 import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { env } from '@env';
 import styles from './ProductDetails.styles';
 
 const Tab = createMaterialTopTabNavigator();
@@ -21,9 +21,7 @@ const buildCoverUrl = (files, coverRelationId) => {
   }
   if (!first) first = arr.find(item => item?.file?.id);
   if (!first) return null;
-  if (first?.file?.url) return first.file.url;
-  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '');
-  return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`;
+  return resolveFileImageUrl(first.file);
 };
 
 const ProductDetails = ({ route, navigation }) => {
@@ -54,7 +52,7 @@ const ProductDetails = ({ route, navigation }) => {
     try {
       const data = await productsStore?.actions?.get(ProductId);
       setProductSummary(data || null);
-    } catch (e) {
+    } catch {
       // Mantem tela utilizavel mesmo se o resumo falhar.
       setProductSummary(null);
     } finally {

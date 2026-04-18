@@ -7,6 +7,7 @@ import StateStore from '@controleonline/ui-layout/src/react/components/StateStor
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { env } from '@env'
 import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'
+import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl'
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager'
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal'
 import {
@@ -41,8 +42,7 @@ const buildCoverUrl = (files, coverRelationId) => {
   }
   if (!first) first = arr.find(item => item?.file?.id)
   if (!first) return null
-  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
-  return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`
+  return resolveFileImageUrl(first.file)
 }
 
 const slugifyFileName = value => {
@@ -163,7 +163,7 @@ const CategoriesPage = () => {
       modelActions.setError?.(null)
 
       return availableModels
-    } catch (error) {
+    } catch {
       setMenuModels([])
       setSelectedMenuModel('')
       modelActions.setError?.(null)

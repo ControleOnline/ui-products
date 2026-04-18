@@ -1,3 +1,5 @@
+import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
+
 const toId = value => {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number') return value;
@@ -33,13 +35,8 @@ export const isCatalogPublished = product =>
   getLifecycleStatus(product) === 'published' &&
   !toBool(product?.extraData?.blockedForSale);
 
-export const buildFileDownloadUrl = (fileId, appDomain = '') => {
-  if (!fileId) return '';
-  const host =
-    appDomain ||
-    (typeof location !== 'undefined' && location?.host ? location.host : '');
-  return `/files/${fileId}/download?app-domain=${encodeURIComponent(host)}`;
-};
+export const buildFileDownloadUrl = (file, appDomain = '') =>
+  resolveFileImageUrl(file, {appDomain});
 
 export const mapProductToCatalogItem = (product, options = {}) => {
   const categoryId =
@@ -89,7 +86,7 @@ export const mapProductToCatalogItem = (product, options = {}) => {
     publishedAt: lifecycle?.publishedAt || null,
     image: {
       fileId: coverFileId,
-      url: coverFileId ? buildFileDownloadUrl(coverFileId, options.appDomain) : '',
+      url: cover?.file ? buildFileDownloadUrl(cover.file, options.appDomain) : '',
     },
     stock: {
       controlsStock: toBool(stock.controlsStock),

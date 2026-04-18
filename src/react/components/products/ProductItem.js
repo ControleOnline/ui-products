@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
-import { View, Text, Platform, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { env } from '@env';
+import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
@@ -27,8 +27,7 @@ const buildCoverUrl = (files, coverRelationId) => {
   }
   if (!first) first = arr.find(item => item?.file?.id)
   if (!first) return null
-  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '')
-  return `${env.API_ENTRYPOINT}/files/${first.file.id}/download?app-domain=${encodeURIComponent(host)}`
+  return resolveFileImageUrl(first.file)
 }
 
 const ProductItem = ({ product, category }) => {

@@ -2,7 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {Platform, Text, TouchableOpacity, View, Image, ScrollView} from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import {useStore} from '@store';
-import {env} from '@env';
+import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
 import {uploadFileToApi, toFileIri} from '@controleonline/ui-products/src/react/services/fileUpload';
 
 import {
@@ -25,23 +25,10 @@ import {
   inlineStyle_209_26,
 } from './AttachmentManager.styles';
 
-const getFileId = file => {
-  const val = file?.id || file?.['@id'] || file;
-  const match = String(val || '').match(/(\d+)$/);
-  return match ? match[1] : null;
-};
-
 const getRelationId = relation => {
   const val = relation?.id || relation?.['@id'] || relation;
   const match = String(val || '').match(/(\d+)$/);
   return match ? match[1] : null;
-};
-
-const buildImageUrl = file => {
-  const fileId = getFileId(file);
-  if (!fileId) return null;
-  const host = env.DOMAIN || (typeof location !== 'undefined' ? location.host : '');
-  return `${env.API_ENTRYPOINT}/files/${fileId}/download?app-domain=${encodeURIComponent(host)}`;
 };
 
 const AttachmentManager = ({
@@ -170,7 +157,7 @@ const AttachmentManager = ({
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={inlineStyle_158_16}>
             {sortedAttachments.map((row, idx) => {
-              const imageUrl = buildImageUrl(row.file);
+              const imageUrl = resolveFileImageUrl(row.file);
               return (
                 <View
                   key={row.id || idx}
