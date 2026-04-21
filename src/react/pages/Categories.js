@@ -87,7 +87,7 @@ const SkeletonCard = ({ width }) => (
   </View>
 )
 
-const CategoriesPage = () => {
+const CategoriesPage = ({ route }) => {
   const [showImportModal, setShowImportModal] = useState(false)
   const [isDownloadingCatalog, setIsDownloadingCatalog] = useState(false)
   const [isLoadingMenuModels, setIsLoadingMenuModels] = useState(false)
@@ -96,7 +96,10 @@ const CategoriesPage = () => {
   const [selectedMenuModel, setSelectedMenuModel] = useState('')
   const navigation = useNavigation()
   const { width } = useWindowDimensions()
-  const isManagerApp = env.APP_TYPE === 'MANAGER'
+  const interactionMode =
+    route?.params?.interactionMode ||
+    (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv')
+  const isManagerApp = env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
 
   const categoriesStore = useStore('categories')
   const { items, isLoading: storeLoading } = categoriesStore.getters
@@ -209,7 +212,7 @@ const CategoriesPage = () => {
     categoryActions.setItem(category || {})
     navigation.navigate({
       name: 'ProductsPage',
-      params: { categoryId, context },
+      params: { categoryId, context, interactionMode },
       merge: false,
     })
   }
@@ -317,6 +320,7 @@ const CategoriesPage = () => {
     currentCompany?.alias,
     currentCompany?.id,
     currentCompany?.name,
+    interactionMode,
     isDownloadingCatalog,
     loadMenuModels,
     menuModels,
@@ -347,7 +351,7 @@ const CategoriesPage = () => {
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
-          env.APP_TYPE === 'MANAGER' && { paddingBottom: 84 },
+          isManagerApp && { paddingBottom: 84 },
         ]}
       >
         <View style={inlineStyle_424_14({
@@ -528,7 +532,7 @@ const CategoriesPage = () => {
               </View>
               <Text style={styles.emptyTitle}>Nenhuma categoria</Text>
               <Text style={styles.emptySubtitle}>
-                {env.APP_TYPE === 'MANAGER'
+                {isManagerApp
                   ? 'Adicione a primeira categoria para começar'
                   : 'Nenhuma categoria disponível no momento'}
               </Text>
@@ -590,7 +594,7 @@ const CategoriesPage = () => {
                           </Text>
                         </View>
 
-                        {env.APP_TYPE === 'MANAGER' && (
+                        {isManagerApp && (
                           <TouchableOpacity
                             onPress={() => openEditModal(category)}
                             style={styles.editOverlay}
@@ -608,7 +612,7 @@ const CategoriesPage = () => {
           )}
         </View>
       </ScrollView>
-      {env.APP_TYPE === 'MANAGER' && (
+      {isManagerApp && (
         <View style={styles.bottomBar}>
           <TouchableOpacity
             style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}

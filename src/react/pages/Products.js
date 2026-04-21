@@ -158,6 +158,9 @@ const SkeletonProductCard = () => (
 const ProductsPage = ({ navigation, route }) => {
   const routeParams = route.params || {};
   const context = routeParams.context;
+  const interactionMode =
+    routeParams.interactionMode ||
+    (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -205,7 +208,8 @@ const ProductsPage = ({ navigation, route }) => {
   const [visibleCount, setVisibleCount] = useState(50);
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
 
-  const isManager = env.APP_TYPE === 'MANAGER';
+  const isManager =
+    env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
   const categoryRouteValue = routeParams.categoryId || routeParams.category;
   const category = useMemo(
     () =>
@@ -379,14 +383,14 @@ const ProductsPage = ({ navigation, route }) => {
   );
 
   const buildCategoryRouteParams = useCallback(() => {
-    const params = { context };
+    const params = { context, interactionMode };
 
     if (categoryId) {
       params.categoryId = categoryId;
     }
 
     return params;
-  }, [categoryId, context]);
+  }, [categoryId, context, interactionMode]);
 
   const handleProductPress = product => {
     if (!isManager) return;
@@ -454,7 +458,11 @@ const ProductsPage = ({ navigation, route }) => {
           }}
           renderItem={({ item }) => (
             <TouchableOpacity onPress={() => handleProductPress(item)}>
-              <ProductItem product={item} category={category} />
+              <ProductItem
+                product={item}
+                category={category}
+                interactionMode={interactionMode}
+              />
             </TouchableOpacity>
           )}
         />

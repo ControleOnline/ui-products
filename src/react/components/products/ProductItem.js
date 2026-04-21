@@ -30,11 +30,12 @@ const buildCoverUrl = (files, coverRelationId) => {
   return resolveFileImageUrl(first.file)
 }
 
-const ProductItem = ({ product, category }) => {
+const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
   const navigation = useNavigation();
   const coverUrl = buildCoverUrl(product.productFiles, product?.extraData?.imageCoverRelationId)
   const hasImage = !!coverUrl
-  const isManager = APP_ENV.APP_TYPE === 'MANAGER'
+  const isManager =
+    APP_ENV.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
   const typeConf = TYPE_CONFIG[product.type] || null
 
   const renderAction = () => {
