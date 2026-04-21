@@ -212,7 +212,13 @@ const CategoriesPage = ({ route }) => {
     categoryActions.setItem(category || {})
     navigation.navigate({
       name: 'ProductsPage',
-      params: { categoryId, context, interactionMode },
+      params: {
+        categoryId,
+        context,
+        interactionMode,
+        showBottomCart: interactionMode === 'pdv',
+        showBottomToolBar: interactionMode === 'pdv',
+      },
       merge: false,
     })
   }

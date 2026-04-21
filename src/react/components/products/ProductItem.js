@@ -52,7 +52,14 @@ const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
     if (product.type === 'custom') {
       return (
         <TouchableOpacity
-          onPress={() => navigation.navigate('CustomizeScreen', { product })}
+          onPress={() =>
+            navigation.navigate('CustomizeScreen', {
+              product,
+              interactionMode,
+              showBottomCart: interactionMode === 'pdv',
+              showBottomToolBar: interactionMode === 'pdv',
+            })
+          }
           style={styles.customizeButton}
         >
           <Text style={styles.customizeButtonText}>CUSTOMIZAR</Text>

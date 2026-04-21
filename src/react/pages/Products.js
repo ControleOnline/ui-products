@@ -383,7 +383,12 @@ const ProductsPage = ({ navigation, route }) => {
   );
 
   const buildCategoryRouteParams = useCallback(() => {
-    const params = { context, interactionMode };
+    const params = {
+      context,
+      interactionMode,
+      showBottomCart: interactionMode === 'pdv',
+      showBottomToolBar: interactionMode === 'pdv',
+    };
 
     if (categoryId) {
       params.categoryId = categoryId;
