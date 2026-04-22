@@ -23,10 +23,20 @@ import {
   inlineStyle_402_18,
 } from './CustomizeScreen.styles';
 
+const normalizeEntityId = value => {
+  const clean = String(value || '').replace(/\D/g, '');
+  return clean || null;
+};
+
 const CustomizeScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const {product, redirectToCart = false} = route.params || {};
+  const {
+    product,
+    orderProduct: routeOrderProduct = null,
+    redirectToCart = false,
+    returnDepth = 3,
+  } = route.params || {};
   const {globalStyles, styles} = css();
   const [selectedItems, setSelectedItems] = useState({});
   const [saved, setSaved] = useState({});
@@ -51,10 +61,10 @@ const CustomizeScreen = () => {
   const {item: cart} = cartGetters;
   const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
 
-  const normalizeId = value => {
-    const clean = String(value || '').replace(/\D/g, '');
-    return clean || null;
-  };
+  const activeOrderProduct = useMemo(
+    () => (routeOrderProduct && typeof routeOrderProduct === 'object' ? routeOrderProduct : null),
+    [routeOrderProduct],
+  );
 
   const activeProduct = useMemo(() => {
     if (product && typeof product === 'object') {
@@ -68,7 +78,7 @@ const CustomizeScreen = () => {
 
   const activeProductId = useMemo(
     () =>
-      normalizeId(
+      normalizeEntityId(
         activeProduct?.id ||
           activeProduct?.['@id'] ||
           route.params?.productId ||
@@ -84,7 +94,24 @@ const CustomizeScreen = () => {
     return activeProductId ? `/products/${activeProductId}` : null;
   }, [activeProduct, activeProductId]);
 
+  const activeOrderProductId = useMemo(
+    () =>
+      normalizeEntityId(
+        activeOrderProduct?.id ||
+        activeOrderProduct?.['@id'],
+      ),
+    [activeOrderProduct],
+  );
+
   const activeOrderIri = useMemo(() => {
+    if (activeOrderProduct?.order?.['@id']) {
+      return activeOrderProduct.order['@id'];
+    }
+
+    if (activeOrderProduct?.order?.id) {
+      return `/orders/${activeOrderProduct.order.id}`;
+    }
+
     if (order?.['@id']) {
       return order['@id'];
     }
@@ -92,7 +119,42 @@ const CustomizeScreen = () => {
       return cart['@id'];
     }
     return cart?.id ? `/orders/${cart.id}` : null;
-  }, [cart, order]);
+  }, [activeOrderProduct, cart, order]);
+
+  const existingSelectionsByGroup = useMemo(() => {
+    const mappedSelections = {};
+    const components = Array.isArray(activeOrderProduct?.orderProductComponents)
+      ? activeOrderProduct.orderProductComponents
+      : [];
+
+    components.forEach(component => {
+      const groupId = normalizeEntityId(
+        component?.productGroup?.id ||
+        component?.productGroup?.['@id'] ||
+        component?.productGroup,
+      );
+      const productId = normalizeEntityId(
+        component?.product?.id ||
+        component?.product?.['@id'] ||
+        component?.product,
+      );
+
+      if (!groupId || !productId) {
+        return;
+      }
+
+      if (!mappedSelections[groupId]) {
+        mappedSelections[groupId] = {};
+      }
+
+      mappedSelections[groupId][productId] = {
+        selected: true,
+        quantity: parseFloat(String(component?.quantity || 1).replace(',', '.')) || 1,
+      };
+    });
+
+    return mappedSelections;
+  }, [activeOrderProduct]);
 
   const parseCsv = value =>
     String(value || '')
@@ -131,14 +193,21 @@ const CustomizeScreen = () => {
       if (Object.keys(saved).length == 0) {
         return;
       }
+
+      const savedId = normalizeEntityId(saved?.id || saved?.['@id']);
       const currentOrderProducts = Array.isArray(order?.orderProducts)
         ? order.orderProducts
         : [];
-      const updatedOrderProducts = currentOrderProducts.map(op =>
-        op['@id'] === saved['@id']
-          ? {...op, sub_products: getSubproducts()}
-          : op,
+      const savedIndex = currentOrderProducts.findIndex(op =>
+        normalizeEntityId(op?.id || op?.['@id']) === savedId,
       );
+      const updatedOrderProducts =
+        savedIndex >= 0
+          ? currentOrderProducts.map((op, index) =>
+            index === savedIndex ? {...op, ...saved} : op,
+          )
+          : [...currentOrderProducts, saved];
+
       setSaved({});
       if (order && typeof order === 'object') {
         const currentOrder = {...order};
@@ -151,8 +220,8 @@ const CustomizeScreen = () => {
         return;
       }
 
-      navigation.pop(3);
-    }, [order, redirectToCart, saved]),
+      navigation.pop(Math.max(1, Number(returnDepth || 1)));
+    }, [navigation, order, redirectToCart, returnDepth, saved]),
   );
 
   useFocusEffect(
@@ -164,16 +233,25 @@ const CustomizeScreen = () => {
             productType: 'component',
           })
           .then(groupProducts => {
+            const existingSelections = existingSelectionsByGroup[String(group.id)] || {};
             setSelectedItems(prev => ({
               ...prev,
               [group.id]: groupProducts.map(item => ({
                 ...item,
-                selected: false,
+                selected: !!existingSelections[
+                  normalizeEntityId(item?.productChild?.id || item?.productChild?.['@id'])
+                ]?.selected,
+                quantity:
+                  existingSelections[
+                    normalizeEntityId(item?.productChild?.id || item?.productChild?.['@id'])
+                  ]?.quantity ||
+                  parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
+                  1,
               })),
             }));
           });
       }
-    }, [productGroups]),
+    }, [existingSelectionsByGroup, productGroups]),
   );
 
   const init = () => {
@@ -338,10 +416,11 @@ const CustomizeScreen = () => {
     }
 
     const orderProductData = {
+      ...(activeOrderProductId ? {id: activeOrderProductId} : {}),
       product: activeProductIri,
       sub_products: getSubproducts(),
       order: activeOrderIri,
-      quantity: 1,
+      quantity: Number(activeOrderProduct?.quantity || 1),
     };
 
     orderProductsActions.save(orderProductData).then(data => {
