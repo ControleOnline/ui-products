@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useMemo, useEffect} from 'react';
+import React, {useState, useCallback, useMemo, useEffect, useRef} from 'react';
 import {View, Text, TouchableOpacity, ScrollView, Alert} from 'react-native';
 
 import {
@@ -21,12 +21,133 @@ import {
   inlineStyle_378_27,
   inlineStyle_401_10,
   inlineStyle_402_18,
+  inlineStyle_421_18,
+  inlineStyle_449_18,
 } from './CustomizeScreen.styles';
 import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
 
 const normalizeEntityId = value => {
   const clean = String(value || '').replace(/\D/g, '');
   return clean || null;
+};
+
+const parseNumericValue = value => {
+  const parsedValue = parseFloat(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
+const parseNullableInteger = value => {
+  if (value === null || value === undefined || String(value).trim() === '') {
+    return null;
+  }
+
+  const parsedValue = parseInt(String(value), 10);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+};
+
+const formatOptionQuantity = value => {
+  const quantity = parseNumericValue(value);
+
+  if (Number.isInteger(quantity)) {
+    return String(quantity);
+  }
+
+  return quantity.toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+};
+
+const resolveEffectiveGroupMinimum = group => {
+  const minimum = parseNullableInteger(group?.minimum);
+
+  if (minimum !== null && minimum > 0) {
+    return minimum;
+  }
+
+  return group?.required ? 1 : 0;
+};
+
+const resolveEffectiveGroupMaximum = group => {
+  const maximum = parseNullableInteger(group?.maximum);
+
+  if (maximum !== null && maximum > 0) {
+    return maximum;
+  }
+
+  return null;
+};
+
+const resolvePriceCalculationLabel = value => {
+  switch (String(value || '').trim().toLowerCase()) {
+    case 'biggest':
+      return 'maior valor';
+    case 'average':
+      return 'media';
+    case 'free':
+      return 'gratis';
+    case 'sum':
+    default:
+      return 'soma';
+  }
+};
+
+const resolveCompactSelectionRuleLabel = (minimum, maximum) => {
+  if (minimum > 0 && maximum !== null) {
+    if (minimum === maximum) {
+      return minimum === 1 ? '1 selecao' : `${minimum} selecoes`;
+    }
+
+    return `${minimum} a ${maximum} selecoes`;
+  }
+
+  if (minimum > 0) {
+    return `min. ${minimum}`;
+  }
+
+  if (maximum !== null) {
+    return `max. ${maximum}`;
+  }
+
+  return 'sem limite';
+};
+
+const resolveCompactGroupStateLabel = summary => {
+  const selectedCount = summary?.selectedCount || 0;
+  const selectedLabel = `${selectedCount} selecionado${selectedCount === 1 ? '' : 's'}`;
+  const extraPrice = parseNumericValue(summary?.extraPrice);
+
+  if (extraPrice <= 0) {
+    return selectedLabel;
+  }
+
+  return `${selectedLabel} • +${Formatter.formatMoney(extraPrice, 'R$', 'pt-br')}`;
+};
+
+const calculateGroupExtraPrice = (group, groupItems) => {
+  const selectedItems = (Array.isArray(groupItems) ? groupItems : []).filter(
+    item => item?.selected,
+  );
+  const prices = selectedItems.map(item => parseNumericValue(item?.price));
+  const priceCalculation = String(group?.priceCalculation || 'sum')
+    .trim()
+    .toLowerCase();
+
+  if (prices.length === 0) {
+    return 0;
+  }
+
+  switch (priceCalculation) {
+    case 'biggest':
+      return Math.max(...prices);
+    case 'average':
+      return prices.reduce((sum, price) => sum + price, 0) / prices.length;
+    case 'free':
+      return 0;
+    case 'sum':
+    default:
+      return prices.reduce((sum, price) => sum + price, 0);
+  }
 };
 
 const CustomizeScreen = () => {
@@ -41,6 +162,7 @@ const CustomizeScreen = () => {
     returnDepth = 3,
   } = route.params || {};
   const {globalStyles, styles} = css();
+  const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
   const [selectedItems, setSelectedItems] = useState({});
 
   const ordersStore = useStore('orders');
@@ -70,6 +192,11 @@ const CustomizeScreen = () => {
   const {item: order} = ordersGetters;
   const {item: cart} = cartGetters;
   const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
+  const productGroupActionsRef = useRef(productGroupActions);
+  const productsActionsRef = useRef(productsActions);
+  const orderProductsActionsRef = useRef(orderProductsActions);
+  const productGroupProductActionsRef = useRef(productGroupProductActions);
+  const loadedGroupProductsRef = useRef({});
 
   const activeOrderProductId = useMemo(
     () =>
@@ -170,6 +297,10 @@ const CustomizeScreen = () => {
     productsGetters?.item,
     routeProduct,
   ]);
+  const activeResolvedProductId = useMemo(
+    () => normalizeEntityId(activeProduct?.id || activeProduct?.['@id']),
+    [activeProduct],
+  );
 
   const activeProductIri = useMemo(() => {
     if (activeProduct?.['@id']) {
@@ -245,6 +376,85 @@ const CustomizeScreen = () => {
     return mappedSelections;
   }, [activeOrderProduct]);
 
+  const orderProductGroupsById = useMemo(() => {
+    const mappedGroups = {};
+    const components = Array.isArray(activeOrderProduct?.orderProductComponents)
+      ? activeOrderProduct.orderProductComponents
+      : [];
+
+    components.forEach(component => {
+      const groupId = normalizeEntityId(
+        component?.productGroup?.id ||
+        component?.productGroup?.['@id'] ||
+        component?.productGroup,
+      );
+
+      if (!groupId || !component?.productGroup || mappedGroups[groupId]) {
+        return;
+      }
+
+      mappedGroups[groupId] = component.productGroup;
+    });
+
+    return mappedGroups;
+  }, [activeOrderProduct]);
+
+  const resolvedProductGroups = useMemo(() => {
+    const mappedGroups = {};
+
+    ;(Array.isArray(productGroups) ? productGroups : []).forEach(group => {
+      const groupId = normalizeEntityId(group?.id || group?.['@id']);
+
+      if (!groupId) {
+        return;
+      }
+
+      mappedGroups[groupId] = {
+        ...group,
+        ...(orderProductGroupsById[groupId] || {}),
+      };
+    });
+
+    Object.entries(orderProductGroupsById).forEach(([groupId, group]) => {
+      if (!mappedGroups[groupId]) {
+        mappedGroups[groupId] = group;
+      }
+    });
+
+    return Object.values(mappedGroups).sort((leftGroup, rightGroup) => {
+      const leftOrder = parseNumericValue(leftGroup?.groupOrder);
+      const rightOrder = parseNumericValue(rightGroup?.groupOrder);
+
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+
+      return (
+        parseNumericValue(normalizeEntityId(leftGroup?.id)) -
+        parseNumericValue(normalizeEntityId(rightGroup?.id))
+      );
+    });
+  }, [orderProductGroupsById, productGroups]);
+
+  const resolvedProductGroupsById = useMemo(
+    () =>
+      Object.fromEntries(
+        resolvedProductGroups
+          .map(group => [String(normalizeEntityId(group?.id || group?.['@id'])), group])
+          .filter(([groupId]) => !!groupId),
+      ),
+    [resolvedProductGroups],
+  );
+
+  const resolvedProductGroupIdsKey = useMemo(
+    () =>
+      resolvedProductGroups
+        .map(group => normalizeEntityId(group?.id || group?.['@id']))
+        .filter(Boolean)
+        .join(','),
+    [resolvedProductGroups],
+  );
+
   const parseCsv = value =>
     String(value || '')
       .split(',')
@@ -264,9 +474,33 @@ const CustomizeScreen = () => {
     return current >= from && current <= to;
   };
 
+  useEffect(() => {
+    productGroupActionsRef.current = productGroupActions;
+  }, [productGroupActions]);
+
+  useEffect(() => {
+    productsActionsRef.current = productsActions;
+  }, [productsActions]);
+
+  useEffect(() => {
+    orderProductsActionsRef.current = orderProductsActions;
+  }, [orderProductsActions]);
+
+  useEffect(() => {
+    productGroupProductActionsRef.current = productGroupProductActions;
+  }, [productGroupProductActions]);
+
   useFocusEffect(
     useCallback(() => {
-      init();
+      if (!activeProductId) {
+        return undefined;
+      }
+
+      productGroupActionsRef.current.getItems({
+        product: activeProductId,
+        'product.productType': 'component',
+      });
+      return undefined;
     }, [activeProductId]),
   );
 
@@ -274,27 +508,27 @@ const CustomizeScreen = () => {
     setSelectedItems({});
   }, [activeOrderProductId, activeProductId]);
 
+  useEffect(() => {
+    setGroupProductsByGroup({});
+    loadedGroupProductsRef.current = {};
+  }, [activeProductId]);
+
   useFocusEffect(
     useCallback(() => {
       if (activeOrderProductId) {
-        orderProductsActions.get(activeOrderProductId).catch(() => null);
+        orderProductsActionsRef.current.get(activeOrderProductId).catch(() => null);
       }
 
       if (
         activeProductId &&
-        normalizeEntityId(activeProduct?.id || activeProduct?.['@id']) !== activeProductId
+        activeResolvedProductId !== activeProductId
       ) {
-        productsActions.get(activeProductId).catch(() => null);
+        productsActionsRef.current.get(activeProductId).catch(() => null);
       }
     }, [
-      activeOrderProduct?.['@id'],
-      activeOrderProduct?.id,
       activeOrderProductId,
-      activeProduct?.['@id'],
-      activeProduct?.id,
       activeProductId,
-      orderProductsActions,
-      productsActions,
+      activeResolvedProductId,
     ]),
   );
   const leaveCustomizeScreen = useCallback(() => {
@@ -350,86 +584,223 @@ const CustomizeScreen = () => {
     ordersActions,
   ]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
+  useEffect(() => {
+    let isActive = true;
 
-      if (!Array.isArray(productGroups) || productGroups.length === 0) {
-        setSelectedItems({});
-        return () => {
-          isActive = false;
-        };
-      }
+    if (!Array.isArray(resolvedProductGroups) || resolvedProductGroups.length === 0) {
+      setGroupProductsByGroup({});
+      return () => {
+        isActive = false;
+      };
+    }
 
-      Promise.all(
-        productGroups.map(async group => {
-          const groupProducts = await productGroupProductActions.getItems({
-            productGroup: `/product_groups/${group.id}`,
-            productType: 'component',
-          });
-          const existingSelections =
-            existingSelectionsByGroup[String(group.id)] || {};
+    const currentGroups = resolvedProductGroups
+      .map(group => ({
+        id: String(normalizeEntityId(group?.id || group?.['@id'])),
+        group,
+      }))
+      .filter(({id}) => !!id);
 
-          return [
-            String(group.id),
-            (Array.isArray(groupProducts) ? groupProducts : []).map(item => ({
-              ...item,
-              selected: !!existingSelections[
-                normalizeEntityId(
-                  item?.productChild?.id || item?.productChild?.['@id'],
-                )
-              ]?.selected,
-              quantity:
-                existingSelections[
-                  normalizeEntityId(
-                    item?.productChild?.id || item?.productChild?.['@id'],
-                  )
-                ]?.quantity ||
-                parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
-                1,
-            })),
-          ];
-        }),
-      )
-        .then(entries => {
-          if (!isActive) {
-            return;
-          }
+    const pendingGroups = currentGroups.filter(({id}) => {
+      const cacheKey = `${activeProductId || 'none'}:${id}`;
+      return !loadedGroupProductsRef.current[cacheKey];
+    });
 
-          setSelectedItems(Object.fromEntries(entries));
-        })
-        .catch(() => {
-          if (!isActive) {
-            return;
-          }
-
-          setSelectedItems({});
-        });
+    if (pendingGroups.length === 0) {
+      setGroupProductsByGroup(prev =>
+        Object.fromEntries(
+          currentGroups.map(({id}) => [id, Array.isArray(prev[id]) ? prev[id] : []]),
+        ),
+      );
 
       return () => {
         isActive = false;
       };
-    }, [existingSelectionsByGroup, productGroupProductActions, productGroups]),
-  );
+    }
 
-  const init = () => {
-    if (!activeProductId) {
+    pendingGroups.forEach(({id}) => {
+      loadedGroupProductsRef.current[`${activeProductId || 'none'}:${id}`] = 'loading';
+    });
+
+    Promise.all(
+      pendingGroups.map(async ({id, group}) => {
+        const groupProducts = await productGroupProductActionsRef.current.getItems({
+          productGroup: `/product_groups/${group.id}`,
+          productType: 'component',
+        });
+
+        return [id, Array.isArray(groupProducts) ? groupProducts : []];
+      }),
+    )
+      .then(entries => {
+        if (!isActive) {
+          return;
+        }
+
+        entries.forEach(([id]) => {
+          loadedGroupProductsRef.current[`${activeProductId || 'none'}:${id}`] = 'loaded';
+        });
+
+        setGroupProductsByGroup(prev => {
+          const nextGroups = Object.fromEntries(
+            currentGroups.map(({id}) => [id, Array.isArray(prev[id]) ? prev[id] : []]),
+          );
+
+          entries.forEach(([id, items]) => {
+            nextGroups[id] = items;
+          });
+
+          return nextGroups;
+        });
+      })
+      .catch(() => {
+        pendingGroups.forEach(({id}) => {
+          delete loadedGroupProductsRef.current[`${activeProductId || 'none'}:${id}`];
+        });
+
+        if (!isActive) {
+          return;
+        }
+
+        setGroupProductsByGroup(prev =>
+          Object.fromEntries(
+            currentGroups.map(({id}) => [id, Array.isArray(prev[id]) ? prev[id] : []]),
+          ),
+        );
+      });
+
+    return () => {
+      isActive = false;
+      pendingGroups.forEach(({id}) => {
+        const cacheKey = `${activeProductId || 'none'}:${id}`;
+        if (loadedGroupProductsRef.current[cacheKey] === 'loading') {
+          delete loadedGroupProductsRef.current[cacheKey];
+        }
+      });
+    };
+  }, [activeProductId, resolvedProductGroupIdsKey, resolvedProductGroups]);
+
+  useEffect(() => {
+    if (!Array.isArray(resolvedProductGroups) || resolvedProductGroups.length === 0) {
+      setSelectedItems({});
       return;
     }
-    productGroupActions.getItems({
-      product: activeProductId,
-      'product.productType': 'component',
-    });
-  };
+
+    const nextSelectedItems = Object.fromEntries(
+      resolvedProductGroups.map(group => {
+        const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+        const existingSelections = existingSelectionsByGroup[groupId] || {};
+        const groupProducts = Array.isArray(groupProductsByGroup[groupId])
+          ? groupProductsByGroup[groupId]
+          : [];
+
+        return [
+          groupId,
+          groupProducts.map(item => ({
+            ...item,
+            selected: !!existingSelections[
+              normalizeEntityId(
+                item?.productChild?.id || item?.productChild?.['@id'],
+              )
+            ]?.selected,
+            quantity:
+              existingSelections[
+                normalizeEntityId(
+                  item?.productChild?.id || item?.productChild?.['@id'],
+                )
+              ]?.quantity ||
+              parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
+              1,
+          })),
+        ];
+      }),
+    );
+
+    setSelectedItems(nextSelectedItems);
+  }, [
+    existingSelectionsByGroup,
+    groupProductsByGroup,
+    resolvedProductGroupIdsKey,
+    resolvedProductGroups,
+  ]);
+
+  const groupSummaries = useMemo(
+    () =>
+      resolvedProductGroups.map(group => {
+        const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+        const groupItems = Array.isArray(selectedItems[groupId])
+          ? selectedItems[groupId]
+          : [];
+        const selectedCount = groupItems.filter(item => item?.selected).length;
+        const minimum = resolveEffectiveGroupMinimum(group);
+        const maximum = resolveEffectiveGroupMaximum(group);
+        const extraPrice = calculateGroupExtraPrice(group, groupItems);
+        let validationMessage = '';
+
+        if (selectedCount < minimum) {
+          validationMessage =
+            minimum === 1
+              ? 'Selecione 1 opcao.'
+              : `Selecione pelo menos ${minimum} opcoes.`;
+        } else if (maximum !== null && selectedCount > maximum) {
+          validationMessage =
+            maximum === 1
+              ? 'Selecione no maximo 1 opcao.'
+              : `Selecione no maximo ${maximum} opcoes.`;
+        }
+
+        let selectionRuleLabel = 'Sem limite de selecao.';
+        if (minimum > 0 && maximum !== null) {
+          selectionRuleLabel = `Escolha de ${minimum} ate ${maximum} opcoes.`;
+        } else if (minimum > 0) {
+          selectionRuleLabel = `Escolha no minimo ${minimum} opcoes.`;
+        } else if (maximum !== null) {
+          selectionRuleLabel = `Escolha ate ${maximum} opcoes.`;
+        }
+
+        return {
+          groupId,
+          groupName: group?.productGroup || `Grupo ${groupId}`,
+          selectedCount,
+          minimum,
+          maximum,
+          extraPrice,
+          isValid: validationMessage === '',
+          validationMessage,
+          selectionRuleLabel,
+          priceCalculationLabel: resolvePriceCalculationLabel(
+            group?.priceCalculation,
+          ),
+          isRequired: minimum > 0 || !!group?.required,
+        };
+      }),
+    [resolvedProductGroups, selectedItems],
+  );
+
+  const groupSummariesById = useMemo(
+    () => Object.fromEntries(groupSummaries.map(summary => [summary.groupId, summary])),
+    [groupSummaries],
+  );
+
+  const invalidGroupSummaries = useMemo(
+    () => groupSummaries.filter(summary => !summary.isValid),
+    [groupSummaries],
+  );
+
+  const canSubmitCustomization =
+    !!activeProductIri &&
+    !!activeOrderIri &&
+    invalidGroupSummaries.length === 0;
 
   const getProcessedOptions = group => {
+    const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
     let options = getProductOptions(group);
-    const selectedCount =
-      selectedItems[group.id]?.filter(item => item.selected).length || 0;
-    const isMaxReached = group.maximum && selectedCount >= group.maximum;
+    const selectedCount = groupSummariesById[groupId]?.selectedCount || 0;
+    const maximum = resolveEffectiveGroupMaximum(group);
+    const isMaxReached = maximum !== null && selectedCount >= maximum;
 
     if (isMaxReached) {
-      options = options.filter(option => isSelected(group.id, option.value));
+      options = options.filter(option => isSelected(groupId, option.value));
     }
 
     const now = timeNow();
@@ -437,7 +808,7 @@ const CustomizeScreen = () => {
       ...option,
       disable:
         isMaxSelected(group, option.value) ||
-        isOptionDisabledByRules(group.id, option.value, now),
+        isOptionDisabledByRules(groupId, option.value, now),
     }));
   };
 
@@ -486,7 +857,8 @@ const CustomizeScreen = () => {
   };
 
   const getProductOptions = group => {
-    const groupItems = selectedItems[group.id] || [];
+    const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+    const groupItems = selectedItems[groupId] || [];
     if (!Array.isArray(groupItems)) {
       return [];
     }
@@ -497,50 +869,53 @@ const CustomizeScreen = () => {
   };
 
   const isSelected = (groupId, value) => {
+    const normalizedGroupId = String(groupId || '');
     return (
-      selectedItems[groupId]?.some(
+      selectedItems[normalizedGroupId]?.some(
         item => item['@id'] === value['@id'] && item.selected,
       ) || false
     );
   };
 
   const isMaxSelected = (group, product) => {
-    if (!group.maximum) {
+    const maximum = resolveEffectiveGroupMaximum(group);
+    if (maximum === null) {
       return false;
     }
-    const selectedGroup = selectedItems[group.id] || [];
+    const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+    const selectedGroup = selectedItems[groupId] || [];
     return (
-      selectedGroup.filter(item => item.selected).length >= group.maximum &&
+      selectedGroup.filter(item => item.selected).length >= maximum &&
       !selectedGroup.some(p => p['@id'] === product['@id'] && p.selected)
     );
   };
 
   const handleToggleOption = (groupId, option) => {
+    const normalizedGroupId = String(groupId || '');
     setSelectedItems(prev => {
-      const selectedGroup = prev[groupId] || [];
+      const selectedGroup = Array.isArray(prev[normalizedGroupId])
+        ? prev[normalizedGroupId]
+        : [];
+      const optionId = option?.value?.['@id'];
+      const currentGroup = resolvedProductGroupsById[normalizedGroupId];
+      const maximum = resolveEffectiveGroupMaximum(currentGroup);
+      const selectedCount = selectedGroup.filter(item => item?.selected).length;
+      const targetOption = selectedGroup.find(item => item['@id'] === optionId);
+      const isCurrentlySelected = !!targetOption?.selected;
+
+      if (!isCurrentlySelected && maximum !== null && selectedCount >= maximum) {
+        return prev;
+      }
+
       const updatedGroup = selectedGroup.map(item =>
-        item['@id'] === option.value['@id']
+        item['@id'] === optionId
           ? {...item, selected: !item.selected}
           : item,
       );
 
-      if (!updatedGroup.some(item => item['@id'] === option.value['@id'])) {
-        if (
-          !isMaxSelected(
-            {
-              id: groupId,
-              maximum: productGroups.find(g => g.id === groupId)?.maximum,
-            },
-            option.value,
-          )
-        ) {
-          updatedGroup.push({...option.value, selected: true});
-        }
-      }
-
       return {
         ...prev,
-        [groupId]: updatedGroup,
+        [normalizedGroupId]: updatedGroup,
       };
     });
   };
@@ -570,6 +945,20 @@ const CustomizeScreen = () => {
       } else {
         Alert.alert('Atencao', message);
       }
+      return;
+    }
+
+    if (invalidGroupSummaries.length > 0) {
+      const message = invalidGroupSummaries
+        .map(summary => `${summary.groupName}: ${summary.validationMessage}`)
+        .join('\n');
+
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(message);
+      } else {
+        Alert.alert('Atencao', message);
+      }
+
       return;
     }
 
@@ -606,7 +995,16 @@ const CustomizeScreen = () => {
   };
 
   const renderOption = (group, option, index) => {
-    const isOptionSelected = isSelected(group.id, option.value);
+    const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+    const isOptionSelected = isSelected(groupId, option.value);
+    const optionQuantityLabel = formatOptionQuantity(option.value?.quantity || 1);
+    const optionUnitLabel =
+      option.value?.productChild?.productUnit?.productUnit ||
+      option.value?.productChild?.productUnity?.productUnit ||
+      option.value?.productChild?.productUnit?.unit ||
+      option.value?.productChild?.productUnity?.unit ||
+      '';
+
     return (
       <View
         key={`${group.id}-${index}`}
@@ -614,14 +1012,21 @@ const CustomizeScreen = () => {
           index: index,
         })}>
         <TouchableOpacity
-          onPress={() => handleToggleOption(group.id, option)}
+          onPress={() => handleToggleOption(groupId, option)}
           style={inlineStyle_352_10}
-          disabled={option.disable}>
+          disabled={option.disable}
+          activeOpacity={0.8}>
           <View style={inlineStyle_354_16}>
             <Text style={inlineStyle_355_18}>
               {isOptionSelected ? '✓' : '○'}
             </Text>
-            <Text style={styles.text}>{option.label}</Text>
+            <View style={{flex: 1}}>
+              <Text style={styles.text}>{option.label}</Text>
+              <Text style={{color: '#8A94A6', fontSize: 12, marginTop: 2}}>
+                Adiciona {optionQuantityLabel}
+                {optionUnitLabel ? ` ${optionUnitLabel}` : ''}
+              </Text>
+            </View>
           </View>
           <View
             style={inlineStyle_361_12}>
@@ -635,19 +1040,26 @@ const CustomizeScreen = () => {
   };
 
   const renderGroup = group => {
+    const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+    const summary = groupSummariesById[groupId];
+    const compactSummaryParts = [
+      summary?.isRequired ? 'Obrigatorio' : 'Opcional',
+      resolveCompactSelectionRuleLabel(
+        summary?.minimum || 0,
+        summary?.maximum ?? null,
+      ),
+      `preco: ${summary?.priceCalculationLabel || 'soma'}`,
+      resolveCompactGroupStateLabel(summary),
+    ];
+
     return (
       <View key={group.id} style={inlineStyle_378_27}>
-        <Text style={styles.text}>{group.productGroup}</Text>
-        {group.required && <Text>Grupo obrigatório!</Text>}
-        {group.minimum > 0 && group.maximum > 0 ? (
-          <Text style={styles.text}>
-            Escolha entre {group.minimum} e {group.maximum} {group.productGroup}
-          </Text>
-        ) : null}
-        {!group.minimum && group.maximum > 0 ? (
-          <Text style={styles.text}>
-            Escolha até {group.maximum} {group.productGroup}
-          </Text>
+        <Text style={[styles.text, {fontWeight: '700', color: '#23384D'}]}>
+          {group.productGroup}
+        </Text>
+        <Text style={inlineStyle_421_18}>{compactSummaryParts.join(' • ')}</Text>
+        {!summary?.isValid ? (
+          <Text style={inlineStyle_449_18}>{summary.validationMessage}</Text>
         ) : null}
         <View>
           {getProcessedOptions(group).map((item, index) =>
@@ -663,14 +1075,15 @@ const CustomizeScreen = () => {
       <ScrollView
         style={inlineStyle_402_18}
         contentContainerStyle={{paddingBottom: 24}}>
-        {productGroups.map(group => renderGroup(group))}
+        {resolvedProductGroups.map(group => renderGroup(group))}
       </ScrollView>
       <TouchableOpacity
         onPress={addHandle}
-        disabled={isSavingCustomization}
+        disabled={isSavingCustomization || !canSubmitCustomization}
         style={[
           globalStyles.button,
           styles.customizeProduct?.Button,
+          !canSubmitCustomization && !isSavingCustomization ? {opacity: 0.65} : null,
           {marginTop: 16, marginBottom: 8, maxHeight: '10%'},
         ]}>
         <Text style={styles.customizeProduct?.ButtonText}>

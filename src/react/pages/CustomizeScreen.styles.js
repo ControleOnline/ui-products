@@ -47,3 +47,54 @@ export const inlineStyle_401_10 = {
 export const inlineStyle_402_18 = {
   flex: 1,
 };
+
+export const inlineStyle_404_20 = {
+  marginBottom: 16,
+  padding: 16,
+  borderRadius: 12,
+  backgroundColor: '#EEF7FF',
+  borderWidth: 1,
+  borderColor: '#B6DBFF',
+};
+
+export const inlineStyle_414_18 = {
+  color: '#0F2D4A',
+  fontWeight: '700',
+  marginBottom: 8,
+  fontSize: 15,
+};
+
+export const inlineStyle_421_18 = {
+  color: '#35526E',
+  fontSize: 12,
+  marginTop: 4,
+};
+
+export const inlineStyle_427_20 = {
+  marginTop: 10,
+  padding: 12,
+  borderRadius: 10,
+  backgroundColor: '#F7FAFC',
+  borderWidth: 1,
+  borderColor: '#D7E3F0',
+};
+
+export const inlineStyle_436_18 = {
+  color: '#23384D',
+  fontWeight: '700',
+  fontSize: 12,
+  marginBottom: 4,
+};
+
+export const inlineStyle_443_18 = {
+  color: '#46607A',
+  fontSize: 12,
+  marginTop: 2,
+};
+
+export const inlineStyle_449_18 = {
+  color: '#C2410C',
+  fontSize: 12,
+  marginTop: 6,
+  fontWeight: '600',
+};
