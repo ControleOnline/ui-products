@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useMemo} from 'react';
+import React, {useState, useCallback, useMemo, useEffect} from 'react';
 import {View, Text, TouchableOpacity, ScrollView, Alert} from 'react-native';
 
 import {
@@ -22,6 +22,7 @@ import {
   inlineStyle_401_10,
   inlineStyle_402_18,
 } from './CustomizeScreen.styles';
+import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
 
 const normalizeEntityId = value => {
   const clean = String(value || '').replace(/\D/g, '');
@@ -32,14 +33,15 @@ const CustomizeScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const {
-    product,
+    product: routeProduct = null,
+    productId: routeProductId = null,
     orderProduct: routeOrderProduct = null,
+    orderProductId: routeOrderProductId = null,
     redirectToCart = false,
     returnDepth = 3,
   } = route.params || {};
   const {globalStyles, styles} = css();
   const [selectedItems, setSelectedItems] = useState({});
-  const [saved, setSaved] = useState({});
 
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
@@ -49,43 +51,125 @@ const CustomizeScreen = () => {
   const productGroupActions = product_groupStore.actions;
   const {items: productGroups} = productGroupsGetters;
   const productsStore = useStore('products');
+  const productsActions = productsStore.actions;
   const productsGetters = productsStore.getters;
   const productGroupProductStore = useStore('product_group_product');
   const productGroupProductActions = productGroupProductStore.actions;
   const cartStore = useStore('cart');
+  const cartActions = cartStore.actions;
   const cartGetters = cartStore.getters;
 
   const order_productsStore = useStore('order_products');
   const orderProductsActions = order_productsStore.actions;
+  const orderProductsGetters = order_productsStore.getters;
+  const storedOrderProducts = Array.isArray(orderProductsGetters?.items)
+    ? orderProductsGetters.items
+    : [];
+  const storedOrderProductItem = orderProductsGetters?.item;
+  const isSavingCustomization = Boolean(orderProductsGetters?.isSaving);
   const {item: order} = ordersGetters;
   const {item: cart} = cartGetters;
   const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
 
-  const activeOrderProduct = useMemo(
-    () => (routeOrderProduct && typeof routeOrderProduct === 'object' ? routeOrderProduct : null),
-    [routeOrderProduct],
+  const activeOrderProductId = useMemo(
+    () =>
+      normalizeEntityId(
+        routeOrderProductId ||
+        routeOrderProduct?.id ||
+        routeOrderProduct?.['@id'],
+      ),
+    [routeOrderProductId, routeOrderProduct],
   );
 
-  const activeProduct = useMemo(() => {
-    if (product && typeof product === 'object') {
-      return product;
+  const activeOrderProduct = useMemo(() => {
+    if (
+      routeOrderProduct &&
+      typeof routeOrderProduct === 'object' &&
+      normalizeEntityId(routeOrderProduct?.id || routeOrderProduct?.['@id']) ===
+        activeOrderProductId
+    ) {
+      return routeOrderProduct;
     }
-    if (productsGetters?.item && typeof productsGetters.item === 'object') {
-      return productsGetters.item;
+
+    if (
+      storedOrderProductItem &&
+      typeof storedOrderProductItem === 'object' &&
+      normalizeEntityId(
+        storedOrderProductItem?.id || storedOrderProductItem?.['@id'],
+      ) === activeOrderProductId
+    ) {
+      return storedOrderProductItem;
     }
-    return null;
-  }, [product, productsGetters?.item]);
+
+    return (
+      storedOrderProducts.find(
+        item =>
+          normalizeEntityId(item?.id || item?.['@id']) === activeOrderProductId,
+      ) || null
+    );
+  }, [
+    activeOrderProductId,
+    routeOrderProduct,
+    storedOrderProductItem,
+    storedOrderProducts,
+  ]);
 
   const activeProductId = useMemo(
     () =>
       normalizeEntityId(
-        activeProduct?.id ||
-          activeProduct?.['@id'] ||
-          route.params?.productId ||
+        routeProductId ||
+          routeProduct?.id ||
+          routeProduct?.['@id'] ||
+          activeOrderProduct?.product?.id ||
+          activeOrderProduct?.product?.['@id'] ||
           route.params?.id,
       ),
-    [activeProduct?.id, activeProduct?.['@id'], route.params?.id, route.params?.productId],
+    [
+      activeOrderProduct?.product?.['@id'],
+      activeOrderProduct?.product?.id,
+      route.params?.id,
+      routeProduct?.['@id'],
+      routeProduct?.id,
+      routeProductId,
+    ],
   );
+
+  const activeProduct = useMemo(() => {
+    if (
+      routeProduct &&
+      typeof routeProduct === 'object' &&
+      normalizeEntityId(routeProduct?.id || routeProduct?.['@id']) ===
+        activeProductId
+    ) {
+      return routeProduct;
+    }
+
+    if (
+      activeOrderProduct?.product &&
+      normalizeEntityId(
+        activeOrderProduct.product?.id || activeOrderProduct.product?.['@id'],
+      ) === activeProductId
+    ) {
+      return activeOrderProduct.product;
+    }
+
+    if (
+      productsGetters?.item &&
+      typeof productsGetters.item === 'object' &&
+      normalizeEntityId(
+        productsGetters.item?.id || productsGetters.item?.['@id'],
+      ) === activeProductId
+    ) {
+      return productsGetters.item;
+    }
+
+    return null;
+  }, [
+    activeOrderProduct?.product,
+    activeProductId,
+    productsGetters?.item,
+    routeProduct,
+  ]);
 
   const activeProductIri = useMemo(() => {
     if (activeProduct?.['@id']) {
@@ -93,14 +177,19 @@ const CustomizeScreen = () => {
     }
     return activeProductId ? `/products/${activeProductId}` : null;
   }, [activeProduct, activeProductId]);
+  const isEditingExistingOrderProduct = !!activeOrderProductId;
 
-  const activeOrderProductId = useMemo(
+  const activeOrderId = useMemo(
     () =>
       normalizeEntityId(
-        activeOrderProduct?.id ||
-        activeOrderProduct?.['@id'],
+        activeOrderProduct?.order?.id ||
+          activeOrderProduct?.order?.['@id'] ||
+          order?.id ||
+          order?.['@id'] ||
+          cart?.id ||
+          cart?.['@id'],
       ),
-    [activeOrderProduct],
+    [activeOrderProduct, cart, order],
   );
 
   const activeOrderIri = useMemo(() => {
@@ -177,81 +266,150 @@ const CustomizeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      if (activeProduct && typeof activeProduct === 'object') {
-        activeProduct.selectedItems = {...selectedItems};
-      }
-    }, [activeProduct, selectedItems]),
-  );
-
-  useFocusEffect(
-    useCallback(() => {
       init();
     }, [activeProductId]),
   );
+
+  useEffect(() => {
+    setSelectedItems({});
+  }, [activeOrderProductId, activeProductId]);
+
   useFocusEffect(
     useCallback(() => {
-      if (Object.keys(saved).length == 0) {
-        return;
+      if (activeOrderProductId) {
+        orderProductsActions.get(activeOrderProductId).catch(() => null);
       }
 
-      const savedId = normalizeEntityId(saved?.id || saved?.['@id']);
-      const currentOrderProducts = Array.isArray(order?.orderProducts)
-        ? order.orderProducts
-        : [];
-      const savedIndex = currentOrderProducts.findIndex(op =>
-        normalizeEntityId(op?.id || op?.['@id']) === savedId,
-      );
-      const updatedOrderProducts =
-        savedIndex >= 0
-          ? currentOrderProducts.map((op, index) =>
-            index === savedIndex ? {...op, ...saved} : op,
-          )
-          : [...currentOrderProducts, saved];
-
-      setSaved({});
-      if (order && typeof order === 'object') {
-        const currentOrder = {...order};
-        currentOrder.orderProducts = updatedOrderProducts;
-        ordersActions.setItem(currentOrder);
+      if (
+        activeProductId &&
+        normalizeEntityId(activeProduct?.id || activeProduct?.['@id']) !== activeProductId
+      ) {
+        productsActions.get(activeProductId).catch(() => null);
       }
-
-      if (redirectToCart) {
-        navigation.navigate('ShopCartPage');
-        return;
-      }
-
-      navigation.pop(Math.max(1, Number(returnDepth || 1)));
-    }, [navigation, order, redirectToCart, returnDepth, saved]),
+    }, [
+      activeOrderProduct?.['@id'],
+      activeOrderProduct?.id,
+      activeOrderProductId,
+      activeProduct?.['@id'],
+      activeProduct?.id,
+      activeProductId,
+      orderProductsActions,
+      productsActions,
+    ]),
   );
+  const leaveCustomizeScreen = useCallback(() => {
+    if (redirectToCart) {
+      navigation.navigate('ShopCartPage');
+      return;
+    }
+
+    navigation.pop(Math.max(1, Number(returnDepth || 1)));
+  }, [navigation, redirectToCart, returnDepth]);
+
+  const refreshSavedOrderProducts = useCallback(async () => {
+    if (!activeOrderId) {
+      return [];
+    }
+
+    const refreshedOrderProducts = await orderProductsActions.getItems({
+      'order.id': Number(activeOrderId),
+      itemsPerPage: 200,
+    });
+
+    if (typeof ordersActions.syncOrderProducts === 'function') {
+      ordersActions.syncOrderProducts({
+        orderId: Number(activeOrderId),
+        orderProducts: refreshedOrderProducts,
+      });
+    } else if (
+      order &&
+      normalizeEntityId(order?.id || order?.['@id']) === activeOrderId
+    ) {
+      ordersActions.setItem(
+        mergeOrderWithOrderProducts(order, refreshedOrderProducts),
+      );
+    }
+
+    if (
+      cart &&
+      typeof cartActions?.setItem === 'function' &&
+      normalizeEntityId(cart?.id || cart?.['@id']) === activeOrderId
+    ) {
+      cartActions.setItem(
+        mergeOrderWithOrderProducts(cart, refreshedOrderProducts),
+      );
+    }
+
+    return refreshedOrderProducts;
+  }, [
+    activeOrderId,
+    cart,
+    cartActions,
+    order,
+    orderProductsActions,
+    ordersActions,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
-      for (let group of productGroups) {
-        productGroupProductActions
-          .getItems({
+      let isActive = true;
+
+      if (!Array.isArray(productGroups) || productGroups.length === 0) {
+        setSelectedItems({});
+        return () => {
+          isActive = false;
+        };
+      }
+
+      Promise.all(
+        productGroups.map(async group => {
+          const groupProducts = await productGroupProductActions.getItems({
             productGroup: `/product_groups/${group.id}`,
             productType: 'component',
-          })
-          .then(groupProducts => {
-            const existingSelections = existingSelectionsByGroup[String(group.id)] || {};
-            setSelectedItems(prev => ({
-              ...prev,
-              [group.id]: groupProducts.map(item => ({
-                ...item,
-                selected: !!existingSelections[
-                  normalizeEntityId(item?.productChild?.id || item?.productChild?.['@id'])
-                ]?.selected,
-                quantity:
-                  existingSelections[
-                    normalizeEntityId(item?.productChild?.id || item?.productChild?.['@id'])
-                  ]?.quantity ||
-                  parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
-                  1,
-              })),
-            }));
           });
-      }
-    }, [existingSelectionsByGroup, productGroups]),
+          const existingSelections =
+            existingSelectionsByGroup[String(group.id)] || {};
+
+          return [
+            String(group.id),
+            (Array.isArray(groupProducts) ? groupProducts : []).map(item => ({
+              ...item,
+              selected: !!existingSelections[
+                normalizeEntityId(
+                  item?.productChild?.id || item?.productChild?.['@id'],
+                )
+              ]?.selected,
+              quantity:
+                existingSelections[
+                  normalizeEntityId(
+                    item?.productChild?.id || item?.productChild?.['@id'],
+                  )
+                ]?.quantity ||
+                parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
+                1,
+            })),
+          ];
+        }),
+      )
+        .then(entries => {
+          if (!isActive) {
+            return;
+          }
+
+          setSelectedItems(Object.fromEntries(entries));
+        })
+        .catch(() => {
+          if (!isActive) {
+            return;
+          }
+
+          setSelectedItems({});
+        });
+
+      return () => {
+        isActive = false;
+      };
+    }, [existingSelectionsByGroup, productGroupProductActions, productGroups]),
   );
 
   const init = () => {
@@ -403,7 +561,7 @@ const CustomizeScreen = () => {
     return subProducts;
   };
 
-  const addHandle = () => {
+  const addHandle = async () => {
     if (!activeProductIri || !activeOrderIri) {
       const message =
         'Nao foi possivel identificar produto ou carrinho para adicionar.';
@@ -423,9 +581,28 @@ const CustomizeScreen = () => {
       quantity: Number(activeOrderProduct?.quantity || 1),
     };
 
-    orderProductsActions.save(orderProductData).then(data => {
-      setSaved(data);
-    });
+    try {
+      await orderProductsActions.save(orderProductData);
+
+      try {
+        await refreshSavedOrderProducts();
+      } catch {
+        // The parent screen will still refetch on focus; avoid leaving local
+        // order state in a shallow-merged, inconsistent hierarchy.
+      }
+
+      leaveCustomizeScreen();
+    } catch (error) {
+      const message =
+        error?.message ||
+        'Nao foi possivel salvar a customizacao do item.';
+
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(message);
+      } else {
+        Alert.alert('Atencao', message);
+      }
+    }
   };
 
   const renderOption = (group, option, index) => {
@@ -483,17 +660,26 @@ const CustomizeScreen = () => {
 
   return (
     <View style={inlineStyle_401_10}>
-      <ScrollView style={inlineStyle_402_18}>
+      <ScrollView
+        style={inlineStyle_402_18}
+        contentContainerStyle={{paddingBottom: 24}}>
         {productGroups.map(group => renderGroup(group))}
       </ScrollView>
       <TouchableOpacity
         onPress={addHandle}
+        disabled={isSavingCustomization}
         style={[
           globalStyles.button,
           styles.customizeProduct?.Button,
-          {marginTop: 16, maxHeight: '10%'},
+          {marginTop: 16, marginBottom: 8, maxHeight: '10%'},
         ]}>
-        <Text style={styles.customizeProduct?.ButtonText}>ADICIONAR</Text>
+        <Text style={styles.customizeProduct?.ButtonText}>
+          {isSavingCustomization
+            ? 'SALVANDO...'
+            : isEditingExistingOrderProduct
+              ? 'MODIFICAR'
+              : 'ADICIONAR'}
+        </Text>
       </TouchableOpacity>
     </View>
   );

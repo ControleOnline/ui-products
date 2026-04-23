@@ -54,10 +54,8 @@ const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
         <TouchableOpacity
           onPress={() =>
             navigation.navigate('CustomizeScreen', {
-              product,
+              productId: product?.id || product?.['@id'],
               interactionMode,
-              showBottomCart: interactionMode === 'pdv',
-              showBottomToolBar: interactionMode === 'pdv',
             })
           }
           style={styles.customizeButton}
