@@ -228,7 +228,7 @@ const CategoriesPage = ({ route }) => {
         context,
         interactionMode,
         showBottomCart: interactionMode === 'pdv',
-        showBottomToolBar: interactionMode === 'pdv',
+        showBottomToolBar: false,
       },
       merge: false,
     })
@@ -288,7 +288,7 @@ const CategoriesPage = ({ route }) => {
           interactionMode,
           searchQuery: normalizedQuery,
           showBottomCart: interactionMode === 'pdv',
-          showBottomToolBar: interactionMode === 'pdv',
+          showBottomToolBar: false,
         },
         merge: false,
       })

@@ -414,7 +414,7 @@ const ProductsPage = ({ navigation, route }) => {
       context,
       interactionMode,
       showBottomCart: interactionMode === 'pdv',
-      showBottomToolBar: interactionMode === 'pdv',
+      showBottomToolBar: false,
     };
 
     if (categoryId) {

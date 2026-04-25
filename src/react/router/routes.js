@@ -20,7 +20,7 @@ const ordersRoutes = [
       headerBackVisible: true,
       title: 'Escolher Produtos',
       showBottomCart: isPosApp,
-      showBottomToolBar: isPosApp,
+      showBottomToolBar: false,
     },
     initialParams: { store: 'products' },
   },
