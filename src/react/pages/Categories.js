@@ -8,6 +8,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { env } from '@env'
 import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'
 import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl'
+import {useMessage} from '@controleonline/ui-common/src/react/components/MessageService'
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager'
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal'
 import {
@@ -23,6 +24,7 @@ import {
   readCachedCategories,
   writeCachedCategories,
 } from '@controleonline/ui-products/src/react/utils/categoryCache'
+import usePosOrderMaterialization from '@controleonline/ui-orders/src/react/hooks/usePosOrderMaterialization'
 
 import Icon from 'react-native-vector-icons/FontAwesome'
 import { skeletonStyles, styles } from './Categories.styles'
@@ -99,6 +101,7 @@ const CategoriesPage = ({ route }) => {
   const [productSearchResults, setProductSearchResults] = useState([])
   const [productSearchLoading, setProductSearchLoading] = useState(false)
   const navigation = useNavigation()
+  const {showError} = useMessage() || {}
   const { width } = useWindowDimensions()
   const interactionMode =
     route?.params?.interactionMode ||
@@ -132,6 +135,10 @@ const CategoriesPage = ({ route }) => {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
   const context = 'products'
+  const {materializeOrderWithProducts, openOrderDetails} = usePosOrderMaterialization({
+    interactionParams: route?.params,
+    navigation,
+  })
 
   const loadMenuModels = useCallback(async () => {
     if (!currentCompany?.id) {
@@ -287,6 +294,32 @@ const CategoriesPage = ({ route }) => {
       })
     },
     [context, interactionMode, navigation],
+  )
+  const handleAutocompleteProductSelect = useCallback(
+    async product => {
+      try {
+        const productId = normalizeEntityId(product)
+
+        if (!productId) {
+          throw new Error('Nao foi possivel identificar o produto selecionado.')
+        }
+
+        const updatedOrder = await materializeOrderWithProducts({
+          products: [{product: productId, quantity: 1}],
+        })
+
+        if (!updatedOrder) {
+          throw new Error('Nao foi possivel preparar o pedido para conferencia.')
+        }
+
+        setProductSearchText('')
+        setProductSearchResults([])
+        openOrderDetails(updatedOrder)
+      } catch (error) {
+        showError?.(error?.message || 'Nao foi possivel adicionar o produto selecionado.')
+      }
+    },
+    [materializeOrderWithProducts, openOrderDetails, showError],
   )
 
   const openMenuModelPicker = useCallback(async () => {
@@ -461,11 +494,7 @@ const CategoriesPage = ({ route }) => {
                     key={product?.id || product?.['@id']}
                     style={styles.searchSuggestionItem}
                     activeOpacity={0.85}
-                    onPress={() =>
-                      openProductSearchResults(
-                        product?.product || product?.description || normalizedProductSearchText,
-                      )
-                    }
+                    onPress={() => handleAutocompleteProductSelect(product)}
                   >
                     <View style={styles.searchSuggestionCopy}>
                       <Text style={styles.searchSuggestionTitle} numberOfLines={1}>
