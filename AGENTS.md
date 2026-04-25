@@ -10,6 +10,10 @@
 - Prompts sobre produtos, categorias, inventario, estoque, movimentacoes, sugestao de compra e formularios de produto.
 
 ## Regras
+- A listagem de categorias do fluxo operacional de `POS` deve suportar busca de produtos com auto-complete.
+- O auto-complete de produtos no catalogo operacional nao e exclusivo de `kiosk`; ele deve permanecer disponivel em todos os modos de `POS`.
+- Quando a selecao de um produto pelo auto-complete fizer parte do fluxo `PDV`, ela pode materializar o pedido, adicionar o item e abrir `OrderDetails` sem passar pela listagem filtrada.
+- O submit textual da busca ainda pode abrir a listagem filtrada de produtos quando o operador quiser navegar pelo catalogo.
 - `CustomizeScreen` precisa suportar inclusao e reabertura de um `order_product` customizavel existente.
 - Na reabertura, a tela deve carregar as selecoes atuais do item e salvar por `PUT` no mesmo `order_product`, sem criar outro item.
 - Depois de salvar uma reabertura, a tela nao deve fazer merge raso do item retornado dentro de `orderProducts`. Ela precisa reconciliar a colecao atual de `order_product` do pedido para nao quebrar a hierarquia de componentes.
