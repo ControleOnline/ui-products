@@ -35,7 +35,6 @@ import {
 } from '@controleonline/ui-orders/src/utils/orderState';
 
 import { inlineStyle_413_16 } from './Products.styles';
-import { inlineStyle_449_10 } from './Products.styles';
 
 const resolveRouteCategoryId = value => {
   if (!value) return '';
@@ -447,6 +446,14 @@ const ProductsPage = ({ navigation, route }) => {
 
   const maxContentWidth = 860;
   const containerWidth = Math.min(width, maxContentWidth);
+  const isCompactMobile = width < 360;
+  const listContentStyle = {
+    paddingTop: isCompactMobile ? 12 : 16,
+    paddingHorizontal: isCompactMobile ? 12 : 16,
+    paddingBottom: interactionMode === 'pdv'
+      ? (isCompactMobile ? 136 : 152)
+      : (isCompactMobile ? 12 : 16),
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -489,7 +496,7 @@ const ProductsPage = ({ navigation, route }) => {
         <FlatList
           data={productsData}
           keyExtractor={item => String(item.id)}
-          contentContainerStyle={inlineStyle_449_10}
+          contentContainerStyle={listContentStyle}
           onEndReached={() => {
             if (visibleCount < visibleProducts.length)
               setVisibleCount(v => v + 50);

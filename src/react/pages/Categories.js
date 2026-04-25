@@ -447,8 +447,14 @@ const CategoriesPage = ({ route }) => {
   const columns = getColumns()
   const maxContentWidth = 1600
   const containerWidth = Math.min(width, maxContentWidth)
-  const gap = 12
+  const isCompactMobile = width < 360
+  const gap = isCompactMobile ? 8 : 12
   const cardWidth = (containerWidth - (columns + 1) * gap) / columns
+  const scrollBottomPadding = isManagerApp
+    ? 84
+    : interactionMode === 'pdv'
+      ? (isCompactMobile ? 148 : 164)
+      : 0
 
   const { styles: orderStyles } = css()
   const modalTitle = selectedCategory ? 'Editar Categoria' : 'Nova Categoria'
@@ -457,19 +463,36 @@ const CategoriesPage = ({ route }) => {
   return (
     <SafeAreaView style={[orderStyles.container, styles.container]}>
       {!storeLoading && <StateStore store="categories" />}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.scrollContent,
-          isManagerApp && { paddingBottom: 84 },
+      <View
+        style={[
+          styles.searchStickyShell,
+          isCompactMobile && styles.searchStickyShellCompact,
         ]}
       >
-        <View style={inlineStyle_424_14({
-          containerWidth: containerWidth,
-          gap: gap,
-        })}>
-          <View style={styles.searchSection}>
-            <View style={styles.searchInputWrap}>
+        <View
+          style={[
+            inlineStyle_424_14({
+              containerWidth: containerWidth,
+              gap: gap,
+            }),
+            {
+              paddingTop: isCompactMobile ? 8 : 16,
+              paddingBottom: isCompactMobile ? 8 : 0,
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.searchSection,
+              isCompactMobile && styles.searchSectionCompact,
+            ]}
+          >
+            <View
+              style={[
+                styles.searchInputWrap,
+                isCompactMobile && styles.searchInputWrapCompact,
+              ]}
+            >
               <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
               <TextInput
                 value={productSearchText}
@@ -477,30 +500,45 @@ const CategoriesPage = ({ route }) => {
                 onSubmitEditing={() => openProductSearchResults(productSearchText)}
                 placeholder="Buscar produto pelo nome ou SKU"
                 placeholderTextColor="#94A3B8"
-                style={styles.searchInput}
+                style={[
+                  styles.searchInput,
+                  isCompactMobile && styles.searchInputCompact,
+                ]}
                 returnKeyType="search"
               />
               {productSearchLoading && (
                 <ActivityIndicator size="small" color={brandColors.primary} />
               )}
             </View>
-            <Text style={styles.searchHelperText}>
-              A busca com auto-complete fica disponivel em todos os modos do PDV.
-            </Text>
             {normalizedProductSearchText.length >= 2 && (
               <View style={styles.searchSuggestionList}>
                 {productSearchResults.map(product => (
                   <TouchableOpacity
                     key={product?.id || product?.['@id']}
-                    style={styles.searchSuggestionItem}
+                    style={[
+                      styles.searchSuggestionItem,
+                      isCompactMobile && styles.searchSuggestionItemCompact,
+                    ]}
                     activeOpacity={0.85}
                     onPress={() => handleAutocompleteProductSelect(product)}
                   >
                     <View style={styles.searchSuggestionCopy}>
-                      <Text style={styles.searchSuggestionTitle} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.searchSuggestionTitle,
+                          isCompactMobile && styles.searchSuggestionTitleCompact,
+                        ]}
+                        numberOfLines={1}
+                      >
                         {product?.product || 'Produto sem nome'}
                       </Text>
-                      <Text style={styles.searchSuggestionMeta} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.searchSuggestionMeta,
+                          isCompactMobile && styles.searchSuggestionMetaCompact,
+                        ]}
+                        numberOfLines={1}
+                      >
                         {[product?.sku ? `SKU ${product.sku}` : '', product?.description || '']
                           .filter(Boolean)
                           .join(' • ')}
@@ -515,16 +553,31 @@ const CategoriesPage = ({ route }) => {
                 ))}
                 {!productSearchLoading && productSearchResults.length === 0 && (
                   <TouchableOpacity
-                    style={styles.searchSuggestionItem}
+                    style={[
+                      styles.searchSuggestionItem,
+                      isCompactMobile && styles.searchSuggestionItemCompact,
+                    ]}
                     activeOpacity={0.85}
                     onPress={() => openProductSearchResults(productSearchText)}
                   >
                     <View style={styles.searchSuggestionCopy}>
-                      <Text style={styles.searchSuggestionTitle} numberOfLines={1}>
-                        Buscar por "{normalizedProductSearchText}"
+                      <Text
+                        style={[
+                          styles.searchSuggestionTitle,
+                          isCompactMobile && styles.searchSuggestionTitleCompact,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        Ver produtos para "{normalizedProductSearchText}"
                       </Text>
-                      <Text style={styles.searchSuggestionMeta} numberOfLines={1}>
-                        Nenhum atalho encontrado. Abrir listagem filtrada.
+                      <Text
+                        style={[
+                          styles.searchSuggestionMeta,
+                          isCompactMobile && styles.searchSuggestionMetaCompact,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        Abrir lista filtrada.
                       </Text>
                     </View>
                     <MaterialCommunityIcons
@@ -537,6 +590,25 @@ const CategoriesPage = ({ route }) => {
               </View>
             )}
           </View>
+        </View>
+      </View>
+      <ScrollView
+        style={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: scrollBottomPadding },
+        ]}
+      >
+        <View
+          style={[
+            inlineStyle_424_14({
+              containerWidth: containerWidth,
+              gap: gap,
+            }),
+            { paddingTop: isCompactMobile ? 10 : 16 },
+          ]}
+        >
           {isManagerApp && (
             <>
               <Modal
@@ -722,7 +794,12 @@ const CategoriesPage = ({ route }) => {
           {!storeLoading && (
             <>
               {items.length > 0 && (
-                <Text style={styles.countLabel}>
+                <Text
+                  style={[
+                    styles.countLabel,
+                    isCompactMobile && styles.countLabelCompact,
+                  ]}
+                >
                   {items.length} {items.length === 1 ? 'categoria' : 'categorias'}
                 </Text>
               )}
@@ -737,9 +814,22 @@ const CategoriesPage = ({ route }) => {
                     onPress={() => changeCategory(ALL_PRODUCTS_SENTINEL)}
                     activeOpacity={0.88}
                   >
-                    <View style={[styles.noCategoryCard, { aspectRatio: 3 / 4 }]}>
+                    <View
+                      style={[
+                        styles.noCategoryCard,
+                        isCompactMobile && styles.noCategoryCardCompact,
+                        { aspectRatio: 3 / 4 },
+                      ]}
+                    >
                       <MaterialCommunityIcons name="tag-off-outline" size={32} color="#94A3B8" />
-                      <Text style={styles.noCategoryName}>Todos</Text>
+                      <Text
+                        style={[
+                          styles.noCategoryName,
+                          isCompactMobile && styles.noCategoryNameCompact,
+                        ]}
+                      >
+                        Todos
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -756,6 +846,7 @@ const CategoriesPage = ({ route }) => {
                       <View
                         style={[
                           styles.cardImage,
+                          isCompactMobile && styles.cardImageCompact,
                           { backgroundColor: category.color || '#CBD5E1' },
                         ]}
                       >
@@ -767,8 +858,19 @@ const CategoriesPage = ({ route }) => {
                           />
                         ) : null}
 
-                        <View style={styles.cardOverlay}>
-                          <Text style={styles.cardOverlayName} numberOfLines={2}>
+                        <View
+                          style={[
+                            styles.cardOverlay,
+                            isCompactMobile && styles.cardOverlayCompact,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.cardOverlayName,
+                              isCompactMobile && styles.cardOverlayNameCompact,
+                            ]}
+                            numberOfLines={2}
+                          >
                             {category.name}
                           </Text>
                         </View>

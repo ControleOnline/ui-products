@@ -19,9 +19,21 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
   },
+  searchStickyShell: {
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    zIndex: 6,
+  },
+  searchStickyShellCompact: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
   searchSection: {
     width: '100%',
     marginBottom: 18,
+  },
+  searchSectionCompact: {
+    marginBottom: 0,
   },
   searchInputWrap: {
     flexDirection: 'row',
@@ -45,11 +57,25 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     paddingVertical: 12,
   },
+  searchInputWrapCompact: {
+    minHeight: 44,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+  },
+  searchInputCompact: {
+    fontSize: 14,
+    paddingVertical: 10,
+  },
   searchHelperText: {
     marginTop: 8,
     marginLeft: 4,
     fontSize: 12,
     color: '#64748B',
+  },
+  searchHelperTextCompact: {
+    marginTop: 6,
+    fontSize: 11,
+    lineHeight: 16,
   },
   searchSuggestionList: {
     marginTop: 10,
@@ -68,6 +94,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
+  searchSuggestionItemCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
   searchSuggestionCopy: {
     flex: 1,
   },
@@ -76,10 +106,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
+  searchSuggestionTitleCompact: {
+    fontSize: 13,
+  },
   searchSuggestionMeta: {
     marginTop: 2,
     fontSize: 12,
     color: '#64748B',
+  },
+  searchSuggestionMetaCompact: {
+    fontSize: 11,
   },
 
   countLabel: {
@@ -88,6 +124,10 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginBottom: 14,
     letterSpacing: 0.3,
+  },
+  countLabelCompact: {
+    fontSize: 12,
+    marginBottom: 10,
   },
 
   topActionsRow: {
@@ -256,6 +296,9 @@ const styles = StyleSheet.create({
       web: { boxShadow: '0 4px 16px rgba(0,0,0,0.10)' },
     }),
   },
+  cardImageCompact: {
+    borderRadius: 16,
+  },
 
   cardCoverImage: {
     position: 'absolute',
@@ -286,6 +329,13 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  cardOverlayCompact: {
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    paddingTop: 36,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
   cardOverlayName: {
     color: '#fff',
     fontWeight: '700',
@@ -294,6 +344,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.4)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
+  },
+  cardOverlayNameCompact: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 
   editOverlay: {
@@ -320,12 +374,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
+  noCategoryCardCompact: {
+    borderRadius: 16,
+  },
   noCategoryName: {
     fontSize: 13,
     fontWeight: '700',
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  noCategoryNameCompact: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 
 
