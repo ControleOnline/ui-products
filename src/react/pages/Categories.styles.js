@@ -19,6 +19,68 @@ const styles = StyleSheet.create({
   scrollContent: {
     alignItems: 'center',
   },
+  searchSection: {
+    width: '100%',
+    marginBottom: 18,
+  },
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#DCE7F3',
+    borderRadius: 16,
+    minHeight: 52,
+    paddingHorizontal: 16,
+    ...Platform.select({
+      web: { boxShadow: '0 8px 24px rgba(15,23,42,0.06)' },
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 12 },
+      android: { elevation: 2 },
+    }),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#0F172A',
+    paddingVertical: 12,
+  },
+  searchHelperText: {
+    marginTop: 8,
+    marginLeft: 4,
+    fontSize: 12,
+    color: '#64748B',
+  },
+  searchSuggestionList: {
+    marginTop: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  searchSuggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  searchSuggestionCopy: {
+    flex: 1,
+  },
+  searchSuggestionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  searchSuggestionMeta: {
+    marginTop: 2,
+    fontSize: 12,
+    color: '#64748B',
+  },
 
   countLabel: {
     fontSize: 13,

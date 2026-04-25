@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo, useRef } from 'react'
-import { Text, View, Image, ScrollView, TouchableOpacity, Platform, Modal, useWindowDimensions, ActivityIndicator, Alert } from 'react-native'
+import { Text, View, Image, ScrollView, TouchableOpacity, Platform, Modal, useWindowDimensions, ActivityIndicator, Alert, TextInput } from 'react-native'
 import { useStore } from '@store'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import css from '@controleonline/ui-orders/src/react/css/orders'
@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
 import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports'
+import {searchCompanyProducts} from '@controleonline/ui-common/src/react/utils/commercialDocumentOrders'
 
 import {
   readCachedCategories,
@@ -94,6 +95,9 @@ const CategoriesPage = ({ route }) => {
   const [showMenuModelModal, setShowMenuModelModal] = useState(false)
   const [menuModels, setMenuModels] = useState([])
   const [selectedMenuModel, setSelectedMenuModel] = useState('')
+  const [productSearchText, setProductSearchText] = useState('')
+  const [productSearchResults, setProductSearchResults] = useState([])
+  const [productSearchLoading, setProductSearchLoading] = useState(false)
   const navigation = useNavigation()
   const { width } = useWindowDimensions()
   const interactionMode =
@@ -256,6 +260,34 @@ const CategoriesPage = ({ route }) => {
 
     return menuModels.find(model => model?.['@id'] === selectedMenuModel)?.model || 'Selecionar modelo'
   }, [isLoadingMenuModels, menuModels, selectedMenuModel])
+  const normalizedProductSearchText = useMemo(
+    () => String(productSearchText || '').trim(),
+    [productSearchText],
+  )
+
+  const openProductSearchResults = useCallback(
+    query => {
+      const normalizedQuery = String(query || '').trim()
+      if (!normalizedQuery) {
+        return
+      }
+
+      setProductSearchResults([])
+      navigation.navigate({
+        name: 'ProductsPage',
+        params: {
+          categoryId: ALL_PRODUCTS_SENTINEL['@id'],
+          context,
+          interactionMode,
+          searchQuery: normalizedQuery,
+          showBottomCart: interactionMode === 'pdv',
+          showBottomToolBar: interactionMode === 'pdv',
+        },
+        merge: false,
+      })
+    },
+    [context, interactionMode, navigation],
+  )
 
   const openMenuModelPicker = useCallback(async () => {
     if (!currentCompany?.id) {
@@ -276,6 +308,45 @@ const CategoriesPage = ({ route }) => {
 
     setShowMenuModelModal(true)
   }, [currentCompany?.id, isLoadingMenuModels, loadMenuModels, menuModels])
+
+  React.useEffect(() => {
+    let isMounted = true
+
+    if (!currentCompany?.id || normalizedProductSearchText.length < 2) {
+      setProductSearchResults([])
+      setProductSearchLoading(false)
+      return undefined
+    }
+
+    setProductSearchLoading(true)
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const results = await searchCompanyProducts({
+          companyId: currentCompany.id,
+          query: normalizedProductSearchText,
+          itemsPerPage: 8,
+        })
+
+        if (isMounted) {
+          setProductSearchResults(Array.isArray(results) ? results : [])
+        }
+      } catch {
+        if (isMounted) {
+          setProductSearchResults([])
+        }
+      } finally {
+        if (isMounted) {
+          setProductSearchLoading(false)
+        }
+      }
+    }, 180)
+
+    return () => {
+      isMounted = false
+      clearTimeout(timeoutId)
+    }
+  }, [currentCompany?.id, normalizedProductSearchText])
 
   const downloadCatalog = useCallback(async () => {
     if (isDownloadingCatalog) {
@@ -364,6 +435,79 @@ const CategoriesPage = ({ route }) => {
           containerWidth: containerWidth,
           gap: gap,
         })}>
+          <View style={styles.searchSection}>
+            <View style={styles.searchInputWrap}>
+              <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
+              <TextInput
+                value={productSearchText}
+                onChangeText={setProductSearchText}
+                onSubmitEditing={() => openProductSearchResults(productSearchText)}
+                placeholder="Buscar produto pelo nome ou SKU"
+                placeholderTextColor="#94A3B8"
+                style={styles.searchInput}
+                returnKeyType="search"
+              />
+              {productSearchLoading && (
+                <ActivityIndicator size="small" color={brandColors.primary} />
+              )}
+            </View>
+            <Text style={styles.searchHelperText}>
+              A busca com auto-complete fica disponivel em todos os modos do PDV.
+            </Text>
+            {normalizedProductSearchText.length >= 2 && (
+              <View style={styles.searchSuggestionList}>
+                {productSearchResults.map(product => (
+                  <TouchableOpacity
+                    key={product?.id || product?.['@id']}
+                    style={styles.searchSuggestionItem}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      openProductSearchResults(
+                        product?.product || product?.description || normalizedProductSearchText,
+                      )
+                    }
+                  >
+                    <View style={styles.searchSuggestionCopy}>
+                      <Text style={styles.searchSuggestionTitle} numberOfLines={1}>
+                        {product?.product || 'Produto sem nome'}
+                      </Text>
+                      <Text style={styles.searchSuggestionMeta} numberOfLines={1}>
+                        {[product?.sku ? `SKU ${product.sku}` : '', product?.description || '']
+                          .filter(Boolean)
+                          .join(' • ')}
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons
+                      name="arrow-right"
+                      size={18}
+                      color="#94A3B8"
+                    />
+                  </TouchableOpacity>
+                ))}
+                {!productSearchLoading && productSearchResults.length === 0 && (
+                  <TouchableOpacity
+                    style={styles.searchSuggestionItem}
+                    activeOpacity={0.85}
+                    onPress={() => openProductSearchResults(productSearchText)}
+                  >
+                    <View style={styles.searchSuggestionCopy}>
+                      <Text style={styles.searchSuggestionTitle} numberOfLines={1}>
+                        Buscar por "{normalizedProductSearchText}"
+                      </Text>
+                      <Text style={styles.searchSuggestionMeta} numberOfLines={1}>
+                        Nenhum atalho encontrado. Abrir listagem filtrada.
+                      </Text>
+                    </View>
+                    <MaterialCommunityIcons
+                      name="arrow-right"
+                      size={18}
+                      color="#94A3B8"
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
           {isManagerApp && (
             <>
               <Modal

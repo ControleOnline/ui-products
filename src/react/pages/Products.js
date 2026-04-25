@@ -211,6 +211,10 @@ const ProductsPage = ({ navigation, route }) => {
   const isManager =
     env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
   const categoryRouteValue = routeParams.categoryId || routeParams.category;
+  const normalizedSearchQuery = useMemo(
+    () => String(routeParams.searchQuery || '').trim(),
+    [routeParams.searchQuery],
+  );
   const category = useMemo(
     () =>
       resolveSelectedCategory({
@@ -246,7 +250,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   useEffect(() => {
     setVisibleCount(50);
-  }, [typeFilter, category]);
+  }, [typeFilter, category, normalizedSearchQuery]);
 
   const flushPendingAddProducts = useCallback(() => {
     const currentOrderId = String(
@@ -331,6 +335,20 @@ const ProductsPage = ({ navigation, route }) => {
       type: contextTypes,
     };
 
+    if (normalizedSearchQuery) {
+      actions
+        .getItems({
+          ...baseParams,
+          itemsPerPage: 100,
+          product: normalizedSearchQuery,
+        })
+        .then(data => {
+          setCategoryProducts(data || []);
+        })
+        .catch(() => {});
+      return;
+    }
+
     if (isAllProducts) {
       actions
         .getItems({
@@ -367,7 +385,16 @@ const ProductsPage = ({ navigation, route }) => {
           .catch(() => { });
       }
     }
-  }, [actions, category, categoryId, categories, contextTypes, currentCompany?.id, isAllProducts]);
+  }, [
+    actions,
+    category,
+    categoryId,
+    categories,
+    contextTypes,
+    currentCompany?.id,
+    isAllProducts,
+    normalizedSearchQuery,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -443,12 +470,18 @@ const ProductsPage = ({ navigation, route }) => {
             color="#CBD5E1"
           />
           <Text style={styles.emptyTitle}>
-            {isAllProducts ? 'Nenhum produto cadastrado' : 'Nenhum produto'}
+            {normalizedSearchQuery
+              ? 'Nenhum produto encontrado'
+              : isAllProducts
+                ? 'Nenhum produto cadastrado'
+                : 'Nenhum produto'}
           </Text>
           <Text style={styles.emptySubtitle}>
-            {isAllProducts
-              ? 'Nenhum produto foi cadastrado ainda.'
-              : 'Nenhum produto disponível nesta categoria'}
+            {normalizedSearchQuery
+              ? `Nenhum resultado para "${normalizedSearchQuery}".`
+              : isAllProducts
+                ? 'Nenhum produto foi cadastrado ainda.'
+                : 'Nenhum produto disponível nesta categoria'}
           </Text>
         </View>
       )}
