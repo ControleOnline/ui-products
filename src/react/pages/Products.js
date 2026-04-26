@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { ALL_PRODUCTS_SENTINEL } from './Categories';
+import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 import {
   FlatList, ScrollView, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';

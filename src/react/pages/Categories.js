@@ -36,6 +36,7 @@ import {
   inlineStyle_631_42,
   inlineStyle_692_8,
 } from './Categories.styles';
+import {ALL_PRODUCTS_SENTINEL} from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 const buildCoverUrl = (files, coverRelationId) => {
   const arr = files || []
@@ -70,17 +71,6 @@ const normalizeEntityId = value => {
 
   return String(raw || '').replace(/\D+/g, '').trim()
 }
-
-/*
- * Sentinel para "Sem Categoria".
- * Não é uma categoria real — é um filtro especial que mostra produtos
- * sem nenhuma categoria vinculada.
- */
-export const ALL_PRODUCTS_SENTINEL = {
-  '@id': '__all_products__',
-  name: 'Todos os produtos',
-  _isAllProducts: true,
-};
 
 const SkeletonCard = ({ width }) => (
   <View style={inlineStyle_104_8({

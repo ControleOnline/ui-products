@@ -1,4 +1,4 @@
-import {ALL_PRODUCTS_SENTINEL} from '@controleonline/ui-products/src/react/pages/Categories';
+import {ALL_PRODUCTS_SENTINEL} from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 export const resolveRouteCategoryId = value => {
   if (!value) return '';
