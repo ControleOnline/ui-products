@@ -33,27 +33,12 @@ import {
   mergeOrderWithOrderProducts,
   withOrderProductQuantity,
 } from '@controleonline/ui-orders/src/utils/orderState';
+import {
+  resolveRouteCategoryId,
+  shouldSyncStoredCategory,
+} from '@controleonline/ui-products/src/react/utils/categorySelection';
 
 import { inlineStyle_413_16 } from './Products.styles';
-
-const resolveRouteCategoryId = value => {
-  if (!value) return '';
-
-  if (typeof value === 'object') {
-    if (value?._isAllProducts || value?.['@id'] === ALL_PRODUCTS_SENTINEL['@id']) {
-      return ALL_PRODUCTS_SENTINEL['@id'];
-    }
-
-    return String(value?.id || value?.['@id'] || '').replace(/\D+/g, '').trim();
-  }
-
-  const normalized = String(value || '').trim();
-  if (normalized === ALL_PRODUCTS_SENTINEL['@id']) {
-    return normalized;
-  }
-
-  return normalized.replace(/\D+/g, '').trim();
-};
 
 const getPendingOrderProductKey = productId => `pending-add-product-${productId}`;
 
@@ -227,6 +212,10 @@ const ProductsPage = ({ navigation, route }) => {
     () => resolveRouteCategoryId(category),
     [category],
   );
+  const storedCategoryId = useMemo(
+    () => resolveRouteCategoryId(storedCategory),
+    [storedCategory],
+  );
 
   const isAllProducts =
     category?._isAllProducts === true ||
@@ -237,10 +226,16 @@ const ProductsPage = ({ navigation, route }) => {
   }, [ordersStore.getters?.item]);
 
   useEffect(() => {
-    if (category && storedCategory !== category) {
+    if (
+      shouldSyncStoredCategory({
+        category,
+        categoryId,
+        storedCategory,
+      })
+    ) {
       categoryActions.setItem(category);
     }
-  }, [category, categoryActions, storedCategory]);
+  }, [category, categoryActions, categoryId, storedCategory, storedCategoryId]);
 
   const visibleProducts = useMemo(() => {
     if (!typeFilter) return categoryProducts;
