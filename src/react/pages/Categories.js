@@ -25,7 +25,6 @@ import {
   writeCachedCategories,
 } from '@controleonline/ui-products/src/react/utils/categoryCache'
 import usePosOrderMaterialization from '@controleonline/ui-orders/src/react/hooks/usePosOrderMaterialization'
-import {isPosCounterMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
 
 import Icon from 'react-native-vector-icons/FontAwesome'
 import { skeletonStyles, styles } from './Categories.styles'
@@ -108,8 +107,6 @@ const CategoriesPage = ({ route }) => {
 
   const peopleStore = useStore('people')
   const { currentCompany } = peopleStore.getters
-  const deviceConfigStore = useStore('device_config')
-  const {item: runtimeDeviceConfig} = deviceConfigStore.getters
 
   const themeStore = useStore('theme')
   const { colors: themeColors } = themeStore.getters
@@ -132,9 +129,6 @@ const CategoriesPage = ({ route }) => {
     interactionParams: route?.params,
     navigation,
   })
-  const showCashRegisterShortcut = isPosCounterMode(
-    runtimeDeviceConfig?.configs,
-  )
 
   const loadMenuModels = useCallback(async () => {
     if (!currentCompany?.id) {
@@ -506,30 +500,6 @@ const CategoriesPage = ({ route }) => {
                 <ActivityIndicator size="small" color={brandColors.primary} />
               )}
             </View>
-            {showCashRegisterShortcut && (
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => navigation.navigate('CloseCashRegister')}
-                style={{
-                  minHeight: 48,
-                  paddingHorizontal: 14,
-                  borderRadius: 18,
-                  backgroundColor: brandColors.primary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'row',
-                }}>
-                <MaterialCommunityIcons
-                  name="cash-register"
-                  size={18}
-                  color="#fff"
-                  style={{marginRight: 6}}
-                />
-                <Text style={{color: '#fff', fontWeight: '700'}}>
-                  Caixa
-                </Text>
-              </TouchableOpacity>
-            )}
             {normalizedProductSearchText.length >= 2 && (
               <View style={styles.searchSuggestionList}>
                 {productSearchResults.map(product => (
