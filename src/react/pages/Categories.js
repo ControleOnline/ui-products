@@ -210,7 +210,7 @@ const CategoriesPage = ({ route }) => {
         ? ALL_PRODUCTS_SENTINEL['@id']
         : normalizeEntityId(category)
 
-    categoryActions.setItem(category || {})
+    categoryActions.setItem(category || null)
     navigation.navigate({
       name: 'ProductsPage',
       params: {

@@ -1,18 +1,24 @@
-import {ALL_PRODUCTS_SENTINEL} from '@controleonline/ui-products/src/react/constants/categorySentinels';
+import {
+  ALL_PRODUCTS_SENTINEL_ID,
+} from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 export const resolveRouteCategoryId = value => {
-  if (!value) return '';
+  if (value == null) return '';
 
   if (typeof value === 'object') {
-    if (value?._isAllProducts || value?.['@id'] === ALL_PRODUCTS_SENTINEL['@id']) {
-      return ALL_PRODUCTS_SENTINEL['@id'];
+    if (Array.isArray(value)) {
+      return '';
+    }
+
+    if (value?._isAllProducts || value?.['@id'] === ALL_PRODUCTS_SENTINEL_ID) {
+      return ALL_PRODUCTS_SENTINEL_ID;
     }
 
     return String(value?.id || value?.['@id'] || '').replace(/\D+/g, '').trim();
   }
 
   const normalized = String(value || '').trim();
-  if (normalized === ALL_PRODUCTS_SENTINEL['@id']) {
+  if (normalized === ALL_PRODUCTS_SENTINEL_ID) {
     return normalized;
   }
 
@@ -29,7 +35,11 @@ export const shouldSyncStoredCategory = ({
   }
 
   const resolvedCategoryId = categoryId || resolveRouteCategoryId(category);
+  if (!resolvedCategoryId) {
+    return false;
+  }
+
   const resolvedStoredCategoryId = resolveRouteCategoryId(storedCategory);
 
-  return !!resolvedCategoryId && resolvedStoredCategoryId !== resolvedCategoryId;
+  return resolvedStoredCategoryId !== resolvedCategoryId;
 };

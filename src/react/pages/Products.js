@@ -35,7 +35,6 @@ import {
 } from '@controleonline/ui-orders/src/utils/orderState';
 import {
   resolveRouteCategoryId,
-  shouldSyncStoredCategory,
 } from '@controleonline/ui-products/src/react/utils/categorySelection';
 
 import { inlineStyle_413_16 } from './Products.styles';
@@ -212,11 +211,6 @@ const ProductsPage = ({ navigation, route }) => {
     () => resolveRouteCategoryId(category),
     [category],
   );
-  const storedCategoryId = useMemo(
-    () => resolveRouteCategoryId(storedCategory),
-    [storedCategory],
-  );
-
   const isAllProducts =
     category?._isAllProducts === true ||
     category?.['@id'] === '__all_products__';
@@ -224,18 +218,6 @@ const ProductsPage = ({ navigation, route }) => {
   useEffect(() => {
     currentOrderRef.current = ordersStore.getters?.item || null;
   }, [ordersStore.getters?.item]);
-
-  useEffect(() => {
-    if (
-      shouldSyncStoredCategory({
-        category,
-        categoryId,
-        storedCategory,
-      })
-    ) {
-      categoryActions.setItem(category);
-    }
-  }, [category, categoryActions, categoryId, storedCategory, storedCategoryId]);
 
   const visibleProducts = useMemo(() => {
     if (!typeFilter) return categoryProducts;
