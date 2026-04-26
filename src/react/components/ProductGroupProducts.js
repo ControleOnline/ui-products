@@ -540,6 +540,14 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
     setLoaded(true);
   };
 
+  const openProductSearchModal = () => {
+    setAvailableProducts([]);
+    setHasMoreProducts(true);
+    setProductsPage(1);
+    setProductsQuery('');
+    setSearchModalVisible(true);
+  };
+
   /* ── Produto selecionado na busca → busca completo para obter productUnit aninhado ── */
   const handleProductSelected = async product => {
     setSearchModalVisible(false);
@@ -770,7 +778,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       {/* Botão adicionar */}
       <TouchableOpacity
         style={[styles.addItemBtn, { borderColor: brandColors?.primary || '#64748B' }]}
-        onPress={() => setSearchModalVisible(true)}
+        onPress={openProductSearchModal}
         activeOpacity={0.7}
       >
         <MaterialCommunityIcons

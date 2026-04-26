@@ -379,7 +379,6 @@ const ProductsPage = ({ navigation, route }) => {
       return () => {
         flushPendingAddProducts();
         const cats = readCachedCategories(currentCompany?.id);
-        setCategoryProducts([]);
         if (cats.length > 0) categoryActions.setItems(cats);
       };
     }, [categoryActions, currentCompany?.id, flushPendingAddProducts]),
@@ -429,6 +428,8 @@ const ProductsPage = ({ navigation, route }) => {
     paddingHorizontal: isCompactMobile ? 12 : 16,
     paddingBottom: interactionMode === 'pdv'
       ? (isCompactMobile ? 136 : 152)
+      : isManager
+        ? (isCompactMobile ? 96 : 104)
       : (isCompactMobile ? 12 : 16),
   };
 
