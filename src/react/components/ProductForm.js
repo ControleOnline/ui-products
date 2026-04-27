@@ -82,6 +82,61 @@ const normalizeProductForForm = data => {
   };
 };
 
+const SERVICE_TYPE = 'service';
+
+const normalizeUnitLabel = value => (
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+);
+
+const getUnitOptionLabel = option => (
+  option?.productUnit ||
+  option?.unit ||
+  String(option?.id || '')
+);
+
+const getServiceUnitPriority = label => {
+  const normalized = normalizeUnitLabel(label);
+
+  if (!normalized) return 100;
+  if (normalized.includes('mens') || normalized.includes('month')) return 0;
+  if (normalized.includes('hora') || normalized.includes('hour')) return 1;
+  if (normalized.includes('diar') || normalized.includes('dia') || normalized.includes('day')) return 2;
+  if (normalized.includes('unitar') || normalized === 'un' || normalized.includes('und')) return 3;
+  if (normalized.includes('atend') || normalized.includes('sess')) return 4;
+
+  return 100;
+};
+
+const buildProductUnitOptions = (items, isServiceProduct) => {
+  const options = (items || []).map(option => {
+    const label = getUnitOptionLabel(option);
+    const servicePriority = getServiceUnitPriority(label);
+
+    return {
+      value: option.id,
+      label,
+      servicePriority,
+      isRecommendedServiceUnit: servicePriority < 100,
+    };
+  });
+
+  if (!isServiceProduct) {
+    return options;
+  }
+
+  return [...options].sort((left, right) => {
+    if (left.servicePriority !== right.servicePriority) {
+      return left.servicePriority - right.servicePriority;
+    }
+
+    return left.label.localeCompare(right.label, 'pt-BR');
+  });
+};
+
 const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
   <View style={inlineStyle_71_8({
     height: height,
@@ -543,6 +598,22 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const brandColors = useMemo(() => resolveThemePalette(), []);
   const [openSections, setOpenSections] = React.useState(new Set(['identificacao']));
   const [errorSections, setErrorSections] = React.useState(new Set());
+  const isServiceProduct = product?.type === SERVICE_TYPE;
+  const productUnitOptions = useMemo(
+    () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct),
+    [isServiceProduct, productUnitGetters.items],
+  );
+  const productUnitLabel = isServiceProduct ? 'Unidade de cobrança *' : 'Unidade de Medida *';
+  const productUnitPlaceholder = isServiceProduct
+    ? 'Escolha como o serviço será cobrado'
+    : 'Selecionar...';
+  const productUnitHelperText = isServiceProduct
+    ? (
+      productUnitOptions.some(option => option.isRecommendedServiceUnit)
+        ? 'Para serviços, prefira uma unidade de cobrança como mensal, hora, diária ou unitário.'
+        : 'Para serviços, selecione a unidade de cobrança disponível para este cadastro.'
+    )
+    : '';
   const toggleSection = useCallback(key => setOpenSections(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -554,6 +625,25 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     if (typeof v === 'number') return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return String(v).replace('.', ',');
   }, []);
+
+  useEffect(() => {
+    if (!isServiceProduct || product?.productUnit || productUnitOptions.length === 0) {
+      return;
+    }
+
+    const recommendedOption = productUnitOptions.find(option => option.isRecommendedServiceUnit);
+    if (!recommendedOption) {
+      return;
+    }
+
+    setProduct(prev => {
+      if (!prev || prev.productUnit) {
+        return prev;
+      }
+
+      return { ...prev, productUnit: String(recommendedOption.value) };
+    });
+  }, [isServiceProduct, product?.productUnit, productUnitOptions]);
 
   if (!product) return (
     <View style={inlineStyle_545_10}>
@@ -661,15 +751,19 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
             ]}
           />
           <SelectField
-            label="Unidade de Medida *"
+            label={productUnitLabel}
             value={product.productUnit || ''}
             onChange={val => handleChange('productUnit', val)}
             brandColors={brandColors}
+            placeholder={productUnitPlaceholder}
             options={[
               { value: '', label: 'Selecionar...' },
-              ...(productUnitGetters.items || []).map(opt => ({ value: opt.id, label: opt.productUnit || opt.unit || String(opt.id) })),
+              ...productUnitOptions.map(opt => ({ value: opt.value, label: opt.label })),
             ]}
           />
+          {!!productUnitHelperText && (
+            <Text style={styles.fieldHelperText}>{productUnitHelperText}</Text>
+          )}
         </SectionCard>
 
         {/* Seção: Configurações */}
