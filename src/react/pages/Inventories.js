@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo, useRef } from 'react';
-import { Text, View, ScrollView, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
+import { Text, View, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
@@ -33,6 +33,11 @@ const TYPE_CONFIG = {
   warehouse: { label: 'Depósito', icon: 'warehouse',     color: '#D97706', bg: '#FFFBEB' },
 };
 
+const resolveHistoryTitle = (value, fallback) => {
+  const normalizedValue = String(value || '').replace(/^Tab\s+/i, '').trim();
+  return normalizedValue || fallback;
+};
+
 const SkeletonCard = ({ width }) => (
   <View style={inlineStyle_29_8({
     width: width,
@@ -44,6 +49,14 @@ const SkeletonCard = ({ width }) => (
 const InventoriesPage = () => {
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
+  const transferHistoryTitle = useMemo(
+    () => resolveHistoryTitle(global.t?.t('orders', 'label', 'tab_transfer'), 'Transferências'),
+    [],
+  );
+  const lossHistoryTitle = useMemo(
+    () => resolveHistoryTitle(global.t?.t('orders', 'label', 'tab_loss'), 'Perdas'),
+    [],
+  );
 
   const inventoriesStore = useStore('inventories');
   const { isLoading: storeLoading } = inventoriesStore.getters;
@@ -75,7 +88,7 @@ const InventoriesPage = () => {
         'order[inventory]': 'ASC',
       });
       setInventories(data || []);
-    } catch (_) {
+    } catch {
       setInventories([]);
     }
   }, [currentCompany?.id]);
@@ -85,6 +98,15 @@ const InventoriesPage = () => {
   const openCreate = () => { setSelectedInventory(null); setModalVisible(true); };
   const openEdit   = inv => { setSelectedInventory(inv); setModalVisible(true); };
   const closeModal = () => { setModalVisible(false); setSelectedInventory(null); };
+  const openOrderHistory = useCallback(
+    (orderTypeFilter, historyTitle) => {
+      navigation.navigate('OrderHistoryPage', {
+        orderTypeFilter,
+        historyTitle,
+      });
+    },
+    [navigation],
+  );
 
   const handleSaved = async () => {
     closeModal();
@@ -130,6 +152,30 @@ const InventoriesPage = () => {
             <View style={styles.historyBannerLeft}>
               <MaterialCommunityIcons name="history" size={18} color="#7C3AED" />
               <Text style={styles.historyBannerText}>Histórico de Movimentações</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.historyBanner, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+            onPress={() => openOrderHistory('loss', lossHistoryTitle)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.historyBannerLeft}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#DC2626" />
+              <Text style={[styles.historyBannerText, { color: '#B91C1C' }]}>{lossHistoryTitle}</Text>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.historyBanner, { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE', marginBottom: 16 }]}
+            onPress={() => openOrderHistory('transfer', transferHistoryTitle)}
+            activeOpacity={0.75}
+          >
+            <View style={styles.historyBannerLeft}>
+              <MaterialCommunityIcons name="swap-horizontal" size={18} color="#7C3AED" />
+              <Text style={[styles.historyBannerText, { color: '#6D28D9' }]}>{transferHistoryTitle}</Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={18} color="#94A3B8" />
           </TouchableOpacity>
