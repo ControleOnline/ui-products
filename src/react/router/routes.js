@@ -20,7 +20,6 @@ const ordersRoutes = [
       headerBackVisible: true,
       title: 'Escolher Produtos',
       showBottomCart: isPosApp,
-      showBottomToolBar: false,
     },
     initialParams: { store: 'products' },
   },
@@ -51,10 +50,8 @@ const ordersRoutes = [
     component: CustomizeScreen,
     options: {
       headerShown: true,
-      headerBackVisible: false,
       title: 'Customizar',
       showBottomCart: false,
-      showBottomToolBar: false,
     },
     initialParams: { store: 'products' },
   },
