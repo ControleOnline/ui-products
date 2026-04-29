@@ -9,6 +9,11 @@ import AttachmentManager from '@controleonline/ui-products/src/react/components/
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from './ProductForm.styles';
+import {
+  buildProductUnitOptions,
+  findRecommendedServiceUnit,
+  SERVICE_TYPE,
+} from '../domain/serviceUnitOptions';
 
 import {
   inlineStyle_71_8,
@@ -543,6 +548,22 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const brandColors = useMemo(() => resolveThemePalette(), []);
   const [openSections, setOpenSections] = React.useState(new Set(['identificacao']));
   const [errorSections, setErrorSections] = React.useState(new Set());
+  const isServiceProduct = product?.type === SERVICE_TYPE;
+  const productUnitOptions = useMemo(
+    () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct),
+    [isServiceProduct, productUnitGetters.items],
+  );
+  const productUnitLabel = isServiceProduct ? 'Unidade de cobrança *' : 'Unidade de Medida *';
+  const productUnitPlaceholder = isServiceProduct
+    ? 'Escolha como o serviço será cobrado'
+    : 'Selecionar...';
+  const productUnitHelperText = isServiceProduct
+    ? (
+      productUnitOptions.some(option => option.isRecommendedServiceUnit)
+        ? 'Para serviços, prefira uma unidade de cobrança como mensal, hora, diária ou unitário.'
+        : 'Para serviços, selecione a unidade de cobrança disponível para este cadastro.'
+    )
+    : '';
   const toggleSection = useCallback(key => setOpenSections(prev => {
     const next = new Set(prev);
     if (next.has(key)) next.delete(key); else next.add(key);
@@ -554,6 +575,25 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     if (typeof v === 'number') return v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     return String(v).replace('.', ',');
   }, []);
+
+  useEffect(() => {
+    if (!isServiceProduct || product?.productUnit || productUnitOptions.length === 0) {
+      return;
+    }
+
+    const recommendedOption = findRecommendedServiceUnit(productUnitOptions);
+    if (!recommendedOption) {
+      return;
+    }
+
+    setProduct(prev => {
+      if (!prev || prev.productUnit) {
+        return prev;
+      }
+
+      return { ...prev, productUnit: String(recommendedOption.value) };
+    });
+  }, [isServiceProduct, product?.productUnit, productUnitOptions]);
 
   if (!product) return (
     <View style={inlineStyle_545_10}>
@@ -661,15 +701,19 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
             ]}
           />
           <SelectField
-            label="Unidade de Medida *"
+            label={productUnitLabel}
             value={product.productUnit || ''}
             onChange={val => handleChange('productUnit', val)}
             brandColors={brandColors}
+            placeholder={productUnitPlaceholder}
             options={[
               { value: '', label: 'Selecionar...' },
-              ...(productUnitGetters.items || []).map(opt => ({ value: opt.id, label: opt.productUnit || opt.unit || String(opt.id) })),
+              ...productUnitOptions.map(opt => ({ value: opt.value, label: opt.label })),
             ]}
           />
+          {!!productUnitHelperText && (
+            <Text style={styles.fieldHelperText}>{productUnitHelperText}</Text>
+          )}
         </SectionCard>
 
         {/* Seção: Configurações */}

@@ -17,6 +17,7 @@ const styles = StyleSheet.create({
 
   fieldWrap: { marginBottom: 12 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 },
+  fieldHelperText: { fontSize: 12, lineHeight: 18, color: '#64748B', marginTop: -4, marginBottom: 12 },
   textInput: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, fontSize: 15, color: '#0F172A' },
   textInputMultiline: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, fontSize: 15, color: '#0F172A', minHeight: 88, textAlignVertical: 'top' },
 
@@ -132,5 +133,4 @@ export const inlineStyle_92_14 = {
   padding: 16,
   paddingBottom: 100,
 };
-
 
