@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, ScrollView, useWindowDimensions, TextInput, Text, TouchableOpacity, Switch } from 'react-native';
+import { View, ScrollView, TextInput, Text, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
@@ -178,8 +178,6 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const routeCategoryIdParam = route.params?.categoryId || '';
   const routeInitialProductType = String(route.params?.initialProductType || '').trim().toLowerCase();
   const ProductId = propProductId || routeProductId;
-  const { width } = useWindowDimensions();
-
   const productsStore = useStore('products');
   const categoriesStore = useStore('categories');
   const productCategoryStore = useStore('product_category');
