@@ -176,6 +176,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
   const routeCategoryIdParam = route.params?.categoryId || '';
+  const routeInitialProductType = String(route.params?.initialProductType || '').trim().toLowerCase();
   const ProductId = propProductId || routeProductId;
   const { width } = useWindowDimensions();
 
@@ -264,12 +265,16 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     } else {
       setProduct(prev => {
         if (prev) return prev;
+        const allowedTypes = typeOptions.map(option => option.value);
+        const defaultType = allowedTypes.includes(routeInitialProductType)
+          ? routeInitialProductType
+          : (allowedTypes[0] || 'product');
         return {
           sku: '',
           product: '',
           description: '',
           productUnit: '',
-          type: 'product',
+          type: defaultType,
           productCondition: 'new',
           price: 0,
           company: currentCompany?.id || '',
@@ -279,7 +284,15 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
       });
       if (selectedRouteCategoryId) setSelectedCategoryId(String(selectedRouteCategoryId));
     }
-  }, [ProductId, currentCompany, productCategoryActions, productActions, selectedRouteCategoryId]);
+  }, [
+    ProductId,
+    currentCompany,
+    productCategoryActions,
+    productActions,
+    routeInitialProductType,
+    selectedRouteCategoryId,
+    typeOptions,
+  ]);
 
   useEffect(() => {
     getData();
