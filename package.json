@@ -5,7 +5,9 @@
   "description": "ControleOnline products Quasar UI Component",
   "license": "MIT",
   "main": "src/vue/index.js",
-  "scripts": {},
+  "scripts": {
+    "test:service-units": "node --test src/tests/react/domain/serviceUnitOptions.test.mjs"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/controleonline/conline-quasar-ui"

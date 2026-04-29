@@ -9,6 +9,11 @@ import AttachmentManager from '@controleonline/ui-products/src/react/components/
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from './ProductForm.styles';
+import {
+  buildProductUnitOptions,
+  findRecommendedServiceUnit,
+  SERVICE_TYPE,
+} from '../domain/serviceUnitOptions';
 
 import {
   inlineStyle_71_8,
@@ -80,61 +85,6 @@ const normalizeProductForForm = data => {
     defaultOutInventory: normalizeRelationId(data.defaultOutInventory),
     defaultInInventory: normalizeRelationId(data.defaultInInventory),
   };
-};
-
-const SERVICE_TYPE = 'service';
-
-const normalizeUnitLabel = value => (
-  String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim()
-);
-
-const getUnitOptionLabel = option => (
-  option?.productUnit ||
-  option?.unit ||
-  String(option?.id || '')
-);
-
-const getServiceUnitPriority = label => {
-  const normalized = normalizeUnitLabel(label);
-
-  if (!normalized) return 100;
-  if (normalized.includes('mens') || normalized.includes('month')) return 0;
-  if (normalized.includes('hora') || normalized.includes('hour')) return 1;
-  if (normalized.includes('diar') || normalized.includes('dia') || normalized.includes('day')) return 2;
-  if (normalized.includes('unitar') || normalized === 'un' || normalized.includes('und')) return 3;
-  if (normalized.includes('atend') || normalized.includes('sess')) return 4;
-
-  return 100;
-};
-
-const buildProductUnitOptions = (items, isServiceProduct) => {
-  const options = (items || []).map(option => {
-    const label = getUnitOptionLabel(option);
-    const servicePriority = getServiceUnitPriority(label);
-
-    return {
-      value: option.id,
-      label,
-      servicePriority,
-      isRecommendedServiceUnit: servicePriority < 100,
-    };
-  });
-
-  if (!isServiceProduct) {
-    return options;
-  }
-
-  return [...options].sort((left, right) => {
-    if (left.servicePriority !== right.servicePriority) {
-      return left.servicePriority - right.servicePriority;
-    }
-
-    return left.label.localeCompare(right.label, 'pt-BR');
-  });
 };
 
 const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
@@ -631,7 +581,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
       return;
     }
 
-    const recommendedOption = productUnitOptions.find(option => option.isRecommendedServiceUnit);
+    const recommendedOption = findRecommendedServiceUnit(productUnitOptions);
     if (!recommendedOption) {
       return;
     }
