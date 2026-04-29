@@ -208,8 +208,6 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [controlarEstoque, setControlarEstoque] = useState(false);
 
-  const isDesktop = width >= 768;
-
   const getContextTypes = () => {
     if (!contextTypes || contextTypes.length === 0) return [];
 
