@@ -123,6 +123,11 @@ const resolveSelectedCategory = ({
   }) || null;
 };
 
+const normalizeProductTypeFilter = value => {
+  const normalizedValue = String(value || '').trim().toLowerCase();
+  return normalizedValue || null;
+};
+
 const SkeletonProductCard = () => (
   <View style={skeletonStyles.card}>
     <View style={skeletonStyles.imageBlock} />
@@ -187,7 +192,10 @@ const ProductsPage = ({ navigation, route }) => {
   );
 
   const [categoryProducts, setCategoryProducts] = useState([]);
-  const [typeFilter] = useState(null);
+  const typeFilter = useMemo(
+    () => normalizeProductTypeFilter(routeParams.typeFilter),
+    [routeParams.typeFilter],
+  );
   const [visibleCount, setVisibleCount] = useState(50);
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
 
@@ -308,7 +316,7 @@ const ProductsPage = ({ navigation, route }) => {
       'order[product]': 'ASC',
       'order[description]': 'ASC',
       company: currentCompany?.id,
-      type: contextTypes,
+      type: typeFilter ? [typeFilter] : contextTypes,
     };
 
     if (normalizedSearchQuery) {
@@ -396,8 +404,12 @@ const ProductsPage = ({ navigation, route }) => {
       params.categoryId = categoryId;
     }
 
+    if (typeFilter) {
+      params.typeFilter = typeFilter;
+    }
+
     return params;
-  }, [categoryId, context, interactionMode]);
+  }, [categoryId, context, interactionMode, typeFilter]);
 
   const handleProductPress = product => {
     if (!isManager) return;
