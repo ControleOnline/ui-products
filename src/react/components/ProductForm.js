@@ -559,8 +559,8 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const [errorSections, setErrorSections] = React.useState(new Set());
   const isServiceProduct = product?.type === SERVICE_TYPE;
   const productUnitOptions = useMemo(
-    () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct),
-    [isServiceProduct, productUnitGetters.items],
+    () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct, product?.productUnit),
+    [isServiceProduct, product?.productUnit, productUnitGetters.items],
   );
   const productUnitLabel = isServiceProduct ? 'Unidade de cobrança *' : 'Unidade de Medida *';
   const productUnitPlaceholder = isServiceProduct
@@ -569,8 +569,8 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const productUnitHelperText = isServiceProduct
     ? (
       productUnitOptions.some(option => option.isRecommendedServiceUnit)
-        ? 'Para serviços, prefira uma unidade de cobrança como mensal, hora, diária ou unitário.'
-        : 'Para serviços, selecione a unidade de cobrança disponível para este cadastro.'
+        ? 'Para serviços, selecione uma unidade de cobrança compatível, como unitário, semanal, mensal ou por hora.'
+        : 'Para serviços, este campo aceita apenas unidades de cobrança compatíveis com execução única ou recorrência.'
     )
     : '';
   const toggleSection = useCallback(key => setOpenSections(prev => {
