@@ -26,3 +26,9 @@
 - A tela de customizacao deve aplicar e exibir com clareza as regras do grupo atual: `required`, `minimum`, `maximum`, `priceCalculation` e a quantidade padrao de cada opcao. Na reabertura, quando houver metadado do grupo dentro de `orderProduct.orderProductComponents[].productGroup`, esse payload atual do pedido deve prevalecer na apresentacao e validacao.
 - As regras de `CustomizeScreen` precisam ficar visiveis, mas em formato compacto e discreto para o usuario final. Evitar cards grandes de resumo; preferir uma linha curta por grupo e destacar somente pendencias de validacao.
 - A decisao de permitir ou bloquear a reabertura por etapa de fila pertence ao modulo `ui-orders`/`ui-ppc`; `ui-products` apenas executa a edicao quando a navegacao ja chegou autorizada.
+- Em produtos do tipo `service`, o seletor de unidade nao deve oferecer medidas fisicas como `grama`, `litro`, `fracao` e equivalentes. Ele deve expor apenas unidades de cobranca compativeis com execucao unica ou recorrencia, como `unitario`, `hora`, `diaria`, `semanal`, `mensal` e correlatas.
+- Ao editar registros antigos de `service`, a unidade legada ja salva pode continuar visivel apenas para preservar contexto ate a correcao manual. Para novos cadastros e novas escolhas, a regra restritiva de unidade deve prevalecer.
+- Essa regra de unidade para `service` nao pode ficar so no front. A API ou fluxo de persistencia responsavel pelo save do produto tambem deve validar e rejeitar unidades incompatíveis para servicos.
+
+## Limites
+- A decisao de permitir ou bloquear a reabertura por etapa de fila pertence ao modulo `ui-orders`/`ui-ppc`; `ui-products` apenas executa a edicao quando a navegacao ja chegou autorizada.
