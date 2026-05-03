@@ -1,5 +1,14 @@
 import React, {useState, useCallback, useMemo, useEffect, useRef} from 'react';
-import {View, Text, TouchableOpacity, ScrollView, Alert} from 'react-native';
+import {
+  Alert,
+  Image,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import {
   useNavigation,
@@ -8,23 +17,76 @@ import {
 } from '@react-navigation/native';
 
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
-import css from '@controleonline/ui-products/src/react/css/products';
 import {useStore} from '@store';
 import {env} from '@env';
 
 import {
-  inlineStyle_344_8,
-  inlineStyle_352_10,
-  inlineStyle_354_16,
-  inlineStyle_355_18,
-  inlineStyle_361_12,
-  inlineStyle_378_27,
-  inlineStyle_401_10,
-  inlineStyle_402_18,
-  inlineStyle_421_18,
-  inlineStyle_449_18,
+  customizeChipRowStyle,
+  customizeChipStyle,
+  customizeChipTextStyle,
+  customizeBackdropPressableStyle,
+  customizeCloseButtonStyle,
+  customizeDescriptionStyle,
+  customizeEyebrowStyle,
+  customizeFooterFloatingStyle,
+  customizeFooterStyle,
+  customizeGroupCardStyle,
+  customizeGroupErrorStyle,
+  customizeGroupHeaderStyle,
+  customizeGroupMetaStyle,
+  customizeGroupRuleStyle,
+  customizeGroupsStackStyle,
+  customizeGroupTitleRowStyle,
+  customizeGroupTitleStyle,
+  customizeHeaderContentStyle,
+  customizeHeaderStyle,
+  customizeHeroImageStyle,
+  customizeHeroImageWrapStyle,
+  customizeHeroPlaceholderStyle,
+  customizeHeroPlaceholderTextStyle,
+  customizeMainColumnStyle,
+  customizeModalStyle,
+  customizeMobileSummaryWrapStyle,
+  customizeOptionBodyStyle,
+  customizeOptionControlInnerStyle,
+  customizeOptionControlStyle,
+  customizeOptionImageStyle,
+  customizeOptionImageWrapStyle,
+  customizeOptionMetaStyle,
+  customizeOptionNameStyle,
+  customizeOptionPlaceholderTextStyle,
+  customizeOptionPriceStyle,
+  customizeOptionsStackStyle,
+  customizeOptionTouchableStyle,
+  customizeQuantityPillStyle,
+  customizeQuantityPillTextStyle,
+  customizeQuantityRowStyle,
+  customizeScreenBackdropStyle,
+  customizeScreenRootStyle,
+  customizeScrollContentStyle,
+  customizeScrollStyle,
+  customizeSubmitButtonStyle,
+  customizeSubmitButtonTextStyle,
+  customizeSummaryCardStyle,
+  customizeSummaryColumnStyle,
+  customizeSummaryGroupItemStyle,
+  customizeSummaryGroupListStyle,
+  customizeSummaryGroupNameStyle,
+  customizeSummaryGroupStateStyle,
+  customizeSummaryHeaderStyle,
+  customizeSummaryKickerStyle,
+  customizeSummaryLabelStyle,
+  customizeSummaryLineStyle,
+  customizeSummaryTitleStyle,
+  customizeSummaryTotalStyle,
+  customizeSummaryValueStyle,
+  customizeTitleRowStyle,
+  customizeTitleStyle,
+  resolveCustomizePalette,
 } from './CustomizeScreen.styles';
 import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
+import {MaterialCommunityIcons} from '@expo/vector-icons';
+import {resolveFileImageUrl} from '@controleonline/ui-common/src/react/utils/fileUrl';
 
 const normalizeEntityId = value => {
   const clean = String(value || '').replace(/\D/g, '');
@@ -150,9 +212,61 @@ const calculateGroupExtraPrice = (group, groupItems) => {
   }
 };
 
+const buildCoverUrl = product => {
+  const files = Array.isArray(product?.productFiles) ? product.productFiles : [];
+  const coverRelationId = normalizeEntityId(product?.extraData?.imageCoverRelationId);
+  const filesByNewestRelation = [...files].sort(
+    (left, right) =>
+      parseNumericValue(normalizeEntityId(right?.id)) -
+      parseNumericValue(normalizeEntityId(left?.id)),
+  );
+  const coverRelation =
+    files.find(item => normalizeEntityId(item?.id) === coverRelationId && item?.file) ||
+    filesByNewestRelation.find(item => item?.file);
+
+  return coverRelation?.file ? resolveFileImageUrl(coverRelation.file) : null;
+};
+
+const resolveProductInitial = product =>
+  String(product?.product || product?.name || '?').trim().charAt(0).toUpperCase() ||
+  '?';
+
+const normalizeOptionDedupKey = option => {
+  const product = option?.value?.productChild || {};
+  const name = String(product?.product || product?.name || option?.label || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+  const price = parseNumericValue(option?.value?.price).toFixed(2);
+
+  return `${name}:${price}`;
+};
+
 const CustomizeScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
+  const {width, height} = useWindowDimensions();
+  const viewportWidth =
+    Number.isFinite(width) && width > 0
+      ? width
+      : typeof window !== 'undefined'
+        ? window.innerWidth
+        : 1024;
+  const viewportHeight =
+    Number.isFinite(height) && height > 0
+      ? height
+      : typeof window !== 'undefined'
+        ? window.innerHeight
+        : 768;
+  const isLargeScreen = viewportWidth >= 960;
+  const modalHeight = isLargeScreen
+    ? Math.max(640, Math.min(viewportHeight - 64, 900))
+    : viewportHeight;
+  const modalWidth = isLargeScreen
+    ? Math.max(840, Math.min(viewportWidth - 56, 1180))
+    : viewportWidth;
   const {
     product: routeProduct = null,
     productId: routeProductId = null,
@@ -161,9 +275,9 @@ const CustomizeScreen = () => {
     redirectToCart = false,
     returnDepth = 3,
   } = route.params || {};
-  const {globalStyles, styles} = css();
   const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
   const [selectedItems, setSelectedItems] = useState({});
+  const [optionProductsById, setOptionProductsById] = useState({});
 
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
@@ -175,6 +289,8 @@ const CustomizeScreen = () => {
   const productsStore = useStore('products');
   const productsActions = productsStore.actions;
   const productsGetters = productsStore.getters;
+  const themeStore = useStore('theme');
+  const palette = resolveCustomizePalette(themeStore.getters?.colors || {});
   const productGroupProductStore = useStore('product_group_product');
   const productGroupProductActions = productGroupProductStore.actions;
   const cartStore = useStore('cart');
@@ -197,6 +313,7 @@ const CustomizeScreen = () => {
   const orderProductsActionsRef = useRef(orderProductsActions);
   const productGroupProductActionsRef = useRef(productGroupProductActions);
   const loadedGroupProductsRef = useRef({});
+  const loadedOptionProductsRef = useRef({});
 
   const activeOrderProductId = useMemo(
     () =>
@@ -511,7 +628,92 @@ const CustomizeScreen = () => {
   useEffect(() => {
     setGroupProductsByGroup({});
     loadedGroupProductsRef.current = {};
+    setOptionProductsById({});
+    loadedOptionProductsRef.current = {};
   }, [activeProductId]);
+
+  const optionProductIdsNeedingImagesKey = useMemo(() => {
+    const ids = new Set();
+
+    Object.values(groupProductsByGroup).forEach(groupProducts => {
+      if (!Array.isArray(groupProducts)) {
+        return;
+      }
+
+      groupProducts.forEach(item => {
+        const product = item?.productChild;
+        const productId = normalizeEntityId(product?.id || product?.['@id']);
+        const productFiles = Array.isArray(product?.productFiles)
+          ? product.productFiles
+          : [];
+
+        if (productId && productFiles.length === 0) {
+          ids.add(productId);
+        }
+      });
+    });
+
+    return Array.from(ids).sort((left, right) => Number(left) - Number(right)).join(',');
+  }, [groupProductsByGroup]);
+
+  useEffect(() => {
+    const productIds = optionProductIdsNeedingImagesKey
+      .split(',')
+      .map(item => item.trim())
+      .filter(Boolean)
+      .filter(
+        productId =>
+          !optionProductsById[productId] &&
+          loadedOptionProductsRef.current[productId] !== 'loading' &&
+          loadedOptionProductsRef.current[productId] !== 'loaded',
+      );
+
+    if (productIds.length === 0) {
+      return;
+    }
+
+    let isActive = true;
+    productIds.forEach(productId => {
+      loadedOptionProductsRef.current[productId] = 'loading';
+    });
+
+    productsActionsRef.current
+      .getItems({
+        id: productIds,
+        itemsPerPage: Math.max(productIds.length, 1),
+      })
+      .then(items => {
+        if (!isActive) {
+          return;
+        }
+
+        const nextProducts = {};
+        (Array.isArray(items) ? items : []).forEach(product => {
+          const productId = normalizeEntityId(product?.id || product?.['@id']);
+          if (productId) {
+            nextProducts[productId] = product;
+          }
+        });
+
+        productIds.forEach(productId => {
+          loadedOptionProductsRef.current[productId] = 'loaded';
+        });
+
+        setOptionProductsById(prev => ({
+          ...prev,
+          ...nextProducts,
+        }));
+      })
+      .catch(() => {
+        productIds.forEach(productId => {
+          delete loadedOptionProductsRef.current[productId];
+        });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [optionProductIdsNeedingImagesKey, optionProductsById]);
 
   useFocusEffect(
     useCallback(() => {
@@ -531,7 +733,19 @@ const CustomizeScreen = () => {
       activeResolvedProductId,
     ]),
   );
-  const leaveCustomizeScreen = useCallback(() => {
+  const closeCustomizeScreen = useCallback(() => {
+    if (
+      typeof navigation.canGoBack === 'function' &&
+      navigation.canGoBack()
+    ) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.navigate('ShopIndex', {store: 'categories'});
+  }, [navigation]);
+
+  const finishCustomizeScreen = useCallback(() => {
     if (redirectToCart) {
       navigation.navigate('ShopCartPage');
       return;
@@ -791,10 +1005,56 @@ const CustomizeScreen = () => {
     !!activeProductIri &&
     !!activeOrderIri &&
     invalidGroupSummaries.length === 0;
+  const productCoverUrl = useMemo(
+    () => buildCoverUrl(activeProduct),
+    [activeProduct],
+  );
+  const selectedGroupsCount = groupSummaries.filter(
+    summary => summary.selectedCount > 0,
+  ).length;
+  const selectedOptionsCount = groupSummaries.reduce(
+    (sum, summary) => sum + (summary.selectedCount || 0),
+    0,
+  );
+  const complementsTotal = groupSummaries.reduce(
+    (sum, summary) => sum + parseNumericValue(summary.extraPrice),
+    0,
+  );
+  const basePrice = parseNumericValue(activeProduct?.price || activeOrderProduct?.price);
+  const itemQuantity = Number(activeOrderProduct?.quantity || 1);
+  const itemTotal = (basePrice + complementsTotal) * itemQuantity;
+  const submitLabel = isSavingCustomization
+    ? 'SALVANDO...'
+    : isEditingExistingOrderProduct
+      ? 'MODIFICAR'
+      : 'ADICIONAR';
+  const selectedOptionsLabel =
+    selectedOptionsCount === 1
+      ? '1 selecao feita'
+      : `${selectedOptionsCount} selecoes feitas`;
 
   const getProcessedOptions = group => {
     const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
     let options = getProductOptions(group);
+    const dedupedOptions = [];
+    const dedupedOptionIndexByKey = {};
+
+    options.forEach(option => {
+      const key = normalizeOptionDedupKey(option);
+      const existingIndex = dedupedOptionIndexByKey[key];
+
+      if (existingIndex === undefined) {
+        dedupedOptionIndexByKey[key] = dedupedOptions.length;
+        dedupedOptions.push(option);
+        return;
+      }
+
+      if (isSelected(groupId, option.value)) {
+        dedupedOptions[existingIndex] = option;
+      }
+    });
+
+    options = dedupedOptions;
     const selectedCount = groupSummariesById[groupId]?.selectedCount || 0;
     const maximum = resolveEffectiveGroupMaximum(group);
     const isMaxReached = maximum !== null && selectedCount >= maximum;
@@ -980,7 +1240,7 @@ const CustomizeScreen = () => {
         // order state in a shallow-merged, inconsistent hierarchy.
       }
 
-      leaveCustomizeScreen();
+      finishCustomizeScreen();
     } catch (error) {
       const message =
         error?.message ||
@@ -994,48 +1254,103 @@ const CustomizeScreen = () => {
     }
   };
 
+  const renderProductImage = ({product, imageUrl, wrapperStyle, imageStyle}) => {
+    if (imageUrl) {
+      return (
+        <View style={wrapperStyle}>
+          <Image source={{uri: imageUrl}} style={imageStyle} resizeMode="cover" />
+        </View>
+      );
+    }
+
+    return (
+      <View style={wrapperStyle}>
+        <View style={customizeHeroPlaceholderStyle({palette})}>
+          <Text style={customizeHeroPlaceholderTextStyle({palette})}>
+            {resolveProductInitial(product)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
   const renderOption = (group, option, index) => {
     const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
     const isOptionSelected = isSelected(groupId, option.value);
     const optionQuantityLabel = formatOptionQuantity(option.value?.quantity || 1);
+    const baseOptionProduct = option.value?.productChild;
+    const optionProductId = normalizeEntityId(
+      baseOptionProduct?.id || baseOptionProduct?.['@id'],
+    );
+    const hydratedOptionProduct = optionProductId
+      ? optionProductsById[optionProductId]
+      : null;
+    const optionProduct = hydratedOptionProduct
+      ? {
+          ...baseOptionProduct,
+          ...hydratedOptionProduct,
+        }
+      : baseOptionProduct;
+    const optionImageUrl = buildCoverUrl(optionProduct);
+    const optionPrice = parseNumericValue(option.value?.price);
     const optionUnitLabel =
-      option.value?.productChild?.productUnit?.productUnit ||
-      option.value?.productChild?.productUnity?.productUnit ||
-      option.value?.productChild?.productUnit?.unit ||
-      option.value?.productChild?.productUnity?.unit ||
+      optionProduct?.productUnit?.productUnit ||
+      optionProduct?.productUnity?.productUnit ||
+      optionProduct?.productUnit?.unit ||
+      optionProduct?.productUnity?.unit ||
       '';
 
     return (
-      <View
+      <TouchableOpacity
         key={`${group.id}-${index}`}
-        style={inlineStyle_344_8({
-          index: index,
-        })}>
-        <TouchableOpacity
-          onPress={() => handleToggleOption(groupId, option)}
-          style={inlineStyle_352_10}
-          disabled={option.disable}
-          activeOpacity={0.8}>
-          <View style={inlineStyle_354_16}>
-            <Text style={inlineStyle_355_18}>
-              {isOptionSelected ? '✓' : '○'}
+        onPress={() => handleToggleOption(groupId, option)}
+        style={customizeOptionTouchableStyle({
+          palette,
+          selected: isOptionSelected,
+          disabled: option.disable,
+        })}
+        disabled={option.disable}
+        activeOpacity={0.78}>
+        <View
+          style={customizeOptionControlStyle({
+            palette,
+            selected: isOptionSelected,
+          })}>
+          {isOptionSelected ? (
+            <View style={customizeOptionControlInnerStyle({palette})} />
+          ) : null}
+        </View>
+        <View style={customizeOptionImageWrapStyle({palette})}>
+          {optionImageUrl ? (
+            <Image
+              source={{uri: optionImageUrl}}
+              style={customizeOptionImageStyle}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={customizeOptionPlaceholderTextStyle({palette})}>
+              {resolveProductInitial(optionProduct)}
             </Text>
-            <View style={{flex: 1}}>
-              <Text style={styles.text}>{option.label}</Text>
-              <Text style={{color: '#8A94A6', fontSize: 12, marginTop: 2}}>
-                Adiciona {optionQuantityLabel}
-                {optionUnitLabel ? ` ${optionUnitLabel}` : ''}
-              </Text>
-            </View>
-          </View>
-          <View
-            style={inlineStyle_361_12}>
-            <Text style={styles.text}>
-              {Formatter.formatMoney(option.value?.price, 'R$', 'pt-br')}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          )}
+        </View>
+        <View style={customizeOptionBodyStyle}>
+          <Text style={customizeOptionNameStyle({palette})} numberOfLines={1}>
+            {option.label}
+          </Text>
+          <Text style={customizeOptionMetaStyle({palette})} numberOfLines={1}>
+            Adiciona {optionQuantityLabel}
+            {optionUnitLabel ? ` ${optionUnitLabel}` : ''}
+          </Text>
+        </View>
+        <Text
+          style={customizeOptionPriceStyle({
+            palette,
+            selected: isOptionSelected,
+          })}>
+          {optionPrice > 0 ? '+' : ''}
+          {Formatter.formatMoney(optionPrice, 'R$', 'pt-br')}
+        </Text>
+      </TouchableOpacity>
     );
   };
 
@@ -1049,19 +1364,34 @@ const CustomizeScreen = () => {
         summary?.maximum ?? null,
       ),
       `preco: ${summary?.priceCalculationLabel || 'soma'}`,
-      resolveCompactGroupStateLabel(summary),
     ];
 
     return (
-      <View key={group.id} style={inlineStyle_378_27}>
-        <Text style={[styles.text, {fontWeight: '700', color: '#23384D'}]}>
-          {group.productGroup}
-        </Text>
-        <Text style={inlineStyle_421_18}>{compactSummaryParts.join(' • ')}</Text>
-        {!summary?.isValid ? (
-          <Text style={inlineStyle_449_18}>{summary.validationMessage}</Text>
-        ) : null}
-        <View>
+      <View
+        key={group.id}
+        style={customizeGroupCardStyle({
+          palette,
+          isInvalid: !summary?.isValid,
+        })}>
+        <View style={customizeGroupHeaderStyle({palette})}>
+          <View style={customizeGroupTitleRowStyle}>
+            <Text style={customizeGroupTitleStyle({palette})} numberOfLines={2}>
+              {group.productGroup}
+            </Text>
+            <Text style={customizeGroupRuleStyle({palette})}>
+              {compactSummaryParts.join(' • ')}
+            </Text>
+          </View>
+          <Text style={customizeGroupMetaStyle({palette})}>
+            {resolveCompactGroupStateLabel(summary)}
+          </Text>
+          {!summary?.isValid ? (
+            <Text style={customizeGroupErrorStyle({palette})}>
+              {summary.validationMessage}
+            </Text>
+          ) : null}
+        </View>
+        <View style={customizeOptionsStackStyle}>
           {getProcessedOptions(group).map((item, index) =>
             renderOption(group, item, index),
           )}
@@ -1070,30 +1400,205 @@ const CustomizeScreen = () => {
     );
   };
 
-  return (
-    <View style={inlineStyle_401_10}>
-      <ScrollView
-        style={inlineStyle_402_18}
-        contentContainerStyle={{paddingBottom: 24}}>
-        {resolvedProductGroups.map(group => renderGroup(group))}
-      </ScrollView>
+  const renderSummary = ({compact = false} = {}) => (
+    <View style={customizeSummaryCardStyle({palette})}>
+      <View style={customizeSummaryHeaderStyle}>
+        <View>
+          <Text style={customizeSummaryTitleStyle({palette})}>
+            Resumo do item
+          </Text>
+          <Text style={customizeSummaryKickerStyle({palette})}>
+            {selectedOptionsLabel}
+          </Text>
+        </View>
+        <Text style={customizeSummaryKickerStyle({palette})}>total</Text>
+      </View>
+      <Text style={customizeSummaryTotalStyle({palette})}>
+        {Formatter.formatMoney(itemTotal, 'R$', 'pt-br')}
+      </Text>
+      <View style={customizeSummaryLineStyle({palette})}>
+        <Text style={customizeSummaryLabelStyle({palette})}>Preco base</Text>
+        <Text style={customizeSummaryValueStyle({palette})}>
+          {Formatter.formatMoney(basePrice, 'R$', 'pt-br')}
+        </Text>
+      </View>
+      <View style={customizeSummaryLineStyle({palette})}>
+        <Text style={customizeSummaryLabelStyle({palette})}>Complementos</Text>
+        <Text style={customizeSummaryValueStyle({palette})}>
+          {Formatter.formatMoney(complementsTotal, 'R$', 'pt-br')}
+        </Text>
+      </View>
+      {!compact ? (
+        <View style={customizeSummaryGroupListStyle}>
+          {groupSummaries.map(summary => (
+            <View
+              key={summary.groupId}
+              style={customizeSummaryGroupItemStyle({palette})}>
+              <Text
+                style={customizeSummaryGroupNameStyle({palette})}
+                numberOfLines={1}>
+                {summary.groupName}
+              </Text>
+              <Text
+                style={customizeSummaryGroupStateStyle({
+                  palette,
+                  valid: summary.isValid,
+                })}>
+                {summary.isValid
+                  ? `${summary.selectedCount}/${summary.maximum || summary.minimum || '-'}`
+                  : 'pendente'}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <View style={customizeQuantityRowStyle}>
+        <Text style={customizeSummaryLabelStyle({palette})}>Quantidade</Text>
+        <View style={customizeQuantityPillStyle({palette})}>
+          <Text style={customizeQuantityPillTextStyle({palette})}>
+            {itemQuantity} un
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderSubmitButton = () => {
+    const disabled = isSavingCustomization || !canSubmitCustomization;
+
+    return (
       <TouchableOpacity
         onPress={addHandle}
-        disabled={isSavingCustomization || !canSubmitCustomization}
-        style={[
-          globalStyles.button,
-          styles.customizeProduct?.Button,
-          !canSubmitCustomization && !isSavingCustomization ? {opacity: 0.65} : null,
-          {marginTop: 16, marginBottom: 8, maxHeight: '10%'},
-        ]}>
-        <Text style={styles.customizeProduct?.ButtonText}>
-          {isSavingCustomization
-            ? 'SALVANDO...'
-            : isEditingExistingOrderProduct
-              ? 'MODIFICAR'
-              : 'ADICIONAR'}
+        disabled={disabled}
+        style={customizeSubmitButtonStyle({
+          palette,
+          disabled,
+        })}
+        activeOpacity={0.82}>
+        <Text
+          style={customizeSubmitButtonTextStyle({
+            palette,
+            disabled,
+          })}>
+          {submitLabel}
         </Text>
       </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View
+      style={[
+        customizeScreenRootStyle({palette, isLargeScreen}),
+        Platform.OS === 'web' && isLargeScreen ? {backdropFilter: 'blur(7px)'} : null,
+      ]}>
+      {isLargeScreen ? (
+        <TouchableOpacity
+          onPress={closeCustomizeScreen}
+          style={customizeBackdropPressableStyle}
+          activeOpacity={1}
+        />
+      ) : null}
+      <View
+        style={customizeScreenBackdropStyle({
+          isLargeScreen,
+          modalHeight,
+          modalWidth,
+        })}>
+        <View
+          style={customizeModalStyle({
+            palette,
+            isLargeScreen,
+            modalHeight,
+            modalWidth,
+          })}>
+          <View style={customizeMainColumnStyle({palette, isLargeScreen})}>
+            <ScrollView
+              style={customizeScrollStyle}
+              contentContainerStyle={customizeScrollContentStyle({
+                isLargeScreen,
+              })}>
+              <View style={customizeHeaderStyle({isLargeScreen})}>
+                <View style={customizeHeaderContentStyle}>
+                  <Text style={customizeEyebrowStyle({palette})}>
+                    Personalizacao
+                  </Text>
+                  <View style={customizeTitleRowStyle}>
+                    <Text
+                      style={customizeTitleStyle({palette, isLargeScreen})}
+                      numberOfLines={3}>
+                      {activeProduct?.product || 'Produto'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={closeCustomizeScreen}
+                      style={customizeCloseButtonStyle({palette})}
+                      activeOpacity={0.78}>
+                      <MaterialCommunityIcons
+                        name="close"
+                        size={20}
+                        color={palette.muted}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {activeProduct?.description ? (
+                    <Text
+                      style={customizeDescriptionStyle({
+                        palette,
+                        isLargeScreen,
+                      })}
+                      numberOfLines={3}>
+                      {activeProduct.description}
+                    </Text>
+                  ) : null}
+                  <View style={customizeChipRowStyle}>
+                    <View style={customizeChipStyle({palette})}>
+                      <Text style={customizeChipTextStyle({palette})}>
+                        {resolvedProductGroups.length} grupo
+                        {resolvedProductGroups.length === 1 ? '' : 's'}
+                      </Text>
+                    </View>
+                    <View style={customizeChipStyle({palette})}>
+                      <Text style={customizeChipTextStyle({palette})}>
+                        {selectedGroupsCount} grupo
+                        {selectedGroupsCount === 1 ? '' : 's'} com selecao
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+                {renderProductImage({
+                  product: activeProduct,
+                  imageUrl: productCoverUrl,
+                  wrapperStyle: customizeHeroImageWrapStyle({
+                    palette,
+                    isLargeScreen,
+                  }),
+                  imageStyle: customizeHeroImageStyle,
+                })}
+              </View>
+              {!isLargeScreen ? (
+                <View style={customizeMobileSummaryWrapStyle}>
+                  {renderSummary({compact: true})}
+                </View>
+              ) : null}
+              <View style={customizeGroupsStackStyle}>
+                {resolvedProductGroups.map(group => renderGroup(group))}
+              </View>
+            </ScrollView>
+          </View>
+          {isLargeScreen ? (
+            <View style={customizeSummaryColumnStyle({palette, isLargeScreen})}>
+              {renderSummary()}
+              <View style={customizeFooterStyle({palette, isLargeScreen})}>
+                {renderSubmitButton()}
+              </View>
+            </View>
+          ) : (
+            <View style={customizeFooterFloatingStyle({palette})}>
+              {renderSubmitButton()}
+            </View>
+          )}
+        </View>
+      </View>
     </View>
   );
 };

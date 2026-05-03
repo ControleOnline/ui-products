@@ -49,9 +49,11 @@ const ordersRoutes = [
     name: 'CustomizeScreen',
     component: CustomizeScreen,
     options: {
-      headerShown: true,
-      title: 'Customizar',
+      headerShown: false,
       showBottomCart: false,
+      presentation: 'transparentModal',
+      animation: 'fade',
+      contentStyle: {backgroundColor: 'transparent'},
     },
     initialParams: { store: 'products' },
   },
