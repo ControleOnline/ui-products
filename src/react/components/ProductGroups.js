@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, TextInput, Switch, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, Switch, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
@@ -30,6 +30,7 @@ import { inlineStyle_101_14 } from './ProductGroups.styles';
  * Campos válidos de product_group (confirmados no banco):
  *  id, parent_product_id, product_group, price_calculation,
  *  required, minimum, maximum, active, group_order
+ * A associação produto ↔ grupo também é gravada em product_group_parent.
  *
  * Removidos por não existirem no banco:
  *  extraData, bomVersion, validFrom, validTo
@@ -48,6 +49,45 @@ const parseInteger = value => {
   return Number.isFinite(n) ? n : null;
 };
 
+const extractItems = response => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
+  if (Array.isArray(response?.member)) return response.member;
+  return [];
+};
+
+const normalizeEntityId = value => {
+  if (!value) return '';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'string') return String(value).replace(/\D/g, '');
+  return String(value?.id || value?.['@id'] || '').replace(/\D/g, '');
+};
+
+const toProductIri = value => {
+  const id = normalizeEntityId(value);
+  return id ? `/products/${id}` : null;
+};
+
+const toProductGroupIri = value => {
+  const id = normalizeEntityId(value);
+  return id ? `/product_groups/${id}` : null;
+};
+
+const isDuplicateError = error => {
+  const raw = String(
+    error?.response?.data?.['hydra:description'] ||
+    error?.response?.data?.detail ||
+    error?.message ||
+    '',
+  ).toLowerCase();
+  return raw.includes('duplicate') || raw.includes('unique');
+};
+
+const isImportedGroup = (group, productId) => {
+  const parentId = normalizeEntityId(group?.parentProduct);
+  return !!parentId && String(parentId) !== String(productId || '');
+};
+
 /* Normaliza apenas campos que existem na entidade */
 const normalizeGroupDraft = group => ({
   productGroup: String(group?.productGroup || ''),
@@ -59,7 +99,7 @@ const normalizeGroupDraft = group => ({
 });
 
 /* ─── Validação por campo ─── */
-const validateGroupDraft = (draft, required) => {
+const validateGroupDraft = draft => {
   const errs = {};
 
   if (!String(draft.productGroup || '').trim()) {
@@ -301,12 +341,136 @@ const GroupEditModal = ({
   );
 };
 
+const GroupImportModal = ({
+  visible, groups, loading, importingId, error,
+  onClose, onImport, brandColors,
+}) => {
+  const [search, setSearch] = useState('');
+  const normalizedSearch = String(search || '').trim().toLowerCase();
+  const filteredGroups = useMemo(() => {
+    if (!normalizedSearch) return groups;
+    return groups.filter(group =>
+      String(group?.productGroup || '').toLowerCase().includes(normalizedSearch)
+    );
+  }, [groups, normalizedSearch]);
+
+  useEffect(() => {
+    if (!visible) setSearch('');
+  }, [visible]);
+
+  return (
+    <AnimatedModal visible={visible} onRequestClose={onClose} style={inlineStyle_153_62}>
+      <View style={styles.importModal}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Importar Grupo</Text>
+          <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
+            <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.importModalBody}>
+          {!!error && (
+            <View style={styles.errorBox}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#9e1b1b" style={inlineStyle_166_94} />
+              <Text style={[styles.errorText, { flex: 1 }]}>{error}</Text>
+            </View>
+          )}
+
+          <View style={styles.searchInputWrap}>
+            <MaterialCommunityIcons name="magnify" size={20} color="#94A3B8" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Pesquisar grupo..."
+              placeholderTextColor="#CBD5E1"
+              style={styles.searchInput}
+              autoFocus={visible}
+              returnKeyType="search"
+            />
+            {!!search && (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <MaterialCommunityIcons name="close-circle" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <ScrollView style={styles.importList} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {loading && (
+              <View style={styles.importEmpty}>
+                <ActivityIndicator size="small" color="#94A3B8" />
+                <Text style={styles.importEmptyText}>Buscando grupos...</Text>
+              </View>
+            )}
+
+            {!loading && filteredGroups.length === 0 && (
+              <View style={styles.importEmpty}>
+                <MaterialCommunityIcons name="format-list-group" size={36} color="#CBD5E1" />
+                <Text style={styles.importEmptyText}>Nenhum grupo disponível</Text>
+              </View>
+            )}
+
+            {!loading && filteredGroups.map(group => {
+              const gid = normalizeEntityId(group);
+              const minMax = [group.minimum, group.maximum].filter(v => v != null).join(' – ');
+              const calcLabel = PRICE_CALCULATION_OPTIONS.find(o => o.value === group.priceCalculation)?.label || '';
+              const importing = String(importingId || '') === String(gid);
+
+              return (
+                <TouchableOpacity
+                  key={gid || String(group?.['@id'])}
+                  style={styles.importGroupItem}
+                  onPress={() => onImport(group)}
+                  disabled={!!importingId}
+                  activeOpacity={0.75}
+                >
+                  <View style={inlineStyle_498_22}>
+                    <Text style={styles.importGroupName} numberOfLines={1}>
+                      {group.productGroup || 'Grupo'}
+                    </Text>
+                    <View style={styles.cardMeta}>
+                      {!!minMax && (
+                        <View style={styles.badge}>
+                          <MaterialCommunityIcons name="swap-horizontal" size={11} color="#64748B" />
+                          <Text style={styles.badgeText}>{minMax}</Text>
+                        </View>
+                      )}
+                      {group.required && (
+                        <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
+                          <Text style={[styles.badgeText, { color: '#92400E' }]}>Obrigatório</Text>
+                        </View>
+                      )}
+                      {!!calcLabel && (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>{calcLabel}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  {importing ? (
+                    <ActivityIndicator size="small" color={brandColors?.primary || '#3B82F6'} />
+                  ) : (
+                    <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary || '#3B82F6'} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </View>
+    </AnimatedModal>
+  );
+};
+
 /* ─── Componente principal ─── */
 const ProductGroups = ({ ProductId }) => {
   const productGroupStore = useStore('product_group');
+  const productGroupParentStore = useStore('product_group_parent');
+  const productGroupProductStore = useStore('product_group_product');
   const peopleStore = useStore('people');
 
   const { actions } = productGroupStore;
+  const groupParentActions = productGroupParentStore.actions;
+  const groupProductActions = productGroupProductStore.actions;
   const { currentCompany } = peopleStore.getters;
   const brandColors = useMemo(() => resolveThemePalette(), []);
 
@@ -322,6 +486,13 @@ const ProductGroups = ({ ProductId }) => {
   const [modalError, setModalError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
+  /* importação */
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importCandidates, setImportCandidates] = useState([]);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importingId, setImportingId] = useState('');
+  const [importError, setImportError] = useState('');
+
   /* confirmação de exclusão */
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(null);
   const [removing, setRemoving] = useState(false);
@@ -334,9 +505,10 @@ const ProductGroups = ({ ProductId }) => {
     setLoadingGroups(true);
     return actions
       .getItems({
-        parentProduct: `/products/${ProductId}`,
-        people: currentCompany?.id,
+        product: ProductId,
         itemsPerPage: 200,
+        'order[groupOrder]': 'ASC',
+        'order[productGroup]': 'ASC',
       })
       .then(response => {
         const items = Array.isArray(response)
@@ -355,6 +527,169 @@ const ProductGroups = ({ ProductId }) => {
     if (currentCompany?.id) loadData();
     else setLoadingGroups(false);
   }, [currentCompany?.id, loadData]);
+
+  const ensureGroupParentLink = useCallback(async groupValue => {
+    const productGroup = toProductGroupIri(groupValue);
+    const parentProduct = toProductIri(ProductId);
+    if (!productGroup || !parentProduct) return;
+
+    try {
+      await groupParentActions.save({
+        productGroup,
+        parentProduct,
+        active: true,
+      });
+    } catch (e) {
+      if (!isDuplicateError(e)) throw e;
+    }
+  }, [ProductId, groupParentActions]);
+
+  const fetchGroupItems = useCallback(async (product, productGroup) => {
+    if (!productGroup) return [];
+    const params = {
+      productGroup,
+      itemsPerPage: 500,
+      ...(product ? { product } : {}),
+    };
+    const response = await groupProductActions.getItems(params);
+    return extractItems(response);
+  }, [groupProductActions]);
+
+  const copyGroupItemsToProduct = useCallback(async group => {
+    const productGroup = toProductGroupIri(group);
+    const targetProduct = toProductIri(ProductId);
+    if (!productGroup || !targetProduct) return;
+
+    const sourceProduct = toProductIri(group?.parentProduct);
+    const sourceItems = await fetchGroupItems(sourceProduct, productGroup);
+    const existingItems = await fetchGroupItems(targetProduct, productGroup);
+    const existingChildren = new Set(
+      existingItems
+        .map(item => normalizeEntityId(item?.productChild))
+        .filter(Boolean)
+    );
+
+    const itemsByChild = new Map();
+    sourceItems.forEach(item => {
+      const childIri = toProductIri(item?.productChild);
+      const childId = normalizeEntityId(item?.productChild);
+      if (!childIri || !childId || childId === String(ProductId || '') || existingChildren.has(childId)) {
+        return;
+      }
+      if (!itemsByChild.has(childId)) itemsByChild.set(childId, item);
+    });
+
+    for (const item of itemsByChild.values()) {
+      try {
+        await groupProductActions.save({
+          product: targetProduct,
+          productGroup,
+          productChild: toProductIri(item?.productChild),
+          productType: item?.productType || 'component',
+          quantity: Number(item?.quantity) > 0 ? Number(item.quantity) : 1,
+          price: Number(item?.price) || 0,
+          active: item?.active ?? true,
+        });
+      } catch (e) {
+        if (!isDuplicateError(e)) throw e;
+      }
+    }
+  }, [ProductId, fetchGroupItems, groupProductActions]);
+
+  const removeImportedGroupFromProduct = useCallback(async group => {
+    const productGroup = toProductGroupIri(group);
+    const parentProduct = toProductIri(ProductId);
+    if (!productGroup || !parentProduct) return;
+
+    const items = await fetchGroupItems(parentProduct, productGroup);
+    for (const item of items) {
+      const id = normalizeEntityId(item);
+      if (id) await groupProductActions.remove(id);
+    }
+
+    const links = extractItems(await groupParentActions.getItems({
+      productGroup,
+      parentProduct,
+      itemsPerPage: 20,
+    }));
+    for (const link of links) {
+      const id = normalizeEntityId(link);
+      if (id) await groupParentActions.remove(id);
+    }
+  }, [ProductId, fetchGroupItems, groupParentActions, groupProductActions]);
+
+  const loadImportCandidates = useCallback(async () => {
+    if (!currentCompany?.id) {
+      setImportCandidates([]);
+      return [];
+    }
+
+    setImportLoading(true);
+    setImportError('');
+    try {
+      const response = await actions.getItems({
+        'parentProduct.company': `/people/${currentCompany.id}`,
+        itemsPerPage: 300,
+        'order[productGroup]': 'ASC',
+      });
+      const associatedIds = new Set(groups.map(group => normalizeEntityId(group)).filter(Boolean));
+      const candidates = extractItems(response)
+        .filter(group => {
+          const id = normalizeEntityId(group);
+          return id && group?.active !== false && !associatedIds.has(id);
+        });
+
+      setImportCandidates(candidates);
+      return candidates;
+    } catch (e) {
+      const detail =
+        e?.response?.data?.['hydra:description'] ||
+        e?.response?.data?.detail ||
+        e?.message || '';
+      setImportError(detail || 'Falha ao buscar grupos.');
+      setImportCandidates([]);
+      return [];
+    } finally {
+      setImportLoading(false);
+    }
+  }, [actions, currentCompany?.id, groups]);
+
+  const openImportModal = () => {
+    setImportModalVisible(true);
+    setImportCandidates([]);
+    setImportError('');
+    setImportingId('');
+    loadImportCandidates();
+  };
+
+  const handleImportGroup = async group => {
+    const gid = normalizeEntityId(group);
+    if (!gid) return;
+
+    setImportError('');
+    setImportingId(gid);
+    try {
+      await ensureGroupParentLink(group);
+      await copyGroupItemsToProduct(group);
+      await loadData();
+      setExpanded(prev => ({ ...prev, [toProductGroupIri(group) || gid]: true }));
+      setImportModalVisible(false);
+      setImportCandidates([]);
+      emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
+        productId: ProductId,
+        productGroupId: gid,
+        source: 'ProductGroups.importGroup',
+      });
+    } catch (e) {
+      const detail =
+        e?.response?.data?.['hydra:description'] ||
+        e?.response?.data?.detail ||
+        e?.message || '';
+      setImportError(detail || 'Falha ao importar grupo.');
+    } finally {
+      setImportingId('');
+    }
+  };
 
   const openCreateModal = () => {
     setEditingGroup(null);
@@ -433,7 +768,10 @@ const ProductGroups = ({ ProductId }) => {
           };
 
       const saved = await actions.save(payload);
-      const items = await loadData();
+      if (!editingGroup) {
+        await ensureGroupParentLink(saved);
+      }
+      await loadData();
 
       if (!editingGroup && saved) {
         const newId = String(saved?.['@id'] || saved?.id || '');
@@ -462,7 +800,11 @@ const ProductGroups = ({ ProductId }) => {
     if (!gid) { setConfirmDeleteGroup(null); return; }
     setRemoving(true);
     try {
-      await actions.remove(gid);
+      if (isImportedGroup(confirmDeleteGroup, ProductId)) {
+        await removeImportedGroupFromProduct(confirmDeleteGroup);
+      } else {
+        await actions.remove(gid);
+      }
       await loadData();
       emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
         productId: ProductId,
@@ -506,6 +848,7 @@ const ProductGroups = ({ ProductId }) => {
           const isExpanded = !!expanded[gid];
           const minMax = [group.minimum, group.maximum].filter(v => v != null).join(' – ');
           const calcLabel = PRICE_CALCULATION_OPTIONS.find(o => o.value === group.priceCalculation)?.label || '';
+          const imported = isImportedGroup(group, ProductId);
 
           return (
             <View key={gid} style={styles.card}>
@@ -529,6 +872,11 @@ const ProductGroups = ({ ProductId }) => {
                     {group.required && (
                       <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
                         <Text style={[styles.badgeText, { color: '#92400E' }]}>Obrigatório</Text>
+                      </View>
+                    )}
+                    {imported && (
+                      <View style={[styles.badge, { backgroundColor: '#ECFEFF' }]}>
+                        <Text style={[styles.badgeText, { color: '#0E7490' }]}>Importado</Text>
                       </View>
                     )}
                     {!!calcLabel && (
@@ -581,14 +929,24 @@ const ProductGroups = ({ ProductId }) => {
       {/* Barra inferior: adicionar grupo */}
       {!!ProductId && (
         <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.addGroupBtn, { backgroundColor: brandColors?.primary }]}
-            onPress={openCreateModal}
-            activeOpacity={0.85}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.addGroupBtnText}>Adicionar Grupo</Text>
-          </TouchableOpacity>
+          <View style={styles.bottomBarRow}>
+            <TouchableOpacity
+              style={styles.importGroupBtn}
+              onPress={openImportModal}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary || '#3B82F6'} />
+              <Text style={[styles.importGroupBtnText, { color: brandColors?.primary || '#3B82F6' }]}>Importar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addGroupBtn, { backgroundColor: brandColors?.primary }]}
+              onPress={openCreateModal}
+              activeOpacity={0.85}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+              <Text style={styles.addGroupBtnText}>Adicionar Grupo</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
       {/* Modal de edição */}
@@ -602,6 +960,16 @@ const ProductGroups = ({ ProductId }) => {
         error={modalError}
         fieldErrors={fieldErrors}
         onChangeDraft={handleChangeDraft}
+        brandColors={brandColors}
+      />
+      <GroupImportModal
+        visible={importModalVisible}
+        groups={importCandidates}
+        loading={importLoading}
+        importingId={importingId}
+        error={importError}
+        onClose={() => setImportModalVisible(false)}
+        onImport={handleImportGroup}
         brandColors={brandColors}
       />
       {/* Modal de confirmação de exclusão */}
@@ -619,7 +987,17 @@ const ProductGroups = ({ ProductId }) => {
           />
           <Text style={styles.confirmTitle}>Excluir grupo?</Text>
           <Text style={styles.confirmSubtitle}>
-            O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> e todos os seus modificadores serão removidos. Esta ação não pode ser desfeita.
+            {isImportedGroup(confirmDeleteGroup, ProductId)
+              ? (
+                <>
+                  O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> será removido deste produto.
+                </>
+              )
+              : (
+                <>
+                  O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> e todos os seus modificadores serão removidos. Esta ação não pode ser desfeita.
+                </>
+              )}
           </Text>
           <View style={styles.confirmFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeleteGroup(null)}>

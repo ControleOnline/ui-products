@@ -111,6 +111,7 @@ const styles = StyleSheet.create({
     }),
   },
   addGroupBtn: {
+    flex: 1.3,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -121,6 +122,26 @@ const styles = StyleSheet.create({
   addGroupBtnText: {
     color: '#fff',
     fontSize: 16,
+    fontWeight: '700',
+  },
+  bottomBarRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  importGroupBtn: {
+    flex: 0.8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#fff',
+  },
+  importGroupBtnText: {
+    fontSize: 15,
     fontWeight: '700',
   },
 
@@ -284,6 +305,74 @@ const styles = StyleSheet.create({
   },
   pickerOptionText: { fontSize: 15, color: '#0F172A' },
 
+  /* import */
+  importModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '86%',
+    width: '100%',
+    ...Platform.select({
+      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 10 },
+    }),
+  },
+  importModalBody: {
+    padding: 20,
+    paddingBottom: 24,
+  },
+  searchInputWrap: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    marginBottom: 14,
+  },
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    color: '#0F172A',
+    fontSize: 15,
+    paddingVertical: 12,
+  },
+  importList: {
+    maxHeight: 420,
+  },
+  importEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    gap: 10,
+  },
+  importEmptyText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  importGroupItem: {
+    minHeight: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  importGroupName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 5,
+  },
+
   /* erro */
   errorBox: {
     backgroundColor: '#FFF3F3',
@@ -400,5 +489,4 @@ export const inlineStyle_606_26 = {
 export const inlineStyle_101_14 = {
   padding: 16,
 };
-
 
