@@ -54,6 +54,18 @@ const styles = StyleSheet.create({
   tabsContainer: {
     flex: 1,
   },
+  feedstockTabContent: {
+    flex: 1,
+    padding: 16,
+  },
+  feedstockCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
 });
 
 export default styles;
