@@ -59,6 +59,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.3,
   },
+  queueLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 5,
+  },
+  queueText: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
   managerMeta: {
     flexDirection: 'row',
     alignItems: 'center',

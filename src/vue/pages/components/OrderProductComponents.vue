@@ -49,6 +49,13 @@ export default {
         .then((products) => {
           let grouped = products.reduce((acc, product) => {
             if (!product.productGroup) return acc;
+            if (
+              product.showInParentQueue === false ||
+              product.show_in_parent_queue === false ||
+              product.showProductGroupInQueue === false ||
+              product.show_product_group_in_queue === false
+            )
+              return acc;
             const groupId = product.productGroup.id;
             if (!acc[groupId]) acc[groupId] = product.productGroup;
             if (!acc[groupId]["products"]) acc[groupId]["products"] = [];

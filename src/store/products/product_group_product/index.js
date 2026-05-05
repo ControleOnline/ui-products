@@ -54,7 +54,7 @@ export default {
         align: 'left',
         label: 'productChild',
         list: 'products/getItems',
-        saveFormat(value, column, row) {
+        saveFormat(value) {
           return '/products/' + value.value;
         },
 
@@ -76,6 +76,23 @@ export default {
         },
         format(value) {
           return Formatter.formatMoney(value);
+        },
+      },
+      {
+        sortable: true,
+        name: 'showInParentQueue',
+        externalFilter: false,
+        align: 'left',
+        label: 'showInParentQueue',
+        list: [
+          { value: true, label: 'Sim' },
+          { value: false, label: 'Nao' },
+        ],
+        format: function (value) {
+          return value === false ? 'Nao' : 'Sim';
+        },
+        saveFormat: function (value) {
+          return value !== false;
         },
       },
     ],
