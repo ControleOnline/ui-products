@@ -475,7 +475,6 @@ const ProductGroups = ({ ProductId }) => {
   const brandColors = useMemo(() => resolveThemePalette(), []);
 
   const [groups, setGroups] = useState([]);
-  const [groupParentLinks, setGroupParentLinks] = useState({});
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [expanded, setExpanded] = useState({});
 
@@ -498,45 +497,20 @@ const ProductGroups = ({ ProductId }) => {
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(null);
   const [removing, setRemoving] = useState(false);
 
-  const loadGroupParentLinks = useCallback(async () => {
-    const parentProduct = toProductIri(ProductId);
-    if (!parentProduct) {
-      setGroupParentLinks({});
-      return {};
-    }
-
-    const response = await groupParentActions.getItems({
-      parentProduct,
-      itemsPerPage: 500,
-    }).catch(() => []);
-
-    const linksByGroupId = {};
-    extractItems(response).forEach(link => {
-      const groupId = normalizeEntityId(link?.productGroup);
-      if (groupId) linksByGroupId[groupId] = link;
-    });
-
-    setGroupParentLinks(linksByGroupId);
-    return linksByGroupId;
-  }, [ProductId, groupParentActions]);
-
   const loadData = useCallback(() => {
     if (!ProductId || !currentCompany?.id) {
       setLoadingGroups(false);
       return Promise.resolve([]);
     }
     setLoadingGroups(true);
-    return Promise.all([
-      actions
+    return actions
       .getItems({
         product: ProductId,
         itemsPerPage: 200,
         'order[groupOrder]': 'ASC',
         'order[productGroup]': 'ASC',
-      }),
-      loadGroupParentLinks(),
-    ])
-      .then(([response]) => {
+      })
+      .then(response => {
         const items = Array.isArray(response)
           ? response
           : Array.isArray(response?.['hydra:member'])
@@ -547,7 +521,7 @@ const ProductGroups = ({ ProductId }) => {
         return items;
       })
       .catch(() => { setLoadingGroups(false); return []; });
-  }, [ProductId, currentCompany?.id, actions, loadGroupParentLinks]);
+  }, [ProductId, currentCompany?.id, actions]);
 
   useEffect(() => {
     if (currentCompany?.id) loadData();
@@ -569,41 +543,6 @@ const ProductGroups = ({ ProductId }) => {
       if (!isDuplicateError(e)) throw e;
     }
   }, [ProductId, groupParentActions]);
-
-  const resolveGroupParentLink = useCallback(group => {
-    const groupId = normalizeEntityId(group);
-    return groupId ? groupParentLinks[groupId] : null;
-  }, [groupParentLinks]);
-
-  const handleToggleGroupQueueVisibility = useCallback(async (group, showInQueue) => {
-    const productGroup = toProductGroupIri(group);
-    const parentProduct = toProductIri(ProductId);
-    if (!productGroup || !parentProduct) return;
-
-    const currentLink = resolveGroupParentLink(group);
-    const payload = {
-      ...(currentLink?.id ? { id: currentLink.id } : {}),
-      productGroup,
-      parentProduct,
-      active: currentLink?.active ?? true,
-      showInQueue,
-    };
-
-    const saved = await groupParentActions.save(payload);
-    const groupId = normalizeEntityId(group);
-    if (groupId) {
-      setGroupParentLinks(prev => ({
-        ...prev,
-        [groupId]: saved || { ...payload, productGroup: group, parentProduct },
-      }));
-    }
-
-    emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
-      productId: ProductId,
-      productGroupId: groupId,
-      source: 'ProductGroups.toggleQueueVisibility',
-    });
-  }, [ProductId, groupParentActions, resolveGroupParentLink]);
 
   const fetchGroupItems = useCallback(async (product, productGroup) => {
     if (!productGroup) return [];
