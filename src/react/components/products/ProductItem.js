@@ -6,6 +6,7 @@ import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/f
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
+import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
 import { APP_ENV } from '@controleonline/../../config/env.js';
 import styles from './ProductItem.styles';
 
@@ -30,7 +31,14 @@ const buildCoverUrl = (files, coverRelationId) => {
   return resolveFileImageUrl(first.file)
 }
 
-const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
+const ProductItem = ({
+  product,
+  category,
+  interactionMode = 'auto',
+  marketplaceStatuses = [],
+  onMarketplaceSync,
+  marketplaceSyncingKey = '',
+}) => {
   const navigation = useNavigation();
   const coverUrl = buildCoverUrl(product.productFiles, product?.extraData?.imageCoverRelationId)
   const hasImage = !!coverUrl
@@ -90,9 +98,18 @@ const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
 
       <View style={[styles.body, !hasImage && styles.bodyNoImage]}>
         <View>
-          <Text style={styles.name} numberOfLines={2}>
-            {product.product}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={2}>
+              {product.product}
+            </Text>
+            <MarketplaceSyncIndicators
+              entityLabel={product.product}
+              entityType="product"
+              statuses={marketplaceStatuses}
+              onSync={onMarketplaceSync}
+              syncingKey={marketplaceSyncingKey}
+            />
+          </View>
           {typeConf && (
             <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
               <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>

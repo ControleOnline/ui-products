@@ -41,10 +41,16 @@ const styles = StyleSheet.create({
   },
 
   name: {
+    flex: 1,
     fontSize: 15,
     fontWeight: '700',
     color: '#0F172A',
     lineHeight: 20,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 4,
   },
   typeChip: {

@@ -19,6 +19,8 @@ import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
 import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports'
 import {searchCompanyProducts} from '@controleonline/ui-common/src/react/utils/commercialDocumentOrders'
+import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators'
+import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
 
 import {
   readCachedCategories,
@@ -107,6 +109,14 @@ const CategoriesPage = ({ route }) => {
 
   const peopleStore = useStore('people')
   const { currentCompany } = peopleStore.getters
+  const {
+    getCategoryStatuses,
+    hasActivePlatforms,
+    loadCatalogStatus,
+    syncAllEligible,
+    syncEntity,
+    syncingKey: marketplaceSyncingKey,
+  } = useMarketplaceCatalogSync(isManagerApp ? currentCompany?.id : null)
 
   const themeStore = useStore('theme')
   const { colors: themeColors } = themeStore.getters
@@ -203,9 +213,10 @@ const CategoriesPage = ({ route }) => {
 
         if (isManagerApp) {
           loadMenuModels()
+          loadCatalogStatus().catch(() => {})
         }
       }
-    }, [currentCompany?.id, categoryActions, isManagerApp, loadMenuModels])
+    }, [currentCompany?.id, categoryActions, isManagerApp, loadCatalogStatus, loadMenuModels])
   )
 
   const changeCategory = category => {
@@ -480,6 +491,36 @@ const CategoriesPage = ({ route }) => {
     menuModels,
     selectedMenuModel,
   ])
+
+  const openIntegrationsPage = useCallback(() => {
+    navigation.navigate('IntegrationsPage')
+  }, [navigation])
+
+  const handleSyncAllEligible = useCallback(async () => {
+    try {
+      await syncAllEligible()
+    } catch (error) {
+      Alert.alert(
+        'Sincronizacao nao concluida',
+        error?.message || 'Nao foi possivel sincronizar os produtos elegiveis.',
+      )
+    }
+  }, [syncAllEligible])
+
+  const handleMarketplaceSync = useCallback(
+    async (platformKey, status, syncKey) => {
+      try {
+        await syncEntity(platformKey, status, { syncKey })
+      } catch (error) {
+        Alert.alert(
+          'Sincronizacao nao concluida',
+          error?.message || 'Nao foi possivel sincronizar este item.',
+        )
+        throw error
+      }
+    },
+    [syncEntity],
+  )
 
   const getColumns = () => {
     if (width < 640) return 2
@@ -788,6 +829,37 @@ const CategoriesPage = ({ route }) => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  style={[styles.actionButton, styles.integrationButton]}
+                  onPress={openIntegrationsPage}
+                  activeOpacity={0.85}
+                >
+                  <MaterialCommunityIcons name="cloud-sync-outline" size={18} color="#0369A1" />
+                  <Text style={[styles.actionButtonText, styles.integrationButtonText]}>
+                    Sincronias
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    styles.syncEligibleButton,
+                    (!hasActivePlatforms || marketplaceSyncingKey === 'all') && styles.disabledActionButton,
+                  ]}
+                  onPress={handleSyncAllEligible}
+                  activeOpacity={0.85}
+                  disabled={!hasActivePlatforms || marketplaceSyncingKey === 'all'}
+                >
+                  {marketplaceSyncingKey === 'all' ? (
+                    <ActivityIndicator size="small" color="#047857" />
+                  ) : (
+                    <MaterialCommunityIcons name="cloud-upload-outline" size={18} color="#047857" />
+                  )}
+                  <Text style={[styles.actionButtonText, styles.syncEligibleButtonText]}>
+                    {marketplaceSyncingKey === 'all' ? 'Sincronizando...' : 'Sincronizar todos os elegiveis'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={[
                     styles.actionButton,
                     styles.catalogButton,
@@ -920,6 +992,18 @@ const CategoriesPage = ({ route }) => {
                         </View>
 
                         {isManagerApp && (
+                          <View style={styles.syncOverlay}>
+                            <MarketplaceSyncIndicators
+                              entityLabel={category.name}
+                              entityType="category"
+                              statuses={getCategoryStatuses(category)}
+                              onSync={handleMarketplaceSync}
+                              syncingKey={marketplaceSyncingKey}
+                            />
+                          </View>
+                        )}
+
+                        {isManagerApp && (
                           <TouchableOpacity
                             onPress={() => openEditModal(category)}
                             style={styles.editOverlay}
@@ -969,7 +1053,10 @@ const CategoriesPage = ({ route }) => {
                 ref={formRef}
                 category={selectedCategory}
                 onClose={closeModal}
-                onSaved={saved => setSelectedCategory(saved || null)}
+                onSaved={saved => {
+                  setSelectedCategory(saved || null)
+                  loadCatalogStatus().catch(() => {})
+                }}
               />
 
               {selectedCategory?.id && (
