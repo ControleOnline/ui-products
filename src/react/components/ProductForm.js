@@ -55,24 +55,43 @@ const extractId = value => {
   return '';
 };
 
-const extractCategoryId = data => {
-  const candidates = [
-    data?.productCategory?.category,
-    data?.productCategory?.category?.id,
-    data?.productCategory?.category?.['@id'],
-    data?.productCategories?.[0]?.category,
-    data?.productCategories?.[0]?.category?.id,
-    data?.productCategories?.[0]?.category?.['@id'],
-    data?.category,
-    data?.category?.id,
-    data?.category?.['@id'],
-    data?.categoryId,
-  ];
-  for (const candidate of candidates) {
-    const id = extractId(candidate);
-    if (id) return id;
-  }
-  return '';
+const extractCategoryIdValue = value => {
+  const id = extractId(value);
+  return /^\d+$/.test(String(id || '')) ? String(id) : '';
+};
+
+const collectionFrom = value => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value.member)) return value.member;
+  if (Array.isArray(value['hydra:member'])) return value['hydra:member'];
+  return [value];
+};
+
+const uniqueCategoryIds = ids => {
+  const seen = new Set();
+  return ids
+    .map(extractCategoryIdValue)
+    .filter(Boolean)
+    .filter(id => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+};
+
+const extractCategoryIds = data => {
+  const ids = [];
+
+  collectionFrom(data?.productCategory).forEach(relation => {
+    ids.push(relation?.category);
+  });
+  collectionFrom(data?.productCategories).forEach(relation => {
+    ids.push(relation?.category);
+  });
+  ids.push(data?.category, data?.category?.id, data?.category?.['@id'], data?.categoryId);
+
+  return uniqueCategoryIds(ids);
 };
 
 const normalizeProductForForm = data => {
@@ -156,6 +175,91 @@ const SelectField = ({ label, value, options, onChange, placeholder = 'Seleciona
   );
 };
 
+const CategoryMultiSelectField = ({ label, values = [], options, onChange, brandColors }) => {
+  const [open, setOpen] = React.useState(false);
+  const selectedValues = useMemo(() => new Set(uniqueCategoryIds(values)), [values]);
+  const selectedOptions = options.filter(opt => selectedValues.has(String(opt.value)));
+
+  const toggleValue = value => {
+    const id = extractCategoryIdValue(value);
+    if (!id) return;
+
+    const next = new Set(selectedValues);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onChange(Array.from(next));
+  };
+
+  return (
+    <View style={styles.fieldWrap}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TouchableOpacity style={styles.multiSelectButton} onPress={() => setOpen(true)} activeOpacity={0.7}>
+        <View style={styles.multiSelectSummary}>
+          {selectedOptions.length === 0 ? (
+            <Text style={styles.selectPlaceholder}>Sem categoria</Text>
+          ) : (
+            <>
+              {selectedOptions.slice(0, 3).map(option => (
+                <View key={String(option.value)} style={styles.categoryChip}>
+                  <Text style={styles.categoryChipText} numberOfLines={1}>{option.label}</Text>
+                </View>
+              ))}
+              {selectedOptions.length > 3 && (
+                <View style={styles.categoryChipOverflow}>
+                  <Text style={styles.categoryChipText}>+{selectedOptions.length - 3}</Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+        <MaterialCommunityIcons name="chevron-down" size={18} color="#94A3B8" />
+      </TouchableOpacity>
+      <AnimatedModal visible={open} onRequestClose={() => setOpen(false)}>
+        <View style={styles.pickerModalContainer}>
+          <View style={styles.pickerModalHeader}>
+            <Text style={styles.pickerModalTitle}>{label}</Text>
+            <TouchableOpacity onPress={() => setOpen(false)} style={styles.pickerModalClose}>
+              <MaterialCommunityIcons name="close" size={22} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+          <ScrollView style={styles.pickerModalList} showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={[styles.pickerOption, selectedValues.size === 0 && styles.pickerOptionActive]}
+              onPress={() => onChange([])}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.pickerOptionText, selectedValues.size === 0 && { color: brandColors.primary, fontWeight: '700' }]}>
+                Sem categoria
+              </Text>
+              {selectedValues.size === 0 && <MaterialCommunityIcons name="check-circle" size={20} color={brandColors.primary} />}
+            </TouchableOpacity>
+            {options.map(opt => {
+              const isSelected = selectedValues.has(String(opt.value));
+              return (
+                <TouchableOpacity
+                  key={String(opt.value)}
+                  style={[styles.pickerOption, isSelected && styles.pickerOptionActive]}
+                  onPress={() => toggleValue(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.pickerOptionText, isSelected && { color: brandColors.primary, fontWeight: '700' }]}>
+                    {opt.label}
+                  </Text>
+                  <MaterialCommunityIcons
+                    name={isSelected ? 'check-circle' : 'checkbox-blank-circle-outline'}
+                    size={20}
+                    color={isSelected ? brandColors.primary : '#CBD5E1'}
+                  />
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      </AnimatedModal>
+    </View>
+  );
+};
+
 /* ─── SectionCard fora do componente pai para evitar remount a cada render ─── */
 const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
   <View style={[styles.sectionCard, hasError && styles.sectionCardError]}>
@@ -177,7 +281,7 @@ const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
   </View>
 );
 
-const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
+const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedProductId }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
   const routeCategoryIdParam = route.params?.categoryId || '';
@@ -201,14 +305,14 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const { currentCompany } = peopleGetters;
   const storedCategory = categoryGetters.item;
   const selectedRouteCategoryId =
-    extractId(routeCategoryIdParam) ||
-    extractId(storedCategory?.id) ||
-    extractId(storedCategory?.['@id']) ||
+    extractCategoryIdValue(routeCategoryIdParam) ||
+    extractCategoryIdValue(storedCategory?.id) ||
+    extractCategoryIdValue(storedCategory?.['@id']) ||
     '';
 
   const [product, setProduct] = useState(null);
   const [actionStatus, setActionStatus] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [controlarEstoque, setControlarEstoque] = useState(false);
 
   const getContextTypes = () => {
@@ -241,27 +345,21 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         setProduct(normalized);
         setControlarEstoque(Boolean(normalized?.defaultOutInventory || normalized?.defaultInInventory));
 
-        let existingCategoryId = extractCategoryId(data);
+        let existingCategoryIds = extractCategoryIds(data);
 
-        if (!existingCategoryId) {
-          const cleanProductId = extractId(data?.id || ProductId);
-          if (cleanProductId) {
-            const relationList = await productCategoryActions
-              .getItems({ product: `/products/${cleanProductId}` })
-              .catch(() => []);
-            const relation = Array.isArray(relationList)
-              ? relationList[0]
-              : Array.isArray(relationList?.['hydra:member'])
-                ? relationList['hydra:member'][0]
-                : null;
-            existingCategoryId = extractCategoryId({ productCategory: relation });
-          }
+        const cleanProductId = extractId(data?.id || ProductId);
+        if (cleanProductId) {
+          const relationList = await productCategoryActions
+            .getItems({ product: `/products/${cleanProductId}`, itemsPerPage: 300 })
+            .catch(() => []);
+          const relationCategoryIds = extractCategoryIds({ productCategories: collectionFrom(relationList) });
+          if (relationCategoryIds.length > 0) existingCategoryIds = relationCategoryIds;
         }
 
-        if (!existingCategoryId) {
-          existingCategoryId = selectedRouteCategoryId;
+        if (existingCategoryIds.length === 0 && selectedRouteCategoryId) {
+          existingCategoryIds = [selectedRouteCategoryId];
         }
-        setSelectedCategoryId(existingCategoryId ? String(existingCategoryId) : '');
+        setSelectedCategoryIds(existingCategoryIds);
       });
     } else {
       setProduct(prev => {
@@ -283,7 +381,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
           featured: false,
         };
       });
-      if (selectedRouteCategoryId) setSelectedCategoryId(String(selectedRouteCategoryId));
+      if (selectedRouteCategoryId) setSelectedCategoryIds([selectedRouteCategoryId]);
     }
   }, [
     ProductId,
@@ -393,46 +491,40 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     }
   }, [product, productActions, reloadProduct]);
 
-  const syncProductCategory = async data => {
-    if (!data?.id || !selectedCategoryId) return;
-    const productId = String(data.id).replace(/\D/g, '');
-    const categoryIri = `/categories/${String(selectedCategoryId).replace(/\D/g, '')}`;
+  const syncProductCategories = async data => {
+    const productId = extractId(data?.id || data?.['@id']);
+    if (!productId) return;
     const productIri = `/products/${productId}`;
+    const desiredCategoryIds = uniqueCategoryIds(selectedCategoryIds);
     const existingList = await productCategoryActions
-      .getItems({ product: productIri })
+      .getItems({ product: productIri, itemsPerPage: 300 })
       .catch(() => []);
-    const allRelations = Array.isArray(existingList)
-      ? existingList
-      : Array.isArray(existingList?.['hydra:member'])
-        ? existingList['hydra:member']
-        : [];
+    const allRelations = collectionFrom(existingList);
+    const desiredSet = new Set(desiredCategoryIds);
+    const keptCategoryIds = new Set();
 
-    const matching = allRelations.filter(relation => {
-      const relCategoryId = extractId(relation?.category);
-      return relCategoryId && String(relCategoryId) === String(selectedCategoryId);
-    });
-
-    const keeper = matching[0] || allRelations[0] || null;
-    const relationPayload = {
-      ...(keeper || {}),
-      product: productIri,
-      category: categoryIri,
-    };
-    if (keeper?.id || keeper?.['@id']) {
-      relationPayload.id = String(keeper.id || keeper['@id']).replace(/\D/g, '');
-    }
-    const savedRelation = await productCategoryActions.save(relationPayload);
-
-    const keeperId = String(
-      savedRelation?.id || savedRelation?.['@id'] || relationPayload.id || keeper?.id || keeper?.['@id'] || '',
-    ).replace(/\D/g, '');
-    const duplicated = allRelations.filter(rel => {
-      const rid = String(rel?.id || rel?.['@id'] || '').replace(/\D/g, '');
-      return rid && rid !== keeperId;
-    });
-    for (const relation of duplicated) {
+    for (const relation of allRelations) {
+      const relCategoryId = extractCategoryIdValue(relation?.category);
       const rid = String(relation?.id || relation?.['@id'] || '').replace(/\D/g, '');
-      if (rid) await productCategoryActions.remove(rid).catch(() => null);
+      const shouldKeep = relCategoryId && desiredSet.has(relCategoryId) && !keptCategoryIds.has(relCategoryId);
+
+      if (shouldKeep) {
+        keptCategoryIds.add(relCategoryId);
+      } else if (rid) {
+        await productCategoryActions.remove(rid).catch(() => null);
+      }
+    }
+
+    for (const categoryId of desiredCategoryIds) {
+      if (keptCategoryIds.has(categoryId)) continue;
+
+      await productCategoryActions.save({
+        product: productIri,
+        category: `/categories/${categoryId}`,
+      }).catch(error => {
+        const message = String(error?.message || error?.response?.data?.detail || '');
+        if (!/unique|duplicate|duplic/i.test(message)) throw error;
+      });
     }
   };
 
@@ -532,15 +624,19 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     try {
       const data = await productActions.save(payload);
       if (data) {
-        await syncProductCategory(data);
+        await syncProductCategories(data);
         const refreshed = await productActions.get(data.id || ProductId);
         setProduct(normalizeProductForForm(refreshed || data));
         setActionStatus('Produto salvo.');
         if (!propProductId) {
           const newId = data.id || (data['@id'] && String(data['@id']).split('/').pop());
           if (newId) {
-            const parent = navigation.getParent();
-            if (parent && parent.setParams) parent.setParams({ ProductId: newId });
+            if (onSavedProductId) {
+              onSavedProductId(newId);
+            } else {
+              const parent = navigation.getParent();
+              if (parent && parent.setParams) parent.setParams({ ProductId: newId });
+            }
           }
         }
       }
@@ -681,15 +777,14 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
               placeholderTextColor="#CBD5E1"
             />
           </View>
-          <SelectField
-            label="Categoria"
-            value={selectedCategoryId || ''}
-            onChange={val => setSelectedCategoryId(String(val || ''))}
+          <CategoryMultiSelectField
+            label="Categorias"
+            values={selectedCategoryIds}
+            onChange={setSelectedCategoryIds}
             brandColors={brandColors}
-            options={[
-              { value: '', label: 'Sem categoria' },
-              ...(categoryGetters.items || []).map(opt => ({ value: String(opt.id), label: opt.name || String(opt.id) })),
-            ]}
+            options={(categoryGetters.items || [])
+              .map(opt => ({ value: extractCategoryIdValue(opt.id || opt['@id']), label: opt.name || String(opt.id) }))
+              .filter(opt => opt.value)}
           />
           <SelectField
             label="Tipo"

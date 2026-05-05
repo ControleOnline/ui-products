@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 import {
-  FlatList, ScrollView, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
+  Alert, FlatList, ScrollView, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
@@ -14,6 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
+import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 
 import {
   readCachedCategories,
@@ -145,7 +146,7 @@ const SkeletonProductCard = () => (
 
 const ProductsPage = ({ navigation, route }) => {
   const routeParams = route.params || {};
-  const context = routeParams.context;
+  const context = routeParams.context || 'products';
   const interactionMode =
     routeParams.interactionMode ||
     (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
@@ -201,6 +202,12 @@ const ProductsPage = ({ navigation, route }) => {
 
   const isManager =
     env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
+  const {
+    getProductStatuses,
+    loadCatalogStatus,
+    syncEntity,
+    syncingKey: marketplaceSyncingKey,
+  } = useMarketplaceCatalogSync(isManager ? currentCompany?.id : null);
   const categoryRouteValue = routeParams.categoryId || routeParams.category;
   const normalizedSearchQuery = useMemo(
     () => String(routeParams.searchQuery || '').trim(),
@@ -219,6 +226,11 @@ const ProductsPage = ({ navigation, route }) => {
     () => resolveRouteCategoryId(category),
     [category],
   );
+  useEffect(() => {
+    if (!categoryId) return;
+    if (resolveRouteCategoryId(categoryRouteValue) === categoryId) return;
+    navigation.setParams({ categoryId });
+  }, [categoryId, categoryRouteValue, navigation]);
   const isAllProducts =
     category?._isAllProducts === true ||
     category?.['@id'] === '__all_products__';
@@ -383,13 +395,16 @@ const ProductsPage = ({ navigation, route }) => {
   useFocusEffect(
     useCallback(() => {
       clearPendingAddProducts();
+      if (isManager) {
+        loadCatalogStatus().catch(() => {});
+      }
 
       return () => {
         flushPendingAddProducts();
         const cats = readCachedCategories(currentCompany?.id);
         if (cats.length > 0) categoryActions.setItems(cats);
       };
-    }, [categoryActions, currentCompany?.id, flushPendingAddProducts]),
+    }, [categoryActions, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
   );
 
   const buildCategoryRouteParams = useCallback(() => {
@@ -431,6 +446,21 @@ const ProductsPage = ({ navigation, route }) => {
       merge: false,
     });
   };
+
+  const handleMarketplaceSync = useCallback(
+    async (platformKey, status, syncKey) => {
+      try {
+        await syncEntity(platformKey, status, { syncKey });
+      } catch (error) {
+        Alert.alert(
+          'Sincronizacao nao concluida',
+          error?.message || 'Nao foi possivel sincronizar este item.',
+        );
+        throw error;
+      }
+    },
+    [syncEntity],
+  );
 
   const maxContentWidth = 860;
   const containerWidth = Math.min(width, maxContentWidth);
@@ -497,6 +527,9 @@ const ProductsPage = ({ navigation, route }) => {
                 product={item}
                 category={category}
                 interactionMode={interactionMode}
+                marketplaceStatuses={isManager ? getProductStatuses(item) : []}
+                onMarketplaceSync={handleMarketplaceSync}
+                marketplaceSyncingKey={marketplaceSyncingKey}
               />
             </TouchableOpacity>
           )}

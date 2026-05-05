@@ -19,6 +19,8 @@ import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
 import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports'
 import {searchCompanyProducts} from '@controleonline/ui-common/src/react/utils/commercialDocumentOrders'
+import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators'
+import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
 
 import {
   readCachedCategories,
@@ -107,6 +109,14 @@ const CategoriesPage = ({ route }) => {
 
   const peopleStore = useStore('people')
   const { currentCompany } = peopleStore.getters
+  const {
+    getCategoryStatuses,
+    hasActivePlatforms,
+    loadCatalogStatus,
+    syncAllEligible,
+    syncEntity,
+    syncingKey: marketplaceSyncingKey,
+  } = useMarketplaceCatalogSync(isManagerApp ? currentCompany?.id : null)
 
   const themeStore = useStore('theme')
   const { colors: themeColors } = themeStore.getters
@@ -125,6 +135,10 @@ const CategoriesPage = ({ route }) => {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
   const context = 'products'
+  const routeCategoryId = useMemo(
+    () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
+    [route?.params?.category, route?.params?.categoryId],
+  )
   const {materializeOrderWithProducts, openOrderDetails} = usePosOrderMaterialization({
     interactionParams: route?.params,
     navigation,
@@ -199,9 +213,10 @@ const CategoriesPage = ({ route }) => {
 
         if (isManagerApp) {
           loadMenuModels()
+          loadCatalogStatus().catch(() => {})
         }
       }
-    }, [currentCompany?.id, categoryActions, isManagerApp, loadMenuModels])
+    }, [currentCompany?.id, categoryActions, isManagerApp, loadCatalogStatus, loadMenuModels])
   )
 
   const changeCategory = category => {
@@ -225,11 +240,16 @@ const CategoriesPage = ({ route }) => {
   }
 
   const openCreateModal = () => {
+    if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
     setSelectedCategory(null)
     setModalVisible(true)
   }
 
   const openEditModal = category => {
+    const categoryId = normalizeEntityId(category)
+    if (categoryId && routeCategoryId !== categoryId) {
+      navigation.setParams({ categoryId, category: undefined })
+    }
     setSelectedCategory(category)
     setModalVisible(true)
   }
@@ -237,7 +257,20 @@ const CategoriesPage = ({ route }) => {
   const closeModal = () => {
     setModalVisible(false)
     setSelectedCategory(null)
+    if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
   }
+
+  React.useEffect(() => {
+    if (!routeCategoryId || !isManagerApp) return
+    const category = (Array.isArray(items) ? items : [])
+      .find(item => normalizeEntityId(item) === routeCategoryId)
+
+    if (!category) return
+    if (modalVisible && normalizeEntityId(selectedCategory) === routeCategoryId) return
+
+    setSelectedCategory(category)
+    setModalVisible(true)
+  }, [isManagerApp, items, modalVisible, routeCategoryId, selectedCategory])
 
   const reloadCategories = useCallback(async () => {
     if (!currentCompany?.id) return []
@@ -249,6 +282,38 @@ const CategoriesPage = ({ route }) => {
     writeCachedCategories(currentCompany.id, data || [])
     return data || []
   }, [currentCompany?.id, categoryActions])
+
+  const refreshSelectedCategory = useCallback(async () => {
+    const refreshed = await reloadCategories()
+    const fresh = refreshed.find(c => String(c.id) === String(selectedCategory?.id))
+    if (fresh) setSelectedCategory(fresh)
+    return fresh
+  }, [reloadCategories, selectedCategory?.id])
+
+  const saveCategoryCover = useCallback(async relation => {
+    if (!selectedCategory?.id || !relation?.id || !currentCompany?.id) return
+
+    const parentId = normalizeEntityId(selectedCategory.parent)
+    const companyIri = currentCompany?.['@id']
+      ? String(currentCompany['@id'])
+      : `/people/${normalizeEntityId(currentCompany.id)}`
+
+    await categoryActions.save({
+      id: selectedCategory.id,
+      name: selectedCategory.name || '',
+      color: selectedCategory.color || '#CBD5E1',
+      icon: selectedCategory.icon || '',
+      context,
+      company: companyIri,
+      parent: parentId ? `/categories/${parentId}` : null,
+      extraData: {
+        ...(selectedCategory.extraData || {}),
+        imageCoverRelationId: relation.id,
+      },
+    })
+
+    await refreshSelectedCategory()
+  }, [categoryActions, context, currentCompany, refreshSelectedCategory, selectedCategory])
 
   const selectedMenuModelLabel = useMemo(() => {
     if (isLoadingMenuModels) {
@@ -426,6 +491,36 @@ const CategoriesPage = ({ route }) => {
     menuModels,
     selectedMenuModel,
   ])
+
+  const openIntegrationsPage = useCallback(() => {
+    navigation.navigate('IntegrationsPage')
+  }, [navigation])
+
+  const handleSyncAllEligible = useCallback(async () => {
+    try {
+      await syncAllEligible()
+    } catch (error) {
+      Alert.alert(
+        'Sincronizacao nao concluida',
+        error?.message || 'Nao foi possivel sincronizar os produtos elegiveis.',
+      )
+    }
+  }, [syncAllEligible])
+
+  const handleMarketplaceSync = useCallback(
+    async (platformKey, status, syncKey) => {
+      try {
+        await syncEntity(platformKey, status, { syncKey })
+      } catch (error) {
+        Alert.alert(
+          'Sincronizacao nao concluida',
+          error?.message || 'Nao foi possivel sincronizar este item.',
+        )
+        throw error
+      }
+    },
+    [syncEntity],
+  )
 
   const getColumns = () => {
     if (width < 640) return 2
@@ -734,6 +829,37 @@ const CategoriesPage = ({ route }) => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
+                  style={[styles.actionButton, styles.integrationButton]}
+                  onPress={openIntegrationsPage}
+                  activeOpacity={0.85}
+                >
+                  <MaterialCommunityIcons name="cloud-sync-outline" size={18} color="#0369A1" />
+                  <Text style={[styles.actionButtonText, styles.integrationButtonText]}>
+                    Sincronias
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    styles.syncEligibleButton,
+                    (!hasActivePlatforms || marketplaceSyncingKey === 'all') && styles.disabledActionButton,
+                  ]}
+                  onPress={handleSyncAllEligible}
+                  activeOpacity={0.85}
+                  disabled={!hasActivePlatforms || marketplaceSyncingKey === 'all'}
+                >
+                  {marketplaceSyncingKey === 'all' ? (
+                    <ActivityIndicator size="small" color="#047857" />
+                  ) : (
+                    <MaterialCommunityIcons name="cloud-upload-outline" size={18} color="#047857" />
+                  )}
+                  <Text style={[styles.actionButtonText, styles.syncEligibleButtonText]}>
+                    {marketplaceSyncingKey === 'all' ? 'Sincronizando...' : 'Sincronizar todos os elegiveis'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
                   style={[
                     styles.actionButton,
                     styles.catalogButton,
@@ -866,6 +992,18 @@ const CategoriesPage = ({ route }) => {
                         </View>
 
                         {isManagerApp && (
+                          <View style={styles.syncOverlay}>
+                            <MarketplaceSyncIndicators
+                              entityLabel={category.name}
+                              entityType="category"
+                              statuses={getCategoryStatuses(category)}
+                              onSync={handleMarketplaceSync}
+                              syncingKey={marketplaceSyncingKey}
+                            />
+                          </View>
+                        )}
+
+                        {isManagerApp && (
                           <TouchableOpacity
                             onPress={() => openEditModal(category)}
                             style={styles.editOverlay}
@@ -915,7 +1053,10 @@ const CategoriesPage = ({ route }) => {
                 ref={formRef}
                 category={selectedCategory}
                 onClose={closeModal}
-                onSaved={saved => setSelectedCategory(saved || null)}
+                onSaved={saved => {
+                  setSelectedCategory(saved || null)
+                  loadCatalogStatus().catch(() => {})
+                }}
               />
 
               {selectedCategory?.id && (
@@ -925,12 +1066,10 @@ const CategoriesPage = ({ route }) => {
                     entityId={selectedCategory.id}
                     attachments={selectedCategory.categoryFiles || []}
                     companyId={currentCompany?.id}
-                    context={context}
-                    onChanged={async () => {
-                      const refreshed = await reloadCategories()
-                      const fresh = refreshed.find(c => c.id === selectedCategory.id)
-                      if (fresh) setSelectedCategory(fresh)
-                    }}
+                    context="products-category"
+                    coverRelationId={selectedCategory?.extraData?.imageCoverRelationId}
+                    onChanged={refreshSelectedCategory}
+                    onCoverChanged={saveCategoryCover}
                   />
                 </View>
               )}

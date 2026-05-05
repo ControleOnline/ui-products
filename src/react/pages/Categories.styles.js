@@ -149,8 +149,10 @@ const styles = StyleSheet.create({
     flexBasis: 180,
   },
   actionButtonText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
+    textAlign: 'center',
   },
   importButton: {
     backgroundColor: '#fff',
@@ -179,6 +181,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#4C1D95',
   },
+  integrationButton: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+  },
+  integrationButtonText: {
+    color: '#0369A1',
+  },
+  syncEligibleButton: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  syncEligibleButtonText: {
+    color: '#047857',
+  },
   catalogButton: {
     borderColor: '#0F172A',
   },
@@ -187,6 +203,12 @@ const styles = StyleSheet.create({
   },
   disabledActionButton: {
     opacity: 0.6,
+  },
+  syncOverlay: {
+    position: 'absolute',
+    left: 8,
+    top: 8,
+    zIndex: 3,
   },
   pickerModalOverlay: {
     flex: 1,

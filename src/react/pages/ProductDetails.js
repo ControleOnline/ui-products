@@ -24,8 +24,22 @@ const buildCoverUrl = (files, coverRelationId) => {
   return resolveFileImageUrl(first.file);
 };
 
+const normalizeEntityId = value => {
+  if (!value && value !== 0) return '';
+  const raw = typeof value === 'object'
+    ? value?.id || value?.['@id'] || value?.value || ''
+    : value;
+  return String(raw || '').replace(/\D+/g, '').trim();
+};
+
+const inferProductContext = product => {
+  const type = String(product?.type || '').toLowerCase();
+  return ['package', 'component', 'feedstock'].includes(type) ? 'supplies' : 'products';
+};
+
 const ProductDetails = ({ route, navigation }) => {
-  const { ProductId, context } = route.params || {};
+  const routeParams = route.params || {};
+  const ProductId = normalizeEntityId(routeParams.ProductId || routeParams.id);
   const { width } = useWindowDimensions();
   const productsStore = useStore('products');
   const [productSummary, setProductSummary] = useState(null);
@@ -60,6 +74,7 @@ const ProductDetails = ({ route, navigation }) => {
     }
   }, [ProductId, productsStore?.actions]);
 
+  const context = routeParams.context || (productSummary ? inferProductContext(productSummary) : 'products');
   const contextTypes = useMemo(() => {
     if (context === 'products') {
       return ['product', 'manufactured', 'custom', 'service'];
@@ -75,6 +90,12 @@ const ProductDetails = ({ route, navigation }) => {
   useEffect(() => {
     loadProductSummary();
   }, [loadProductSummary]);
+
+  useEffect(() => {
+    if (!routeParams.ProductId && routeParams.id && ProductId) {
+      navigation.setParams({ ProductId, id: undefined });
+    }
+  }, [ProductId, navigation, routeParams.ProductId, routeParams.id]);
 
   return (
     <View style={styles.container}>
@@ -127,7 +148,19 @@ const ProductDetails = ({ route, navigation }) => {
           }}
         >
           <Tab.Screen name="Dados">
-            {props => <ProductForm {...props} ProductId={ProductId} contextTypes={contextTypes} />}
+            {props => (
+              <ProductForm
+                {...props}
+                ProductId={ProductId}
+                contextTypes={contextTypes}
+                onSavedProductId={newProductId => {
+                  const normalizedProductId = normalizeEntityId(newProductId);
+                  if (normalizedProductId) {
+                    navigation.setParams({ ProductId: normalizedProductId, context });
+                  }
+                }}
+              />
+            )}
           </Tab.Screen>
 
           {ProductId ? (
