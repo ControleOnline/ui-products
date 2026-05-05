@@ -41,6 +41,20 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 4,
   },
+  parentQueueVisibilityLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  parentQueueVisibilityText: {
+    fontSize: 11,
+    color: '#0E7490',
+    fontWeight: '600',
+  },
+  parentQueueVisibilityTextMuted: {
+    color: '#94A3B8',
+  },
   itemBadge: {
     backgroundColor: '#E2E8F0',
     borderRadius: 5,
@@ -70,6 +84,7 @@ const styles = StyleSheet.create({
   },
   itemCardActions: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 6,
   },
   itemActionBtn: {
@@ -79,6 +94,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  visibilityRow: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  visibilityTextWrap: {
+    flex: 1,
+  },
+  visibilityTitle: {
+    fontSize: 13,
+    color: '#0F172A',
+    fontWeight: '700',
   },
 
   /* ─── botão adicionar ─── */

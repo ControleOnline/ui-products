@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Switch } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
@@ -73,6 +73,12 @@ const resolveItemQueueLabel = item => {
   return productQueue ? `Fila: ${productQueue}` : 'Produto sem fila';
 };
 
+const shouldShowInParentQueue = item =>
+  item?.showInParentQueue !== false &&
+  item?.show_in_parent_queue !== false &&
+  item?.showProductGroupInQueue !== false &&
+  item?.show_product_group_in_queue !== false;
+
 const toProductIri = value => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -128,7 +134,6 @@ const ProductSearchModal = ({
   hasMore,
   onSearch,
   onLoadMore,
-  brandColors,
   title,
   excludeId,
 }) => {
@@ -348,6 +353,18 @@ const ItemFormModal = ({
                 </Text>
               </View>
             </View>
+
+            <View style={styles.visibilityRow}>
+              <View style={styles.visibilityTextWrap}>
+                <Text style={styles.visibilityTitle}>Exibir na fila do produto pai</Text>
+              </View>
+              <Switch
+                value={draft.showInParentQueue !== false}
+                onValueChange={value => onChangeDraft('showInParentQueue', value)}
+                trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#3B82F6' }}
+                thumbColor="#fff"
+              />
+            </View>
           </View>
         </ScrollView>
 
@@ -370,7 +387,15 @@ const ItemFormModal = ({
 };
 
 /* ─── Card de item do grupo ─── */
-const ItemCard = ({ item, onEdit, onRemove, brandColors, productGroupIri }) => {
+const ItemCard = ({
+  item,
+  onEdit,
+  onRemove,
+  onToggleShowInParentQueue,
+  toggling,
+  brandColors,
+  productGroupIri,
+}) => {
   const name =
     item.productChild?.name ||
     item.productChild?.product ||
@@ -383,6 +408,7 @@ const ItemCard = ({ item, onEdit, onRemove, brandColors, productGroupIri }) => {
     .replace('.', ',');
   const qty = item.quantity ?? 1;
   const queueLabel = resolveItemQueueLabel(item);
+  const showInParentQueue = shouldShowInParentQueue(item);
 
   return (
     <View style={styles.itemCard}>
@@ -402,6 +428,22 @@ const ItemCard = ({ item, onEdit, onRemove, brandColors, productGroupIri }) => {
               </View>
             </View>
           )}
+          <View style={styles.parentQueueVisibilityLine}>
+            <MaterialCommunityIcons
+              name={showInParentQueue ? 'eye-outline' : 'eye-off-outline'}
+              size={12}
+              color={showInParentQueue ? '#0E7490' : '#94A3B8'}
+            />
+            <Text
+              style={[
+                styles.parentQueueVisibilityText,
+                !showInParentQueue && styles.parentQueueVisibilityTextMuted,
+              ]}
+              numberOfLines={1}
+            >
+              {showInParentQueue ? 'Aparece na fila do pai' : 'Nao aparece na fila do pai'}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.itemCardRight}>
@@ -410,6 +452,13 @@ const ItemCard = ({ item, onEdit, onRemove, brandColors, productGroupIri }) => {
             <Text style={styles.itemQty}>× {qty}</Text>
           </View>
           <View style={styles.itemCardActions}>
+            <Switch
+              value={showInParentQueue}
+              disabled={toggling}
+              onValueChange={value => onToggleShowInParentQueue(item, value)}
+              trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#3B82F6' }}
+              thumbColor="#fff"
+            />
             <TouchableOpacity
               style={styles.itemActionBtn}
               onPress={onEdit}
@@ -467,6 +516,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
   const [removing, setRemoving] = useState(false);
+  const [togglingQueueItemId, setTogglingQueueItemId] = useState('');
 
   const fetchItems = useCallback(async () => {
     if (!productGroupIri) { setCurrentItems([]); return []; }
@@ -531,7 +581,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       setHasMoreProducts(hasNextByView || (list || []).length >= 50);
       setProductsPage(page);
       setProductsQuery(q);
-    } catch (_) {
+    } catch {
       if (!append) setAvailableProducts([]);
       setHasMoreProducts(false);
     } finally {
@@ -594,6 +644,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       productUnit: extractUnit(full),
       price: '0',
       quantity: '1',
+      showInParentQueue: true,
     });
     setFormError('');
     setFieldErrors({});
@@ -615,6 +666,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       productUnit: extractUnit(item.productChild),
       price: String(item.price ?? '0'),
       quantity: String(Number(item.quantity) > 0 ? item.quantity : 1),
+      showInParentQueue: shouldShowInParentQueue(item),
     });
     setFormError('');
     setFieldErrors({});
@@ -689,6 +741,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
           price: nextPrice,
           quantity: nextQty,
           active: editingItem.active ?? true,
+          showInParentQueue: formDraft.showInParentQueue !== false,
         };
       } else {
         /*
@@ -702,6 +755,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
           productType: formDraft.productType,
           price: nextPrice,
           quantity: nextQty,
+          showInParentQueue: formDraft.showInParentQueue !== false,
         };
       }
 
@@ -729,6 +783,39 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       }
     } finally {
       setFormSaving(false);
+    }
+  };
+
+  const handleToggleShowInParentQueue = async (item, showInParentQueue) => {
+    const id = String(item?.id || item?.['@id'] || '').replace(/\D/g, '');
+    if (!id) return;
+
+    setTogglingQueueItemId(id);
+    try {
+      await productGroupProductStore.actions.save({
+        id: item.id || id,
+        product: toProductIri(item.product) || `/products/${ProductId}`,
+        productGroup: toProductGroupIri(item.productGroup) || productGroupIri,
+        productChild: toProductIri(item.productChild),
+        productType: item.productType || toGroupProductType(item.productChild?.type),
+        price: Number(item.price) || 0,
+        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+        active: item.active ?? true,
+        showInParentQueue,
+      });
+
+      setCurrentItems(prev => prev.map(current =>
+        String(current?.id || current?.['@id'] || '').replace(/\D/g, '') === id
+          ? { ...current, showInParentQueue }
+          : current
+      ));
+      emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
+        productId: ProductId,
+        productGroupId,
+        source: 'ProductGroupProducts.toggleParentQueueVisibility',
+      });
+    } finally {
+      setTogglingQueueItemId('');
     }
   };
 
@@ -784,12 +871,15 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       )}
       {currentItems.map((item, index) => {
         const key = String(item?.id || item?.['@id'] || index);
+        const itemId = String(item?.id || item?.['@id'] || '').replace(/\D/g, '');
         return (
           <ItemCard
             key={key}
             item={item}
             onEdit={() => openEditItemModal(item)}
             onRemove={() => setConfirmDeleteItem(item)}
+            onToggleShowInParentQueue={handleToggleShowInParentQueue}
+            toggling={!!itemId && itemId === togglingQueueItemId}
             brandColors={brandColors}
             productGroupIri={productGroupIri}
           />

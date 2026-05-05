@@ -50,6 +50,8 @@ export default {
           let grouped = products.reduce((acc, product) => {
             if (!product.productGroup) return acc;
             if (
+              product.showInParentQueue === false ||
+              product.show_in_parent_queue === false ||
               product.showProductGroupInQueue === false ||
               product.show_product_group_in_queue === false
             )
