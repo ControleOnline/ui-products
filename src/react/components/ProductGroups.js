@@ -849,8 +849,6 @@ const ProductGroups = ({ ProductId }) => {
           const minMax = [group.minimum, group.maximum].filter(v => v != null).join(' – ');
           const calcLabel = PRICE_CALCULATION_OPTIONS.find(o => o.value === group.priceCalculation)?.label || '';
           const imported = isImportedGroup(group, ProductId);
-          const parentLink = resolveGroupParentLink(group);
-          const showInQueue = parentLink?.showInQueue !== false;
 
           return (
             <View key={gid} style={styles.card}>
@@ -864,22 +862,6 @@ const ProductGroups = ({ ProductId }) => {
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {group.productGroup || 'Grupo'}
                   </Text>
-                  <View style={styles.groupQueueRow}>
-                    <MaterialCommunityIcons
-                      name={showInQueue ? 'eye-outline' : 'eye-off-outline'}
-                      size={12}
-                      color={showInQueue ? '#0E7490' : '#94A3B8'}
-                    />
-                    <Text
-                      style={[
-                        styles.groupQueueText,
-                        !showInQueue && styles.groupQueueTextMuted,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {showInQueue ? 'Aparece na fila' : 'Nao aparece na fila'}
-                    </Text>
-                  </View>
                   <View style={styles.cardMeta}>
                     {!!minMax && (
                       <View style={styles.badge}>
@@ -905,15 +887,6 @@ const ProductGroups = ({ ProductId }) => {
                   </View>
                 </View>
                 <View style={styles.cardActions}>
-                  <View style={styles.queueVisibilityControl}>
-                    <Text style={styles.queueVisibilityLabel}>Fila</Text>
-                    <Switch
-                      value={showInQueue}
-                      onValueChange={value => handleToggleGroupQueueVisibility(group, value)}
-                      trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#3B82F6' }}
-                      thumbColor="#fff"
-                    />
-                  </View>
                   <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => openEditModal(group)}
