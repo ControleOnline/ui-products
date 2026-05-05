@@ -475,6 +475,7 @@ const ProductGroups = ({ ProductId }) => {
   const brandColors = useMemo(() => resolveThemePalette(), []);
 
   const [groups, setGroups] = useState([]);
+  const [groupParentLinks, setGroupParentLinks] = useState({});
   const [loadingGroups, setLoadingGroups] = useState(true);
   const [expanded, setExpanded] = useState({});
 
@@ -497,20 +498,45 @@ const ProductGroups = ({ ProductId }) => {
   const [confirmDeleteGroup, setConfirmDeleteGroup] = useState(null);
   const [removing, setRemoving] = useState(false);
 
+  const loadGroupParentLinks = useCallback(async () => {
+    const parentProduct = toProductIri(ProductId);
+    if (!parentProduct) {
+      setGroupParentLinks({});
+      return {};
+    }
+
+    const response = await groupParentActions.getItems({
+      parentProduct,
+      itemsPerPage: 500,
+    }).catch(() => []);
+
+    const linksByGroupId = {};
+    extractItems(response).forEach(link => {
+      const groupId = normalizeEntityId(link?.productGroup);
+      if (groupId) linksByGroupId[groupId] = link;
+    });
+
+    setGroupParentLinks(linksByGroupId);
+    return linksByGroupId;
+  }, [ProductId, groupParentActions]);
+
   const loadData = useCallback(() => {
     if (!ProductId || !currentCompany?.id) {
       setLoadingGroups(false);
       return Promise.resolve([]);
     }
     setLoadingGroups(true);
-    return actions
+    return Promise.all([
+      actions
       .getItems({
         product: ProductId,
         itemsPerPage: 200,
         'order[groupOrder]': 'ASC',
         'order[productGroup]': 'ASC',
-      })
-      .then(response => {
+      }),
+      loadGroupParentLinks(),
+    ])
+      .then(([response]) => {
         const items = Array.isArray(response)
           ? response
           : Array.isArray(response?.['hydra:member'])
@@ -521,7 +547,7 @@ const ProductGroups = ({ ProductId }) => {
         return items;
       })
       .catch(() => { setLoadingGroups(false); return []; });
-  }, [ProductId, currentCompany?.id, actions]);
+  }, [ProductId, currentCompany?.id, actions, loadGroupParentLinks]);
 
   useEffect(() => {
     if (currentCompany?.id) loadData();
@@ -543,6 +569,41 @@ const ProductGroups = ({ ProductId }) => {
       if (!isDuplicateError(e)) throw e;
     }
   }, [ProductId, groupParentActions]);
+
+  const resolveGroupParentLink = useCallback(group => {
+    const groupId = normalizeEntityId(group);
+    return groupId ? groupParentLinks[groupId] : null;
+  }, [groupParentLinks]);
+
+  const handleToggleGroupQueueVisibility = useCallback(async (group, showInQueue) => {
+    const productGroup = toProductGroupIri(group);
+    const parentProduct = toProductIri(ProductId);
+    if (!productGroup || !parentProduct) return;
+
+    const currentLink = resolveGroupParentLink(group);
+    const payload = {
+      ...(currentLink?.id ? { id: currentLink.id } : {}),
+      productGroup,
+      parentProduct,
+      active: currentLink?.active ?? true,
+      showInQueue,
+    };
+
+    const saved = await groupParentActions.save(payload);
+    const groupId = normalizeEntityId(group);
+    if (groupId) {
+      setGroupParentLinks(prev => ({
+        ...prev,
+        [groupId]: saved || { ...payload, productGroup: group, parentProduct },
+      }));
+    }
+
+    emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
+      productId: ProductId,
+      productGroupId: groupId,
+      source: 'ProductGroups.toggleQueueVisibility',
+    });
+  }, [ProductId, groupParentActions, resolveGroupParentLink]);
 
   const fetchGroupItems = useCallback(async (product, productGroup) => {
     if (!productGroup) return [];
@@ -849,6 +910,8 @@ const ProductGroups = ({ ProductId }) => {
           const minMax = [group.minimum, group.maximum].filter(v => v != null).join(' – ');
           const calcLabel = PRICE_CALCULATION_OPTIONS.find(o => o.value === group.priceCalculation)?.label || '';
           const imported = isImportedGroup(group, ProductId);
+          const parentLink = resolveGroupParentLink(group);
+          const showInQueue = parentLink?.showInQueue !== false;
 
           return (
             <View key={gid} style={styles.card}>
@@ -862,6 +925,22 @@ const ProductGroups = ({ ProductId }) => {
                   <Text style={styles.cardTitle} numberOfLines={1}>
                     {group.productGroup || 'Grupo'}
                   </Text>
+                  <View style={styles.groupQueueRow}>
+                    <MaterialCommunityIcons
+                      name={showInQueue ? 'eye-outline' : 'eye-off-outline'}
+                      size={12}
+                      color={showInQueue ? '#0E7490' : '#94A3B8'}
+                    />
+                    <Text
+                      style={[
+                        styles.groupQueueText,
+                        !showInQueue && styles.groupQueueTextMuted,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {showInQueue ? 'Aparece na fila' : 'Nao aparece na fila'}
+                    </Text>
+                  </View>
                   <View style={styles.cardMeta}>
                     {!!minMax && (
                       <View style={styles.badge}>
@@ -887,6 +966,15 @@ const ProductGroups = ({ ProductId }) => {
                   </View>
                 </View>
                 <View style={styles.cardActions}>
+                  <View style={styles.queueVisibilityControl}>
+                    <Text style={styles.queueVisibilityLabel}>Fila</Text>
+                    <Switch
+                      value={showInQueue}
+                      onValueChange={value => handleToggleGroupQueueVisibility(group, value)}
+                      trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#3B82F6' }}
+                      thumbColor="#fff"
+                    />
+                  </View>
                   <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => openEditModal(group)}

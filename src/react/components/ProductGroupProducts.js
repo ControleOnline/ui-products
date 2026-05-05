@@ -62,6 +62,17 @@ const TYPE_LABELS = {
   service: 'Serviço',
 };
 
+const getQueueLabel = queue => {
+  if (!queue) return '';
+  if (typeof queue === 'string') return '';
+  return String(queue.queue || queue.name || '').trim();
+};
+
+const resolveItemQueueLabel = item => {
+  const productQueue = getQueueLabel(item?.productChild?.queue);
+  return productQueue ? `Fila: ${productQueue}` : 'Produto sem fila';
+};
+
 const toProductIri = value => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -217,6 +228,7 @@ const ProductSearchModal = ({
           )}
           {!loading && filtered.map(p => {
             const typeLabel = TYPE_LABELS[p.type] || p.type || '';
+            const queueLabel = getQueueLabel(p.queue);
             return (
               <TouchableOpacity
                 key={String(p.id)}
@@ -229,6 +241,7 @@ const ProductSearchModal = ({
                     {p.product || p.name || `#${p.id}`}
                   </Text>
                   {!!typeLabel && <Text style={styles.searchResultType}>{typeLabel}</Text>}
+                  {!!queueLabel && <Text style={styles.searchResultQueue}>Fila: {queueLabel}</Text>}
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={20} color="#CBD5E1" />
               </TouchableOpacity>
@@ -369,12 +382,19 @@ const ItemCard = ({ item, onEdit, onRemove, brandColors, productGroupIri }) => {
     .toFixed(2)
     .replace('.', ',');
   const qty = item.quantity ?? 1;
+  const queueLabel = resolveItemQueueLabel(item);
 
   return (
     <View style={styles.itemCard}>
       <View style={styles.itemCardRow}>
         <View style={inlineStyle_355_14}>
           <Text style={styles.itemCardName} numberOfLines={2}>{name}</Text>
+          {!!queueLabel && (
+            <View style={styles.itemQueueLine}>
+              <MaterialCommunityIcons name="tray-full" size={12} color="#64748B" />
+              <Text style={styles.itemQueueText} numberOfLines={1}>{queueLabel}</Text>
+            </View>
+          )}
           {!!typeLabel && (
             <View style={styles.itemCardBadges}>
               <View style={styles.itemBadge}>

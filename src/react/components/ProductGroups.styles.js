@@ -54,6 +54,20 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 4,
   },
+  groupQueueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 5,
+  },
+  groupQueueText: {
+    fontSize: 11,
+    color: '#0E7490',
+    fontWeight: '600',
+  },
+  groupQueueTextMuted: {
+    color: '#94A3B8',
+  },
   cardMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -78,6 +92,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginLeft: 8,
+  },
+  queueVisibilityControl: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 52,
+  },
+  queueVisibilityLabel: {
+    fontSize: 10,
+    color: '#64748B',
+    fontWeight: '700',
+    marginBottom: 2,
   },
   actionBtn: {
     width: 30,
@@ -489,4 +514,3 @@ export const inlineStyle_606_26 = {
 export const inlineStyle_101_14 = {
   padding: 16,
 };
-

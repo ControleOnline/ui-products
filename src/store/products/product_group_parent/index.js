@@ -42,6 +42,23 @@ export default {
         align: 'left',
         label: 'parentProduct',
       },
+      {
+        sortable: true,
+        name: 'showInQueue',
+        externalFilter: false,
+        align: 'left',
+        label: 'showInQueue',
+        list: [
+          { value: true, label: 'Sim' },
+          { value: false, label: 'Nao' },
+        ],
+        format: function (value) {
+          return value === false ? 'Nao' : 'Sim';
+        },
+        saveFormat: function (value) {
+          return value !== false;
+        },
+      },
     ],
   },
   actions,

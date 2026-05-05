@@ -37,6 +37,7 @@ const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
   const isManager =
     APP_ENV.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
   const typeConf = TYPE_CONFIG[product.type] || null
+  const queueLabel = product?.queue?.queue || product?.queue?.name || ''
 
   const renderAction = () => {
     if (isManager) {
@@ -95,6 +96,12 @@ const ProductItem = ({ product, category, interactionMode = 'auto' }) => {
           {typeConf && (
             <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
               <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
+            </View>
+          )}
+          {!!queueLabel && (
+            <View style={styles.queueLine}>
+              <MaterialCommunityIcons name="tray-full" size={12} color="#64748B" />
+              <Text style={styles.queueText} numberOfLines={1}>Fila: {queueLabel}</Text>
             </View>
           )}
         </View>
