@@ -4,6 +4,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import ProductFeedStock from './ProductFeedStock';
+import {
+  buildProductCostBreakdown,
+  formatCurrency,
+  normalizeEntityId,
+} from '@controleonline/ui-products/src/react/domain/productCosting';
 import { emitProductEvent, PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
 import styles from './ProductGroupProducts.styles';
 
@@ -78,17 +83,6 @@ const shouldShowInParentQueue = item =>
   item?.show_in_parent_queue !== false &&
   item?.showProductGroupInQueue !== false &&
   item?.show_product_group_in_queue !== false;
-
-const toProductIri = value => {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    if (value.startsWith('/products/')) return value;
-    const id = String(value).replace(/\D/g, '');
-    return id ? `/products/${id}` : null;
-  }
-  const id = value?.id || String(value?.['@id'] || '').replace(/\D/g, '');
-  return id ? `/products/${id}` : null;
-};
 
 const toProductGroupIri = value => {
   if (!value) return null;
@@ -395,6 +389,8 @@ const ItemCard = ({
   toggling,
   brandColors,
   productGroupIri,
+  costSummary,
+  parentProductId,
 }) => {
   const name =
     item.productChild?.name ||
@@ -409,6 +405,7 @@ const ItemCard = ({
   const qty = item.quantity ?? 1;
   const queueLabel = resolveItemQueueLabel(item);
   const showInParentQueue = shouldShowInParentQueue(item);
+  const hasFeedstocks = Boolean(costSummary?.hasFeedstocks);
 
   return (
     <View style={styles.itemCard}>
@@ -449,6 +446,9 @@ const ItemCard = ({
         <View style={styles.itemCardRight}>
           <View style={styles.itemPriceWrap}>
             <Text style={styles.itemPrice}>R$ {price}</Text>
+            {hasFeedstocks ? (
+              <Text style={styles.itemCostText}>Custo {formatCurrency(costSummary?.cost)}</Text>
+            ) : null}
             <Text style={styles.itemQty}>× {qty}</Text>
           </View>
           <View style={styles.itemCardActions}>
@@ -480,6 +480,7 @@ const ItemCard = ({
       <ProductFeedStock
         row={item}
         productGroupIri={productGroupIri}
+        parentProductId={parentProductId}
         brandColors={brandColors}
         targetLabel="este componente"
       />
@@ -518,6 +519,8 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
   const [confirmDeleteItem, setConfirmDeleteItem] = useState(null);
   const [removing, setRemoving] = useState(false);
   const [togglingQueueItemId, setTogglingQueueItemId] = useState('');
+  const [costByItemId, setCostByItemId] = useState({});
+  const [costReloadToken, setCostReloadToken] = useState(0);
 
   const fetchItems = useCallback(async () => {
     if (!productGroupIri) { setCurrentItems([]); return []; }
@@ -537,6 +540,64 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       .then(() => setLoaded(true))
       .catch(() => setLoaded(true));
   }, [ProductId, productGroupIri]);
+
+  useEffect(() => {
+    if (!productGroupIri || !Array.isArray(currentItems) || currentItems.length === 0) {
+      setCostByItemId({});
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const loadComponentCosts = async () => {
+      try {
+        const breakdown = await buildProductCostBreakdown({
+          productId: ProductId,
+          productGroupProductActions: productGroupProductStore.actions,
+          productGroupIri,
+        });
+
+        if (!cancelled) {
+          setCostByItemId(
+            breakdown?.groupItemCosts && typeof breakdown.groupItemCosts === 'object'
+              ? breakdown.groupItemCosts
+              : {},
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          setCostByItemId({});
+        }
+      }
+    };
+
+    loadComponentCosts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentItems, productGroupIri, productGroupProductStore.actions, costReloadToken]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !productGroupId || !ProductId) return undefined;
+
+    const handleBomChanged = event => {
+      const changedGroupId = normalizeEntityId(event?.detail?.productGroupId);
+      const changedParentProductId = normalizeEntityId(
+        event?.detail?.parentProductId || event?.detail?.productId,
+      );
+
+      if (changedGroupId !== String(productGroupId)) return;
+      if (changedParentProductId !== String(ProductId)) return;
+
+      setCostReloadToken(current => current + 1);
+    };
+
+    window.addEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+    return () => {
+      window.removeEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+    };
+  }, [productGroupId, ProductId]);
 
   const searchAvailableProducts = useCallback(async (searchTerm, page = 1, append = false) => {
     const q = String(searchTerm || '').trim();
@@ -883,6 +944,8 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
             toggling={!!itemId && itemId === togglingQueueItemId}
             brandColors={brandColors}
             productGroupIri={productGroupIri}
+            costSummary={costByItemId[normalizeEntityId(item)]}
+            parentProductId={ProductId}
           />
         );
       })}
