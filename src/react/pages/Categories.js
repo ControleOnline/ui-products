@@ -250,6 +250,38 @@ const CategoriesPage = ({ route }) => {
     return data || []
   }, [currentCompany?.id, categoryActions])
 
+  const refreshSelectedCategory = useCallback(async () => {
+    const refreshed = await reloadCategories()
+    const fresh = refreshed.find(c => String(c.id) === String(selectedCategory?.id))
+    if (fresh) setSelectedCategory(fresh)
+    return fresh
+  }, [reloadCategories, selectedCategory?.id])
+
+  const saveCategoryCover = useCallback(async relation => {
+    if (!selectedCategory?.id || !relation?.id || !currentCompany?.id) return
+
+    const parentId = normalizeEntityId(selectedCategory.parent)
+    const companyIri = currentCompany?.['@id']
+      ? String(currentCompany['@id'])
+      : `/people/${normalizeEntityId(currentCompany.id)}`
+
+    await categoryActions.save({
+      id: selectedCategory.id,
+      name: selectedCategory.name || '',
+      color: selectedCategory.color || '#CBD5E1',
+      icon: selectedCategory.icon || '',
+      context,
+      company: companyIri,
+      parent: parentId ? `/categories/${parentId}` : null,
+      extraData: {
+        ...(selectedCategory.extraData || {}),
+        imageCoverRelationId: relation.id,
+      },
+    })
+
+    await refreshSelectedCategory()
+  }, [categoryActions, context, currentCompany, refreshSelectedCategory, selectedCategory])
+
   const selectedMenuModelLabel = useMemo(() => {
     if (isLoadingMenuModels) {
       return 'Carregando modelo'
@@ -925,12 +957,10 @@ const CategoriesPage = ({ route }) => {
                     entityId={selectedCategory.id}
                     attachments={selectedCategory.categoryFiles || []}
                     companyId={currentCompany?.id}
-                    context={context}
-                    onChanged={async () => {
-                      const refreshed = await reloadCategories()
-                      const fresh = refreshed.find(c => c.id === selectedCategory.id)
-                      if (fresh) setSelectedCategory(fresh)
-                    }}
+                    context="products-category"
+                    coverRelationId={selectedCategory?.extraData?.imageCoverRelationId}
+                    onChanged={refreshSelectedCategory}
+                    onCoverChanged={saveCategoryCover}
                   />
                 </View>
               )}

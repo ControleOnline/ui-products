@@ -24,6 +24,11 @@ const styles = StyleSheet.create({
   selectButton: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 13, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   selectText: { fontSize: 15, color: '#0F172A', flex: 1 },
   selectPlaceholder: { fontSize: 15, color: '#CBD5E1', flex: 1 },
+  multiSelectButton: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, padding: 10, minHeight: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  multiSelectSummary: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  categoryChip: { maxWidth: 180, backgroundColor: '#E2E8F0', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  categoryChipOverflow: { backgroundColor: '#CBD5E1', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  categoryChipText: { color: '#334155', fontSize: 12, fontWeight: '700' },
 
   pickerModalContainer: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32, maxHeight: '80%' },
   pickerModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
