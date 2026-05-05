@@ -281,7 +281,7 @@ const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
   </View>
 );
 
-const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
+const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedProductId }) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
   const routeCategoryIdParam = route.params?.categoryId || '';
@@ -631,8 +631,12 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         if (!propProductId) {
           const newId = data.id || (data['@id'] && String(data['@id']).split('/').pop());
           if (newId) {
-            const parent = navigation.getParent();
-            if (parent && parent.setParams) parent.setParams({ ProductId: newId });
+            if (onSavedProductId) {
+              onSavedProductId(newId);
+            } else {
+              const parent = navigation.getParent();
+              if (parent && parent.setParams) parent.setParams({ ProductId: newId });
+            }
           }
         }
       }

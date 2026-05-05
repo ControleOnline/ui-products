@@ -10,11 +10,13 @@ import PurchaseSuggestions from '@controleonline/ui-products/src/react/pages/Pur
 import PurchaseForm from '@controleonline/ui-products/src/react/pages/PurchaseForm';
 
 const isPosApp = String(env.APP_TYPE || '').toUpperCase() === 'POS';
+const normalizeNumericParam = value => String(value || '').replace(/\D+/g, '') || undefined;
 
 const ordersRoutes = [
   {
     name: 'ProductsPage',
     component: Products,
+    path: 'products-page/:categoryId?',
     options: {
       headerShown: true,
       headerBackVisible: true,
@@ -26,6 +28,18 @@ const ordersRoutes = [
   {
     name: 'ProductDetails',
     component: ProductDetails,
+    path: {
+      path: 'product-details/:ProductId?',
+      parse: {
+        ProductId: normalizeNumericParam,
+      },
+      screens: {
+        Dados: '',
+        Fornecedores: 'fornecedores',
+        Grupos: 'grupos',
+        Estoque: 'estoque',
+      },
+    },
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
@@ -36,6 +50,12 @@ const ordersRoutes = [
   {
     name: 'CategoriesPage',
     component: Categories,
+    path: {
+      path: 'categories-page/:categoryId?',
+      parse: {
+        categoryId: normalizeNumericParam,
+      },
+    },
     options: {
       headerShown: true,
       headerBackVisible: true,

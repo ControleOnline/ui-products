@@ -125,6 +125,10 @@ const CategoriesPage = ({ route }) => {
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
   const context = 'products'
+  const routeCategoryId = useMemo(
+    () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
+    [route?.params?.category, route?.params?.categoryId],
+  )
   const {materializeOrderWithProducts, openOrderDetails} = usePosOrderMaterialization({
     interactionParams: route?.params,
     navigation,
@@ -225,11 +229,16 @@ const CategoriesPage = ({ route }) => {
   }
 
   const openCreateModal = () => {
+    if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
     setSelectedCategory(null)
     setModalVisible(true)
   }
 
   const openEditModal = category => {
+    const categoryId = normalizeEntityId(category)
+    if (categoryId && routeCategoryId !== categoryId) {
+      navigation.setParams({ categoryId, category: undefined })
+    }
     setSelectedCategory(category)
     setModalVisible(true)
   }
@@ -237,7 +246,20 @@ const CategoriesPage = ({ route }) => {
   const closeModal = () => {
     setModalVisible(false)
     setSelectedCategory(null)
+    if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
   }
+
+  React.useEffect(() => {
+    if (!routeCategoryId || !isManagerApp) return
+    const category = (Array.isArray(items) ? items : [])
+      .find(item => normalizeEntityId(item) === routeCategoryId)
+
+    if (!category) return
+    if (modalVisible && normalizeEntityId(selectedCategory) === routeCategoryId) return
+
+    setSelectedCategory(category)
+    setModalVisible(true)
+  }, [isManagerApp, items, modalVisible, routeCategoryId, selectedCategory])
 
   const reloadCategories = useCallback(async () => {
     if (!currentCompany?.id) return []

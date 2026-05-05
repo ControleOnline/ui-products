@@ -145,7 +145,7 @@ const SkeletonProductCard = () => (
 
 const ProductsPage = ({ navigation, route }) => {
   const routeParams = route.params || {};
-  const context = routeParams.context;
+  const context = routeParams.context || 'products';
   const interactionMode =
     routeParams.interactionMode ||
     (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
@@ -219,6 +219,11 @@ const ProductsPage = ({ navigation, route }) => {
     () => resolveRouteCategoryId(category),
     [category],
   );
+  useEffect(() => {
+    if (!categoryId) return;
+    if (resolveRouteCategoryId(categoryRouteValue) === categoryId) return;
+    navigation.setParams({ categoryId });
+  }, [categoryId, categoryRouteValue, navigation]);
   const isAllProducts =
     category?._isAllProducts === true ||
     category?.['@id'] === '__all_products__';
