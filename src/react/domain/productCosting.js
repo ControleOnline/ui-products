@@ -93,23 +93,24 @@ export const calculateProductFeedstockCost = async ({
 
 export const buildProductCostBreakdown = async ({
   productId,
-  productGroupProductActions,
+  productGroupProductStore,
   productGroupIri = null,
 }) => {
   const productIri = toProductIri(productId);
+  const productGroupProductActions = productGroupProductStore?.actions;
 
   if (!productId || !productIri || !productGroupProductActions?.getItems) {
     return emptyPricingBreakdown;
   }
 
-  const response = await productGroupProductActions.getItems({
+  await productGroupProductActions.getItems({
     product: productIri,
     summary: 'pricing',
     itemsPerPage: 1,
     ...(productGroupIri ? { productGroup: productGroupIri } : {}),
   });
 
-  return normalizePricingBreakdown(extractSummary(response)?.pricing);
+  return normalizePricingBreakdown(productGroupProductStore?.getters?.summary?.pricing);
 };
 
 const resolvePeopleLabel = entity =>

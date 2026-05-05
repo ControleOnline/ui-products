@@ -553,7 +553,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       try {
         const breakdown = await buildProductCostBreakdown({
           productId: ProductId,
-          productGroupProductActions: productGroupProductStore.actions,
+          productGroupProductStore,
           productGroupIri,
         });
 

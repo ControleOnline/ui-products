@@ -94,7 +94,7 @@ const ProductDetails = ({ route, navigation }) => {
     try {
       const nextBreakdown = await buildProductCostBreakdown({
         productId: ProductId,
-        productGroupProductActions: productGroupProductStore?.actions,
+        productGroupProductStore,
       });
 
       setPricingBreakdown(nextBreakdown);
