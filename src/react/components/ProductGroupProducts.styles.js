@@ -78,6 +78,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
   },
+  itemCostText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#0E7490',
+    marginTop: 2,
+  },
   itemQty: {
     fontSize: 11,
     color: '#94A3B8',

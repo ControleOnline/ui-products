@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, Platform, Activity
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import { emitProductEvent, PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
 import styles from './ProductFeedStock.styles';
 
 import {
@@ -404,7 +405,14 @@ const FeedStockFormModal = ({
 };
 
 /* ─── Componente principal ─── */
-const ProductFeedStock = ({ row, productIri, productGroupIri, brandColors, targetLabel = 'este produto' }) => {
+const ProductFeedStock = ({
+  row,
+  productIri,
+  productGroupIri,
+  parentProductId,
+  brandColors,
+  targetLabel = 'este produto',
+}) => {
   const store = useStore('product_group_product');
   const productsStore = useStore('products');
   const peopleStore = useStore('people');
@@ -728,6 +736,12 @@ const ProductFeedStock = ({ row, productIri, productGroupIri, brandColors, targe
         await store.actions.save(payload);
       }
       await reloadItems();
+      emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
+        productId: targetProductNumericId,
+        parentProductId: String(parentProductId || '').replace(/\D/g, ''),
+        productGroupId: String(productGroupIri || '').replace(/\D/g, ''),
+        source: 'ProductFeedStock.save',
+      });
       closeForm();
     } catch (e) {
       const raw =
@@ -753,6 +767,12 @@ const ProductFeedStock = ({ row, productIri, productGroupIri, brandColors, targe
     try {
       await store.actions.remove(id);
       await reloadItems();
+      emitProductEvent(PRODUCT_EVENTS.BOM_CHANGED, {
+        productId: targetProductNumericId,
+        parentProductId: String(parentProductId || '').replace(/\D/g, ''),
+        productGroupId: String(productGroupIri || '').replace(/\D/g, ''),
+        source: 'ProductFeedStock.remove',
+      });
     } catch {
       /* silent */
     } finally {

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
-import { useWindowDimensions, View, Text, Image } from 'react-native';
+import { useWindowDimensions, View, Text, Image, TouchableOpacity } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
@@ -7,8 +7,16 @@ import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/f
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
 import ProductFeedStock from '@controleonline/ui-products/src/react/components/ProductFeedStock';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
+import ProductPricingModal from '@controleonline/ui-products/src/react/components/ProductPricingModal';
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
 import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
+import {
+  buildProductCostBreakdown,
+  emptyPricingBreakdown,
+  formatCurrency,
+  normalizeEntityId,
+} from '@controleonline/ui-products/src/react/domain/productCosting';
+import { PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from './ProductDetails.styles';
 
@@ -25,14 +33,6 @@ const buildCoverUrl = (files, coverRelationId) => {
   return resolveFileImageUrl(first.file);
 };
 
-const normalizeEntityId = value => {
-  if (!value && value !== 0) return '';
-  const raw = typeof value === 'object'
-    ? value?.id || value?.['@id'] || value?.value || ''
-    : value;
-  return String(raw || '').replace(/\D+/g, '').trim();
-};
-
 const inferProductContext = product => {
   const type = String(product?.type || '').toLowerCase();
   return ['package', 'component', 'feedstock'].includes(type) ? 'supplies' : 'products';
@@ -43,8 +43,15 @@ const ProductDetails = ({ route, navigation }) => {
   const ProductId = normalizeEntityId(routeParams.ProductId || routeParams.id);
   const { width } = useWindowDimensions();
   const productsStore = useStore('products');
+  const productGroupProductStore = useStore('product_group_product');
   const [productSummary, setProductSummary] = useState(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(Boolean(ProductId));
+  const [costPrice, setCostPrice] = useState(0);
+  const [isLoadingCost, setIsLoadingCost] = useState(Boolean(ProductId));
+  const [pricingBreakdown, setPricingBreakdown] = useState({
+    ...emptyPricingBreakdown,
+  });
+  const [pricingModalVisible, setPricingModalVisible] = useState(false);
 
   const themeStore = useStore('theme');
   const brandColors = useMemo(
@@ -75,6 +82,31 @@ const ProductDetails = ({ route, navigation }) => {
     }
   }, [ProductId, productsStore?.actions]);
 
+  const loadCostSummary = useCallback(async () => {
+    if (!ProductId) {
+      setCostPrice(0);
+      setPricingBreakdown(emptyPricingBreakdown);
+      setIsLoadingCost(false);
+      return;
+    }
+
+    setIsLoadingCost(true);
+    try {
+      const nextBreakdown = await buildProductCostBreakdown({
+        productId: ProductId,
+        productGroupProductStore,
+      });
+
+      setPricingBreakdown(nextBreakdown);
+      setCostPrice(nextBreakdown.totalCost || 0);
+    } catch {
+      setCostPrice(0);
+      setPricingBreakdown(emptyPricingBreakdown);
+    } finally {
+      setIsLoadingCost(false);
+    }
+  }, [ProductId, productGroupProductStore?.actions]);
+
   const context = routeParams.context || (productSummary ? inferProductContext(productSummary) : 'products');
   const contextTypes = useMemo(() => {
     if (context === 'products') {
@@ -93,6 +125,28 @@ const ProductDetails = ({ route, navigation }) => {
   useEffect(() => {
     loadProductSummary();
   }, [loadProductSummary]);
+
+  useEffect(() => {
+    loadCostSummary();
+  }, [loadCostSummary]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !ProductId) return undefined;
+
+    const handleBomChanged = event => {
+      const changedProductId = normalizeEntityId(
+        event?.detail?.parentProductId || event?.detail?.productId,
+      );
+      if (changedProductId && changedProductId !== String(ProductId)) return;
+      loadProductSummary();
+      loadCostSummary();
+    };
+
+    window.addEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+    return () => {
+      window.removeEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+    };
+  }, [ProductId, loadCostSummary, loadProductSummary]);
 
   useEffect(() => {
     if (!routeParams.ProductId && routeParams.id && ProductId) {
@@ -120,6 +174,27 @@ const ProductDetails = ({ route, navigation }) => {
                 <Text style={styles.summaryDescription} numberOfLines={2}>
                   {productSummary?.description || 'Sem descrição informada.'}
                 </Text>
+                <View style={styles.summaryMetricsRow}>
+                  <View style={styles.summaryMetricCard}>
+                    <Text style={styles.summaryMetricLabel}>Venda</Text>
+                    <Text style={styles.summaryMetricValue}>{formatCurrency(productSummary?.price)}</Text>
+                  </View>
+                  <View style={styles.summaryMetricCard}>
+                    <View style={styles.summaryMetricHeader}>
+                      <Text style={styles.summaryMetricLabel}>Custo</Text>
+                      <TouchableOpacity
+                        style={styles.summaryMetricAction}
+                        onPress={() => setPricingModalVisible(true)}
+                        activeOpacity={0.75}
+                      >
+                        <MaterialCommunityIcons name="calculator-variant-outline" size={14} color={brandColors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={styles.summaryMetricValue}>
+                      {isLoadingCost ? 'Calculando...' : formatCurrency(costPrice)}
+                    </Text>
+                  </View>
+                </View>
               </View>
             </>
           ) : (
@@ -157,6 +232,10 @@ const ProductDetails = ({ route, navigation }) => {
                 {...props}
                 ProductId={ProductId}
                 contextTypes={contextTypes}
+                onSaved={() => {
+                  loadProductSummary();
+                  loadCostSummary();
+                }}
                 onSavedProductId={newProductId => {
                   const normalizedProductId = normalizeEntityId(newProductId);
                   if (normalizedProductId) {
@@ -187,6 +266,7 @@ const ProductDetails = ({ route, navigation }) => {
                   <View style={styles.feedstockCard}>
                     <ProductFeedStock
                       productIri={`/products/${ProductId}`}
+                      parentProductId={ProductId}
                       brandColors={brandColors}
                       targetLabel="este produto"
                     />
@@ -213,6 +293,12 @@ const ProductDetails = ({ route, navigation }) => {
           </Tab.Screen>
         </Tab.Navigator>
       </View>
+      <ProductPricingModal
+        visible={pricingModalVisible}
+        onClose={() => setPricingModalVisible(false)}
+        navigation={navigation}
+        pricingBreakdown={pricingBreakdown}
+      />
     </View>
   );
 };
