@@ -481,6 +481,7 @@ const ItemCard = ({
         row={item}
         productGroupIri={productGroupIri}
         brandColors={brandColors}
+        targetLabel="este componente"
       />
     </View>
   );

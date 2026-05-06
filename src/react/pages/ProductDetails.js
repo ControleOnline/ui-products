@@ -5,6 +5,7 @@ import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
+import ProductFeedStock from '@controleonline/ui-products/src/react/components/ProductFeedStock';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
 import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
@@ -86,6 +87,8 @@ const ProductDetails = ({ route, navigation }) => {
 
     return [];
   }, [context]);
+  const productType = String(productSummary?.type || '').toLowerCase();
+  const canHaveFeedstocks = Boolean(ProductId && productSummary && productType !== 'feedstock');
 
   useEffect(() => {
     loadProductSummary();
@@ -134,10 +137,11 @@ const ProductDetails = ({ route, navigation }) => {
         <Tab.Navigator
           initialLayout={{ width }}
           screenOptions={{
-            tabBarScrollEnabled: false,
+            tabBarScrollEnabled: canHaveFeedstocks,
             tabBarActiveTintColor: brandColors.primary,
             tabBarIndicatorStyle: { backgroundColor: brandColors.primary, height: 3 },
             tabBarLabelStyle: { fontWeight: '600', fontSize: 12, textTransform: 'none' },
+            tabBarItemStyle: canHaveFeedstocks ? { width: 'auto', minWidth: 96 } : undefined,
             tabBarStyle: {
               backgroundColor: '#fff',
               elevation: 0,
@@ -172,6 +176,22 @@ const ProductDetails = ({ route, navigation }) => {
                   isLoading={isLoadingSummary}
                   onRefresh={loadProductSummary}
                 />
+              )}
+            </Tab.Screen>
+          ) : null}
+
+          {canHaveFeedstocks ? (
+            <Tab.Screen name="Insumos">
+              {() => (
+                <View style={styles.feedstockTabContent}>
+                  <View style={styles.feedstockCard}>
+                    <ProductFeedStock
+                      productIri={`/products/${ProductId}`}
+                      brandColors={brandColors}
+                      targetLabel="este produto"
+                    />
+                  </View>
+                </View>
               )}
             </Tab.Screen>
           ) : null}

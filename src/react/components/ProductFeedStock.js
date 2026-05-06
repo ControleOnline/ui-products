@@ -24,11 +24,11 @@ import {
 /*
  * ProductFeedStock
  *
- * Exibe e gerencia os insumos (feedstock) de um modificador/componente dentro de um grupo.
+ * Exibe e gerencia os insumos (feedstock) de um produto.
  *
  * Estrutura de dados (mesma tabela product_group_product, productType='feedstock'):
- *  product      = IRI do produto COMPONENTE (o productChild do item pai)
- *  productGroup = IRI do grupo
+ *  product      = IRI do produto que consome o insumo
+ *  productGroup = IRI do grupo quando o insumo pertence a um modificador
  *  productChild = IRI do insumo em si
  *  productType  = 'feedstock'
  *  price        = custo do insumo
@@ -404,7 +404,7 @@ const FeedStockFormModal = ({
 };
 
 /* ─── Componente principal ─── */
-const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
+const ProductFeedStock = ({ row, productIri, productGroupIri, brandColors, targetLabel = 'este produto' }) => {
   const store = useStore('product_group_product');
   const productsStore = useStore('products');
   const peopleStore = useStore('people');
@@ -412,8 +412,8 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
 
   const { currentCompany } = peopleStore.getters;
 
-  /* IRI do componente (productChild do item pai) */
-  const componentIri =
+  const targetProductIri =
+    toIri(productIri, '/products/') ||
     toIri(row?.productChild?.['@id'] || row?.productChild, '/products/');
 
   const [expanded, setExpanded] = useState(false);
@@ -445,27 +445,33 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
 
   /* ── Buscar insumos quando expandido ── */
   const fetchItems = useCallback(async () => {
-    if (!componentIri || !productGroupIri) { setItems([]); return; }
+    if (!targetProductIri) { setItems([]); return; }
     try {
-      const response = await store.actions.getItems({
-        product: componentIri,
-        productGroup: productGroupIri,
+      const params = {
+        product: targetProductIri,
         productType: 'feedstock',
-      });
+      };
+
+      if (productGroupIri) {
+        params.productGroup = productGroupIri;
+      } else {
+        params['exists[productGroup]'] = false;
+      }
+
+      const response = await store.actions.getItems(params);
       setItems(extractItems(response));
     } catch {
       setItems([]);
     }
-  }, [componentIri, productGroupIri]);
+  }, [targetProductIri, productGroupIri]);
 
   useEffect(() => {
     if (!expanded) return;
     setLoaded(false);
     fetchItems().then(() => setLoaded(true));
-  }, [expanded, componentIri, productGroupIri]);
+  }, [expanded, targetProductIri, productGroupIri]);
 
-  /* IRI numérico do componente para comparação anti-loop */
-  const componentNumericId = String(componentIri || '').replace(/\D/g, '');
+  const targetProductNumericId = String(targetProductIri || '').replace(/\D/g, '');
 
   const searchAvailableProducts = useCallback(async (searchTerm, page = 1, append = false) => {
     const q = String(searchTerm || '').trim();
@@ -507,7 +513,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         ).filter(Boolean)
       );
       const filtered = (list || []).filter(prod =>
-        String(prod?.id || '') !== String(componentNumericId || '') &&
+        String(prod?.id || '') !== String(targetProductNumericId || '') &&
         !existingChildIds.has(String(prod?.id || ''))
       );
       setAllProducts(prev => (append ? mergeById(prev, filtered) : filtered));
@@ -529,7 +535,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
     searchingProducts,
     hasMoreProducts,
     items,
-    componentNumericId,
+    targetProductNumericId,
   ]);
 
   const handleSearchProducts = useCallback((searchTerm) => {
@@ -697,24 +703,28 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
       if (editingItem) {
         payload = {
           id: editingItem.id,
-          product: componentIri,
-          productGroup: productGroupIri,
+          product: targetProductIri,
           productChild: toIri(editingItem.productChild, '/products/'),
           productType: 'feedstock',
           quantity: nextQty,
           price: nextPrice,
           active: editingItem.active ?? true,
         };
+        if (productGroupIri) {
+          payload.productGroup = productGroupIri;
+        }
         await store.actions.save(payload);
       } else {
         payload = {
-          product: componentIri,
-          productGroup: productGroupIri,
+          product: targetProductIri,
           productChild: `/products/${String(formDraft.productChild).replace(/\D/g, '')}`,
           productType: 'feedstock',
           quantity: nextQty,
           price: nextPrice,
         };
+        if (productGroupIri) {
+          payload.productGroup = productGroupIri;
+        }
         await store.actions.save(payload);
       }
       await reloadItems();
@@ -725,7 +735,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         e?.response?.data?.detail ||
         e?.message || '';
       if (raw.toLowerCase().includes('duplicate') || raw.toLowerCase().includes('unique')) {
-        setFormError('Este insumo já foi adicionado a este componente.');
+        setFormError(`Este insumo já foi adicionado a ${targetLabel}.`);
       } else {
         setFormError(raw || 'Falha ao salvar.');
       }
@@ -751,8 +761,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
     }
   };
 
-  /* ── sem componente IRI → não mostrar nada ── */
-  if (!componentIri) return null;
+  if (!targetProductIri) return null;
 
   const deleteName =
     confirmDelete?.productChild?.product ||
@@ -860,7 +869,7 @@ const ProductFeedStock = ({ row, productGroupIri, brandColors }) => {
         hasMore={hasMoreProducts}
         onSearch={handleSearchProducts}
         onLoadMore={handleLoadMoreProducts}
-        excludeId={componentNumericId}
+        excludeId={targetProductNumericId}
         onQuickRegister={openQuickReg}
       />
       {/* Modal: cadastro rápido de insumo */}
