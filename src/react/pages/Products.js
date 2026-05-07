@@ -227,12 +227,17 @@ const ProductsPage = ({ navigation, route }) => {
   const labels = useMemo(() => buildCatalogLabels(context), [context]);
 
   const [categoryProducts, setCategoryProducts] = useState([]);
+  const categoryProductsRef = useRef([]);
+  const productsRequestKeyRef = useRef('');
   const typeFilter = useMemo(
     () => normalizeProductTypeFilter(routeParams.typeFilter),
     [routeParams.typeFilter],
   );
   const [visibleCount, setVisibleCount] = useState(50);
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
+  const actionsRef = useRef(actions);
+  const categoryActionsRef = useRef(categoryActions);
+  const ordersActionsRef = useRef(ordersActions);
 
   const isManager =
     env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
@@ -273,6 +278,25 @@ const ProductsPage = ({ navigation, route }) => {
     currentOrderRef.current = ordersStore.getters?.item || null;
   }, [ordersStore.getters?.item]);
 
+  useEffect(() => {
+    actionsRef.current = actions;
+  }, [actions]);
+
+  useEffect(() => {
+    categoryActionsRef.current = categoryActions;
+  }, [categoryActions]);
+
+  useEffect(() => {
+    ordersActionsRef.current = ordersActions;
+  }, [ordersActions]);
+
+  const updateCategoryProducts = useCallback(products => {
+    const nextProducts = Array.isArray(products) ? products : [];
+    if (categoryProductsRef.current === nextProducts) return;
+    categoryProductsRef.current = nextProducts;
+    setCategoryProducts(nextProducts);
+  }, []);
+
   const visibleProducts = useMemo(() => {
     if (!typeFilter) return categoryProducts;
     return categoryProducts.filter(p => p.type === typeFilter);
@@ -280,7 +304,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   useEffect(() => {
     setVisibleCount(50);
-  }, [typeFilter, category, normalizedSearchQuery]);
+  }, [typeFilter, categoryId, normalizedSearchQuery]);
 
   const flushPendingAddProducts = useCallback(() => {
     const currentOrderId = String(
@@ -296,12 +320,13 @@ const ProductsPage = ({ navigation, route }) => {
         quantity: selection.quantity,
       }));
 
-      ordersActions.addToQueue(() => ordersActions.addProducts(currentOrderId, payload));
+      const currentOrdersActions = ordersActionsRef.current;
+      currentOrdersActions.addToQueue(() => currentOrdersActions.addProducts(currentOrderId, payload));
     }
 
     clearPendingAddProducts();
-    ordersActions.initQueue();
-  }, [ordersActions]);
+    ordersActionsRef.current.initQueue();
+  }, []);
 
   const handlePendingSelectionChange = useCallback(
     payload => {
@@ -315,9 +340,9 @@ const ProductsPage = ({ navigation, route }) => {
       });
 
       currentOrderRef.current = nextOrder;
-      ordersActions.syncOrder?.(nextOrder);
+      ordersActionsRef.current.syncOrder?.(nextOrder);
     },
-    [ordersActions],
+    [],
   );
 
   useEffect(() => {
@@ -332,20 +357,20 @@ const ProductsPage = ({ navigation, route }) => {
 
   const changeCategoryProduct = (p, changeStorage = false) => {
     if (isAllProducts) {
-      setCategoryProducts(p);
+      updateCategoryProducts(p);
       return;
     }
 
     const index = categories.findIndex(c => resolveRouteCategoryId(c) === categoryId);
     if (index < 0) {
-      setCategoryProducts(p);
+      updateCategoryProducts(p);
       return;
     }
 
     let c = [...categories];
     c[index]['products'] = p;
-    setCategoryProducts(p);
-    categoryActions.setItems(c);
+    updateCategoryProducts(p);
+    categoryActionsRef.current.setItems(c);
 
     if (changeStorage)
       writeCachedCategories(currentCompany?.id, c, context);
@@ -353,7 +378,8 @@ const ProductsPage = ({ navigation, route }) => {
 
   useEffect(() => {
     if (!category) {
-      setCategoryProducts([]);
+      productsRequestKeyRef.current = '';
+      updateCategoryProducts([]);
       return;
     }
 
@@ -366,26 +392,34 @@ const ProductsPage = ({ navigation, route }) => {
     };
 
     if (normalizedSearchQuery) {
-      actions
+      const requestKey = JSON.stringify(['search', baseParams, normalizedSearchQuery]);
+      if (productsRequestKeyRef.current === requestKey) return;
+      productsRequestKeyRef.current = requestKey;
+      actionsRef.current
         .getItems({
           ...baseParams,
           itemsPerPage: 100,
           product: normalizedSearchQuery,
         })
         .then(data => {
-          setCategoryProducts(data || []);
+          if (productsRequestKeyRef.current !== requestKey) return;
+          updateCategoryProducts(data || []);
         })
         .catch(() => {});
       return;
     }
 
     if (isAllProducts) {
-      actions
+      const requestKey = JSON.stringify(['all', baseParams]);
+      if (productsRequestKeyRef.current === requestKey) return;
+      productsRequestKeyRef.current = requestKey;
+      actionsRef.current
         .getItems({
           ...baseParams,
         })
         .then(data => {
-          setCategoryProducts(data || []);
+          if (productsRequestKeyRef.current !== requestKey) return;
+          updateCategoryProducts(data || []);
         })
         .catch(() => { });
       return;
@@ -399,9 +433,12 @@ const ProductsPage = ({ navigation, route }) => {
       const index = categories.findIndex(c => resolveRouteCategoryId(c) === categoryId);
 
       if (index >= 0 && categories[index]?.products?.length > 0) {
-        setCategoryProducts(categories[index]['products']);
+        updateCategoryProducts(categories[index]['products']);
       } else {
-        actions
+        const requestKey = JSON.stringify(['category', baseParams, categoryId]);
+        if (productsRequestKeyRef.current === requestKey) return;
+        productsRequestKeyRef.current = requestKey;
+        actionsRef.current
           .getItems({
             ...baseParams,
             itemsPerPage: 50,
@@ -409,6 +446,7 @@ const ProductsPage = ({ navigation, route }) => {
               category?.['@id'] || `/categories/${categoryId}`,
           })
           .then(data => {
+            if (productsRequestKeyRef.current !== requestKey) return;
             if (data && Object.keys(data).length > 0)
               changeCategoryProduct(data, true);
           })
@@ -416,7 +454,6 @@ const ProductsPage = ({ navigation, route }) => {
       }
     }
   }, [
-    actions,
     category,
     categoryId,
     categories,
@@ -424,6 +461,8 @@ const ProductsPage = ({ navigation, route }) => {
     currentCompany?.id,
     isAllProducts,
     normalizedSearchQuery,
+    typeFilter,
+    updateCategoryProducts,
   ]);
 
   useFocusEffect(
@@ -436,9 +475,9 @@ const ProductsPage = ({ navigation, route }) => {
       return () => {
         flushPendingAddProducts();
         const cats = readCachedCategories(currentCompany?.id, context);
-        if (cats.length > 0) categoryActions.setItems(cats);
+        if (cats.length > 0) categoryActionsRef.current.setItems(cats);
       };
-    }, [categoryActions, context, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
+    }, [context, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
   );
 
   const buildCategoryRouteParams = useCallback(() => {
