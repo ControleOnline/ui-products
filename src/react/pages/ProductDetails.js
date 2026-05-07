@@ -10,6 +10,7 @@ import ProductGroups from '@controleonline/ui-products/src/react/components/Prod
 import ProductPricingModal from '@controleonline/ui-products/src/react/components/ProductPricingModal';
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
 import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
+import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import {
   buildProductCostBreakdown,
   emptyPricingBreakdown,
@@ -37,6 +38,27 @@ const inferProductContext = product => {
   const type = String(product?.type || '').toLowerCase();
   return ['package', 'component', 'feedstock'].includes(type) ? 'supplies' : 'products';
 };
+
+const normalizeCatalogContext = value =>
+  String(value || 'products').trim().toLowerCase() === 'supplies'
+    ? 'supplies'
+    : 'products';
+
+const buildEntityLabels = context => context === 'supplies'
+  ? {
+      singular: 'Insumo',
+      editTitle: 'Editar Insumo',
+      createTitle: 'Adicionar Insumo',
+      emptyDescription: 'Sem descrição informada.',
+      createDescription: 'Preencha as abas abaixo para cadastrar um novo insumo.',
+    }
+  : {
+      singular: 'Produto',
+      editTitle: 'Editar Produto',
+      createTitle: 'Adicionar Produto',
+      emptyDescription: 'Sem descrição informada.',
+      createDescription: 'Preencha as abas abaixo para cadastrar um novo produto.',
+    };
 
 const ProductDetails = ({ route, navigation }) => {
   const routeParams = route.params || {};
@@ -107,7 +129,9 @@ const ProductDetails = ({ route, navigation }) => {
     }
   }, [ProductId, productGroupProductStore?.actions]);
 
-  const context = routeParams.context || (productSummary ? inferProductContext(productSummary) : 'products');
+  const inferredContext = productSummary ? inferProductContext(productSummary) : null;
+  const context = normalizeCatalogContext(routeParams.context || inferredContext || 'products');
+  const entityLabels = useMemo(() => buildEntityLabels(context), [context]);
   const contextTypes = useMemo(() => {
     if (context === 'products') {
       return ['product', 'manufactured', 'custom', 'service'];
@@ -154,6 +178,12 @@ const ProductDetails = ({ route, navigation }) => {
     }
   }, [ProductId, navigation, routeParams.ProductId, routeParams.id]);
 
+  useEffect(() => {
+    navigation.setOptions?.({
+      title: ProductId ? entityLabels.editTitle : entityLabels.createTitle,
+    });
+  }, [ProductId, entityLabels.createTitle, entityLabels.editTitle, navigation]);
+
   return (
     <View style={styles.container}>
       <View style={styles.summaryWrap}>
@@ -168,11 +198,12 @@ const ProductDetails = ({ route, navigation }) => {
                 )}
               </View>
               <View style={styles.summaryContent}>
+                <ProductReferenceLink product={productSummary} context={context} />
                 <Text style={styles.summaryTitle} numberOfLines={1}>
-                  {productSummary?.product || 'Produto'}
+                  {productSummary?.product || entityLabels.singular}
                 </Text>
                 <Text style={styles.summaryDescription} numberOfLines={2}>
-                  {productSummary?.description || 'Sem descrição informada.'}
+                  {productSummary?.description || entityLabels.emptyDescription}
                 </Text>
                 <View style={styles.summaryMetricsRow}>
                   <View style={styles.summaryMetricCard}>
@@ -199,9 +230,9 @@ const ProductDetails = ({ route, navigation }) => {
             </>
           ) : (
             <View style={styles.summaryContentCreate}>
-              <Text style={styles.summaryTitle}>Adicionar Produto</Text>
+              <Text style={styles.summaryTitle}>{entityLabels.createTitle}</Text>
               <Text style={styles.summaryDescription} numberOfLines={2}>
-                Preencha as abas abaixo para cadastrar um novo produto.
+                {entityLabels.createDescription}
               </Text>
             </View>
           )}

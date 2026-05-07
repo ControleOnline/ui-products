@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { emitProductEvent, PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
+import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import styles from './ProductFeedStock.styles';
 
 import {
@@ -67,6 +68,19 @@ const mergeById = (base, incoming) => {
   (incoming || []).forEach(item => map.set(String(item?.id || item?.['@id'] || ''), item));
   return Array.from(map.values());
 };
+
+const withFeedstockScope = (items, scope) =>
+  (items || []).map(item => ({
+    ...item,
+    __feedstockScope: scope,
+  }));
+
+const getFeedstockScopeLabel = item =>
+  item?.__feedstockScope === 'direct'
+    ? 'Receita do item'
+    : item?.__feedstockScope === 'group'
+      ? 'Especifico deste grupo'
+      : '';
 
 /* ─── Modal de cadastro rápido de insumo ─── */
 const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, brandColors, units }) => {
@@ -455,19 +469,26 @@ const ProductFeedStock = ({
   const fetchItems = useCallback(async () => {
     if (!targetProductIri) { setItems([]); return; }
     try {
-      const params = {
+      const directParams = {
         product: targetProductIri,
         productType: 'feedstock',
+        'exists[productGroup]': false,
       };
+      const directResponse = await store.actions.getItems(directParams);
+      const directItems = withFeedstockScope(extractItems(directResponse), 'direct');
 
       if (productGroupIri) {
-        params.productGroup = productGroupIri;
-      } else {
-        params['exists[productGroup]'] = false;
+        const groupedResponse = await store.actions.getItems({
+          product: targetProductIri,
+          productType: 'feedstock',
+          productGroup: productGroupIri,
+        });
+        const groupedItems = withFeedstockScope(extractItems(groupedResponse), 'group');
+        setItems(mergeById(groupedItems, directItems));
+        return;
       }
 
-      const response = await store.actions.getItems(params);
-      setItems(extractItems(response));
+      setItems(directItems);
     } catch {
       setItems([]);
     }
@@ -718,7 +739,10 @@ const ProductFeedStock = ({
           price: nextPrice,
           active: editingItem.active ?? true,
         };
-        if (productGroupIri) {
+        const editingProductGroupIri = toIri(editingItem.productGroup, '/product_groups/');
+        if (editingProductGroupIri) {
+          payload.productGroup = editingProductGroupIri;
+        } else if (productGroupIri && editingItem?.__feedstockScope !== 'direct') {
           payload.productGroup = productGroupIri;
         }
         await store.actions.save(payload);
@@ -837,12 +861,20 @@ const ProductFeedStock = ({
             const price = parseFloat(item.price ?? 0).toFixed(2).replace('.', ',');
             const qty = item.quantity ?? 1;
             const unit = extractUnit(item.productChild);
+            const scopeLabel = getFeedstockScopeLabel(item);
             return (
               <View key={String(item.id || idx)} style={styles.itemCard}>
                 <View style={inlineStyle_798_22}>
+                  <ProductReferenceLink
+                    product={item.productChild}
+                    context="supplies"
+                    style={styles.itemReferenceLink}
+                    textStyle={styles.itemReferenceText}
+                  />
                   <Text style={styles.itemName} numberOfLines={1}>{name}</Text>
                   <Text style={styles.itemMeta}>
                     {qty}{unit ? ` ${unit}` : ''} · R$ {price}
+                    {scopeLabel ? ` · ${scopeLabel}` : ''}
                   </Text>
                 </View>
                 <View style={styles.itemActions}>

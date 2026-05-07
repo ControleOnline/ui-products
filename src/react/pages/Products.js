@@ -129,6 +129,39 @@ const normalizeProductTypeFilter = value => {
   return normalizedValue || null;
 };
 
+const normalizeCatalogContext = value =>
+  String(value || 'products').trim().toLowerCase() === 'supplies'
+    ? 'supplies'
+    : 'products';
+
+const buildCatalogLabels = context => {
+  if (context === 'supplies') {
+    return {
+      singular: 'insumo',
+      plural: 'insumos',
+      addLabel: 'Adicionar Insumo',
+      emptyFound: 'Nenhum insumo encontrado',
+      emptyAll: 'Nenhum insumo cadastrado',
+      emptyCategory: 'Nenhum insumo',
+      emptyFoundSubtitle: query => `Nenhum resultado para "${query}".`,
+      emptyAllSubtitle: 'Nenhum insumo foi cadastrado ainda.',
+      emptyCategorySubtitle: 'Nenhum insumo disponível nesta categoria',
+    };
+  }
+
+  return {
+    singular: 'produto',
+    plural: 'produtos',
+    addLabel: 'Adicionar Produto',
+    emptyFound: 'Nenhum produto encontrado',
+    emptyAll: 'Nenhum produto cadastrado',
+    emptyCategory: 'Nenhum produto',
+    emptyFoundSubtitle: query => `Nenhum resultado para "${query}".`,
+    emptyAllSubtitle: 'Nenhum produto foi cadastrado ainda.',
+    emptyCategorySubtitle: 'Nenhum produto disponível nesta categoria',
+  };
+};
+
 const SkeletonProductCard = () => (
   <View style={skeletonStyles.card}>
     <View style={skeletonStyles.imageBlock} />
@@ -146,7 +179,7 @@ const SkeletonProductCard = () => (
 
 const ProductsPage = ({ navigation, route }) => {
   const routeParams = route.params || {};
-  const context = routeParams.context || 'products';
+  const context = normalizeCatalogContext(routeParams.context);
   const interactionMode =
     routeParams.interactionMode ||
     (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
@@ -191,6 +224,7 @@ const ProductsPage = ({ navigation, route }) => {
       ),
     [themeColors, currentCompany?.id],
   );
+  const labels = useMemo(() => buildCatalogLabels(context), [context]);
 
   const [categoryProducts, setCategoryProducts] = useState([]);
   const typeFilter = useMemo(
@@ -314,7 +348,7 @@ const ProductsPage = ({ navigation, route }) => {
     categoryActions.setItems(c);
 
     if (changeStorage)
-      writeCachedCategories(currentCompany?.id, c);
+      writeCachedCategories(currentCompany?.id, c, context);
   };
 
   useEffect(() => {
@@ -401,10 +435,10 @@ const ProductsPage = ({ navigation, route }) => {
 
       return () => {
         flushPendingAddProducts();
-        const cats = readCachedCategories(currentCompany?.id);
+        const cats = readCachedCategories(currentCompany?.id, context);
         if (cats.length > 0) categoryActions.setItems(cats);
       };
-    }, [categoryActions, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
+    }, [categoryActions, context, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
   );
 
   const buildCategoryRouteParams = useCallback(() => {
@@ -498,17 +532,17 @@ const ProductsPage = ({ navigation, route }) => {
           />
           <Text style={styles.emptyTitle}>
             {normalizedSearchQuery
-              ? 'Nenhum produto encontrado'
+              ? labels.emptyFound
               : isAllProducts
-                ? 'Nenhum produto cadastrado'
-                : 'Nenhum produto'}
+                ? labels.emptyAll
+                : labels.emptyCategory}
           </Text>
           <Text style={styles.emptySubtitle}>
             {normalizedSearchQuery
-              ? `Nenhum resultado para "${normalizedSearchQuery}".`
+              ? labels.emptyFoundSubtitle(normalizedSearchQuery)
               : isAllProducts
-                ? 'Nenhum produto foi cadastrado ainda.'
-                : 'Nenhum produto disponível nesta categoria'}
+                ? labels.emptyAllSubtitle
+                : labels.emptyCategorySubtitle}
           </Text>
         </View>
       )}
@@ -542,7 +576,7 @@ const ProductsPage = ({ navigation, route }) => {
             onPress={handleAddProduct}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.bottomBarButtonText}>Adicionar Produto</Text>
+            <Text style={styles.bottomBarButtonText}>{labels.addLabel}</Text>
           </TouchableOpacity>
         </View>
       )}

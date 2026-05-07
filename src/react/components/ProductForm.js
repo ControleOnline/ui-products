@@ -94,6 +94,25 @@ const extractCategoryIds = data => {
   return uniqueCategoryIds(ids);
 };
 
+const normalizeCatalogContext = value =>
+  String(value || 'products').trim().toLowerCase() === 'supplies'
+    ? 'supplies'
+    : 'products';
+
+const buildEntityLabels = context => context === 'supplies'
+  ? {
+      saveSuccess: 'Insumo salvo.',
+      saveAction: 'Salvar Insumo',
+      namePlaceholder: 'Nome do insumo',
+      descriptionPlaceholder: 'Descreva o insumo...',
+    }
+  : {
+      saveSuccess: 'Produto salvo.',
+      saveAction: 'Salvar Produto',
+      namePlaceholder: 'Nome do produto',
+      descriptionPlaceholder: 'Descreva o produto...',
+    };
+
 const normalizeProductForForm = data => {
   if (!data) return data;
   return {
@@ -286,6 +305,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
   const { ProductId: routeProductId } = route.params || {};
   const routeCategoryIdParam = route.params?.categoryId || '';
   const routeInitialProductType = String(route.params?.initialProductType || '').trim().toLowerCase();
+  const context = normalizeCatalogContext(route.params?.context);
   const ProductId = propProductId || routeProductId;
   const productsStore = useStore('products');
   const categoriesStore = useStore('categories');
@@ -303,6 +323,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
   const { getters: inventoriesGetters } = inventoriesStore;
 
   const { currentCompany } = peopleGetters;
+  const entityLabels = useMemo(() => buildEntityLabels(context), [context]);
   const storedCategory = categoryGetters.item;
   const selectedRouteCategoryId =
     extractCategoryIdValue(routeCategoryIdParam) ||
@@ -433,13 +454,13 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
     if (!currentCompany?.id) return;
     if (!categoryGetters.items || categoryGetters.items.length === 0) {
       categoryActions.getItems({
-        context: 'products',
+        context,
         company: currentCompany.id,
         'order[name]': 'ASC',
         itemsPerPage: 200,
       }).catch(() => { });
     }
-  }, [currentCompany?.id]);
+  }, [categoryActions, categoryGetters.items, context, currentCompany?.id]);
 
   const handleChange = (field, value) => {
     setProduct(prev => ({ ...prev, [field]: value }));
@@ -627,7 +648,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
         await syncProductCategories(data);
         const refreshed = await productActions.get(data.id || ProductId);
         setProduct(normalizeProductForForm(refreshed || data));
-        setActionStatus('Produto salvo.');
+        setActionStatus(entityLabels.saveSuccess);
         if (onSaved) onSaved(refreshed || data);
         if (!propProductId) {
           const newId = data.id || (data['@id'] && String(data['@id']).split('/').pop());
@@ -716,16 +737,16 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
         {!!actionStatus && (
           <View style={[
             styles.statusBanner,
-            actionStatus === 'Produto salvo.' ? styles.statusBannerSuccess : styles.statusBannerError,
+              actionStatus === entityLabels.saveSuccess ? styles.statusBannerSuccess : styles.statusBannerError,
           ]}>
             <MaterialCommunityIcons
-              name={actionStatus === 'Produto salvo.' ? 'check-circle-outline' : 'alert-circle-outline'}
+              name={actionStatus === entityLabels.saveSuccess ? 'check-circle-outline' : 'alert-circle-outline'}
               size={16}
-              color={actionStatus === 'Produto salvo.' ? '#166534' : '#9e1b1b'}
+              color={actionStatus === entityLabels.saveSuccess ? '#166534' : '#9e1b1b'}
             />
             <Text style={[
               styles.statusBannerText,
-              actionStatus === 'Produto salvo.' ? { color: '#166534' } : { color: '#9e1b1b' },
+              actionStatus === entityLabels.saveSuccess ? { color: '#166534' } : { color: '#9e1b1b' },
             ]}>{actionStatus}</Text>
           </View>
         )}
@@ -738,7 +759,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
               value={String(product.product || '')}
               onChangeText={val => handleChange('product', val)}
               style={styles.textInput}
-              placeholder="Nome do produto"
+              placeholder={entityLabels.namePlaceholder}
               placeholderTextColor="#CBD5E1"
             />
           </View>
@@ -749,7 +770,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
               onChangeText={val => handleChange('description', val)}
               multiline
               style={styles.textInputMultiline}
-              placeholder="Descreva o produto..."
+              placeholder={entityLabels.descriptionPlaceholder}
               placeholderTextColor="#CBD5E1"
             />
           </View>
@@ -922,7 +943,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
           activeOpacity={0.85}
         >
           <MaterialCommunityIcons name="content-save-outline" size={20} color="#fff" />
-          <Text style={styles.saveButtonText}>Salvar Produto</Text>
+          <Text style={styles.saveButtonText}>{entityLabels.saveAction}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

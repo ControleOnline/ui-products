@@ -6,12 +6,19 @@ const isStorageAvailable = () => typeof localStorage !== 'undefined'
 const normalizeCompanyId = companyId =>
   String(companyId || '').replace(/\D+/g, '').trim()
 
-export const readCachedCategories = companyId => {
+const normalizeContext = context =>
+  String(context || 'products').trim().toLowerCase() || 'products'
+
+const buildCacheKey = (baseKey, context) =>
+  `${baseKey}:${normalizeContext(context)}`
+
+export const readCachedCategories = (companyId, context = 'products') => {
   if (!isStorageAvailable()) return []
 
   const normalizedCompanyId = normalizeCompanyId(companyId)
+  const normalizedContext = normalizeContext(context)
   const cachedCompanyId = normalizeCompanyId(
-    localStorage.getItem(CATEGORY_CACHE_COMPANY_KEY),
+    localStorage.getItem(buildCacheKey(CATEGORY_CACHE_COMPANY_KEY, normalizedContext)),
   )
 
   if (!normalizedCompanyId || cachedCompanyId !== normalizedCompanyId) {
@@ -19,30 +26,35 @@ export const readCachedCategories = companyId => {
   }
 
   try {
-    const cached = JSON.parse(localStorage.getItem(CATEGORY_CACHE_KEY) || '[]')
+    const cached = JSON.parse(
+      localStorage.getItem(buildCacheKey(CATEGORY_CACHE_KEY, normalizedContext)) || '[]',
+    )
     return Array.isArray(cached) ? cached : []
   } catch (error) {
     return []
   }
 }
 
-export const writeCachedCategories = (companyId, categories) => {
+export const writeCachedCategories = (companyId, categories, context = 'products') => {
   if (!isStorageAvailable()) return
 
   const normalizedCompanyId = normalizeCompanyId(companyId)
+  const normalizedContext = normalizeContext(context)
+  const cacheKey = buildCacheKey(CATEGORY_CACHE_KEY, normalizedContext)
+  const cacheCompanyKey = buildCacheKey(CATEGORY_CACHE_COMPANY_KEY, normalizedContext)
 
   if (!normalizedCompanyId) {
-    localStorage.removeItem(CATEGORY_CACHE_KEY)
-    localStorage.removeItem(CATEGORY_CACHE_COMPANY_KEY)
+    localStorage.removeItem(cacheKey)
+    localStorage.removeItem(cacheCompanyKey)
     return
   }
 
-  localStorage.setItem(CATEGORY_CACHE_COMPANY_KEY, normalizedCompanyId)
-  localStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(categories || []))
+  localStorage.setItem(cacheCompanyKey, normalizedCompanyId)
+  localStorage.setItem(cacheKey, JSON.stringify(categories || []))
 }
 
-export const updateCachedCategoryProducts = (companyId, category, products) => {
-  const cachedCategories = readCachedCategories(companyId)
+export const updateCachedCategoryProducts = (companyId, category, products, context = 'products') => {
+  const cachedCategories = readCachedCategories(companyId, context)
   const nextProducts = Array.isArray(products) ? products : []
 
   if (!category?.['@id']) {
@@ -55,6 +67,6 @@ export const updateCachedCategoryProducts = (companyId, category, products) => {
       : item,
   )
 
-  writeCachedCategories(companyId, nextCategories)
+  writeCachedCategories(companyId, nextCategories, context)
   return nextCategories
 }

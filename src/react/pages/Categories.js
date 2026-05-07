@@ -74,6 +74,47 @@ const normalizeEntityId = value => {
   return String(raw || '').replace(/\D+/g, '').trim()
 }
 
+const normalizeCatalogContext = value =>
+  String(value || 'products').trim().toLowerCase() === 'supplies'
+    ? 'supplies'
+    : 'products'
+
+const buildCatalogLabels = context => {
+  if (context === 'supplies') {
+    return {
+      itemSingular: 'insumo',
+      itemPlural: 'insumos',
+      categorySingular: 'categoria de insumo',
+      categoryPlural: 'categorias de insumo',
+      addCategoryLabel: 'Adicionar Categoria de Insumo',
+      newCategoryLabel: 'Nova Categoria de Insumo',
+      editCategoryLabel: 'Editar Categoria de Insumo',
+      searchPlaceholder: 'Buscar insumo pelo nome ou SKU',
+      allLabel: 'Todos os insumos',
+      emptyTitle: 'Nenhuma categoria de insumo',
+      emptySubtitleManager: 'Adicione a primeira categoria de insumo para começar',
+      countSingular: 'categoria de insumo',
+      countPlural: 'categorias de insumo',
+    }
+  }
+
+  return {
+    itemSingular: 'produto',
+    itemPlural: 'produtos',
+    categorySingular: 'categoria',
+    categoryPlural: 'categorias',
+    addCategoryLabel: 'Adicionar Categoria',
+    newCategoryLabel: 'Nova Categoria',
+    editCategoryLabel: 'Editar Categoria',
+    searchPlaceholder: 'Buscar produto pelo nome ou SKU',
+    allLabel: 'Todos',
+    emptyTitle: 'Nenhuma categoria',
+    emptySubtitleManager: 'Adicione a primeira categoria para começar',
+    countSingular: 'categoria',
+    countPlural: 'categorias',
+  }
+}
+
 const SkeletonCard = ({ width }) => (
   <View style={inlineStyle_104_8({
     width: width,
@@ -134,7 +175,11 @@ const CategoriesPage = ({ route }) => {
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
-  const context = 'products'
+  const context = useMemo(
+    () => normalizeCatalogContext(route?.params?.context),
+    [route?.params?.context],
+  )
+  const labels = useMemo(() => buildCatalogLabels(context), [context])
   const routeCategoryId = useMemo(
     () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
     [route?.params?.category, route?.params?.categoryId],
@@ -193,7 +238,7 @@ const CategoriesPage = ({ route }) => {
 
   useFocusEffect(
     useCallback(() => {
-      const cached = readCachedCategories(currentCompany?.id)
+      const cached = readCachedCategories(currentCompany?.id, context)
       if (cached.length > 0) {
         categoryActions.setItems(cached)
       } else {
@@ -208,7 +253,7 @@ const CategoriesPage = ({ route }) => {
           })
           .then(data => {
             categoryActions.setItems(data || [])
-            writeCachedCategories(currentCompany.id, data || [])
+            writeCachedCategories(currentCompany.id, data || [], context)
           })
 
         if (isManagerApp) {
@@ -216,7 +261,7 @@ const CategoriesPage = ({ route }) => {
           loadCatalogStatus().catch(() => {})
         }
       }
-    }, [currentCompany?.id, categoryActions, isManagerApp, loadCatalogStatus, loadMenuModels])
+    }, [context, currentCompany?.id, categoryActions, isManagerApp, loadCatalogStatus, loadMenuModels])
   )
 
   const changeCategory = category => {
@@ -279,9 +324,9 @@ const CategoriesPage = ({ route }) => {
       'order[name]': 'ASC',
       company: currentCompany.id,
     })
-    writeCachedCategories(currentCompany.id, data || [])
+    writeCachedCategories(currentCompany.id, data || [], context)
     return data || []
-  }, [currentCompany?.id, categoryActions])
+  }, [context, currentCompany?.id, categoryActions])
 
   const refreshSelectedCategory = useCallback(async () => {
     const refreshed = await reloadCategories()
@@ -542,7 +587,7 @@ const CategoriesPage = ({ route }) => {
       : 0
 
   const { styles: orderStyles } = css()
-  const modalTitle = selectedCategory ? 'Editar Categoria' : 'Nova Categoria'
+  const modalTitle = selectedCategory ? labels.editCategoryLabel : labels.newCategoryLabel
   const skeletonCount = columns * 3
 
   return (
@@ -583,7 +628,7 @@ const CategoriesPage = ({ route }) => {
                 value={productSearchText}
                 onChangeText={setProductSearchText}
                 onSubmitEditing={() => openProductSearchResults(productSearchText)}
-                placeholder="Buscar produto pelo nome ou SKU"
+                placeholder={labels.searchPlaceholder}
                 placeholderTextColor="#94A3B8"
                 style={[
                   styles.searchInput,
@@ -897,11 +942,11 @@ const CategoriesPage = ({ route }) => {
               <View style={styles.emptyIconWrap}>
                 <MaterialCommunityIcons name="tag-off-outline" size={48} color="#CBD5E1" />
               </View>
-              <Text style={styles.emptyTitle}>Nenhuma categoria</Text>
+              <Text style={styles.emptyTitle}>{labels.emptyTitle}</Text>
               <Text style={styles.emptySubtitle}>
                 {isManagerApp
-                  ? 'Adicione a primeira categoria para começar'
-                  : 'Nenhuma categoria disponível no momento'}
+                  ? labels.emptySubtitleManager
+                  : `Nenhuma ${labels.categorySingular} disponível no momento`}
               </Text>
             </View>
           )}
@@ -916,7 +961,7 @@ const CategoriesPage = ({ route }) => {
                     isCompactMobile && styles.countLabelCompact,
                   ]}
                 >
-                  {items.length} {items.length === 1 ? 'categoria' : 'categorias'}
+                  {items.length} {items.length === 1 ? labels.countSingular : labels.countPlural}
                 </Text>
               )}
 
@@ -944,7 +989,7 @@ const CategoriesPage = ({ route }) => {
                           isCompactMobile && styles.noCategoryNameCompact,
                         ]}
                       >
-                        Todos
+                        {labels.allLabel}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1029,7 +1074,7 @@ const CategoriesPage = ({ route }) => {
             activeOpacity={0.85}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.bottomBarButtonText}>Adicionar Categoria</Text>
+            <Text style={styles.bottomBarButtonText}>{labels.addCategoryLabel}</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -7,6 +7,7 @@ import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
+import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import { APP_ENV } from '@controleonline/../../config/env.js';
 import styles from './ProductItem.styles';
 
@@ -98,6 +99,7 @@ const ProductItem = ({
 
       <View style={[styles.body, !hasImage && styles.bodyNoImage]}>
         <View>
+          <ProductReferenceLink product={product} />
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={2}>
               {product.product}
