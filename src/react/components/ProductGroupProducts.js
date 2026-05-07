@@ -96,6 +96,17 @@ const toProductGroupIri = value => {
   return id ? `/product_groups/${id}` : null;
 };
 
+const toProductIri = value => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    if (value.startsWith('/products/')) return value;
+    const id = String(value).replace(/\D/g, '');
+    return id ? `/products/${id}` : null;
+  }
+  const id = value?.id || String(value?.['@id'] || '').replace(/\D/g, '');
+  return id ? `/products/${id}` : null;
+};
+
 const extractItems = response => {
   if (Array.isArray(response)) return response;
   if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
