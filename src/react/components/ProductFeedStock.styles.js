@@ -57,6 +57,12 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 2,
   },
+  itemReferenceLink: {
+    marginBottom: 3,
+  },
+  itemReferenceText: {
+    fontSize: 10,
+  },
   itemMeta: {
     fontSize: 11,
     color: '#64748B',
@@ -445,4 +451,3 @@ export const inlineStyle_889_12 = {
 export const inlineStyle_893_18 = {
   fontWeight: '700',
 };
-

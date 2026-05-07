@@ -4,6 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import ProductFeedStock from './ProductFeedStock';
+import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import {
   buildProductCostBreakdown,
   formatCurrency,
@@ -411,6 +412,12 @@ const ItemCard = ({
     <View style={styles.itemCard}>
       <View style={styles.itemCardRow}>
         <View style={inlineStyle_355_14}>
+          <ProductReferenceLink
+            product={item.productChild}
+            context={type === 'feedstock' || type === 'component' || type === 'package' ? 'supplies' : 'products'}
+            style={styles.itemReferenceLink}
+            textStyle={styles.itemReferenceText}
+          />
           <Text style={styles.itemCardName} numberOfLines={2}>{name}</Text>
           {!!queueLabel && (
             <View style={styles.itemQueueLine}>

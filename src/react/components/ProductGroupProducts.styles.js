@@ -25,6 +25,12 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 4,
   },
+  itemReferenceLink: {
+    marginBottom: 4,
+  },
+  itemReferenceText: {
+    fontSize: 10,
+  },
   itemQueueLine: {
     flexDirection: 'row',
     alignItems: 'center',

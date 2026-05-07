@@ -11,18 +11,33 @@ import PurchaseForm from '@controleonline/ui-products/src/react/pages/PurchaseFo
 
 const isPosApp = String(env.APP_TYPE || '').toUpperCase() === 'POS';
 const normalizeNumericParam = value => String(value || '').replace(/\D+/g, '') || undefined;
+const normalizeCatalogContext = value =>
+  String(value || 'products').trim().toLowerCase() === 'supplies'
+    ? 'supplies'
+    : 'products';
+const getCatalogEntityLabel = context =>
+  normalizeCatalogContext(context) === 'supplies' ? 'Insumos' : 'Produtos';
+const getCatalogCategoryLabel = context =>
+  normalizeCatalogContext(context) === 'supplies'
+    ? 'Categorias de Insumo'
+    : 'Categorias';
+const getProductDetailsTitle = route => {
+  const context = normalizeCatalogContext(route.params?.context);
+  const entityLabel = context === 'supplies' ? 'Insumo' : 'Produto';
+  return route.params?.ProductId ? `Editar ${entityLabel}` : `Adicionar ${entityLabel}`;
+};
 
 const ordersRoutes = [
   {
     name: 'ProductsPage',
     component: Products,
     path: 'products-page/:categoryId?',
-    options: {
+    options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
-      title: 'Escolher Produtos',
+      title: getCatalogEntityLabel(route.params?.context),
       showBottomCart: isPosApp,
-    },
+    }),
     initialParams: { store: 'products' },
   },
   {
@@ -43,7 +58,18 @@ const ordersRoutes = [
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
-      title: route.params?.ProductId ? 'Editar Produto' : 'Adicionar Produto',
+      title: getProductDetailsTitle(route),
+    }),
+    initialParams: { store: 'products' },
+  },
+  {
+    name: 'ProductDetailsModal',
+    component: ProductDetails,
+    options: ({ route }) => ({
+      headerShown: true,
+      headerBackVisible: true,
+      presentation: 'modal',
+      title: getProductDetailsTitle(route),
     }),
     initialParams: { store: 'products' },
   },
@@ -56,13 +82,13 @@ const ordersRoutes = [
         categoryId: normalizeNumericParam,
       },
     },
-    options: {
+    options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
-      title: 'Categorias',
+      title: getCatalogCategoryLabel(route.params?.context),
       showCompanyFilter: true,
       companyFilterMode: 'icon',
-    },
+    }),
     initialParams: { store: 'category' },
   },
   {
