@@ -29,6 +29,10 @@
 - Em produtos do tipo `service`, o seletor de unidade nao deve oferecer medidas fisicas como `grama`, `litro`, `fracao` e equivalentes. Ele deve expor apenas unidades de cobranca compativeis com execucao unica ou recorrencia, como `unitario`, `hora`, `diaria`, `semanal`, `mensal` e correlatas.
 - Ao editar registros antigos de `service`, a unidade legada ja salva pode continuar visivel apenas para preservar contexto ate a correcao manual. Para novos cadastros e novas escolhas, a regra restritiva de unidade deve prevalecer.
 - Essa regra de unidade para `service` nao pode ficar so no front. A API ou fluxo de persistencia responsavel pelo save do produto tambem deve validar e rejeitar unidades incompatíveis para servicos.
+- A visao de insumos (`context=supplies`) deve separar com clareza `feedstock`, `component` e `package`. `feedstock` representa a fonte canonica de custo/estoque; `component` representa opcao operacional/comercial que pode consumir insumos; `package` representa embalagem.
+- A listagem de insumos deve priorizar `feedstock` quando nenhum tipo for escolhido e deve usar seletor compacto para alternar entre tipos, evitando uma fileira longa de chips.
+- Em `context=supplies`, o valor exibido no card nao deve ser tratado visualmente como custo base do insumo. Enquanto a regra de custo base nao existir, ele deve ser apresentado como preco de cadastro/opcao, separado do custo gravado nos vinculos de ficha tecnica.
+- A criacao a partir da listagem de insumos deve respeitar a visualizacao atual: `feedstock` cria materia-prima, `component` cria componente operacional e `package` cria embalagem. O contexto deve ser passado explicitamente ao detalhe/formulario, sem depender dos params internos das abas.
 
 ## Limites
 - A decisao de permitir ou bloquear a reabertura por etapa de fila pertence ao modulo `ui-orders`/`ui-ppc`; `ui-products` apenas executa a edicao quando a navegacao ja chegou autorizada.

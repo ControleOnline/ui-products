@@ -39,6 +39,7 @@ const ProductReferenceLink = ({
     () => normalizeCatalogContext(context || inferContextFromProduct(product)),
     [context, product],
   );
+  const productType = String(product?.type || '').trim().toLowerCase();
 
   if (!resolvedProductId) {
     return null;
@@ -47,10 +48,19 @@ const ProductReferenceLink = ({
   return (
     <TouchableOpacity
       onPress={() =>
-        navigation.navigate('ProductDetailsModal', {
-          ProductId: resolvedProductId,
-          context: resolvedContext,
-        })
+        navigation.navigate(
+          resolvedContext === 'supplies' ? 'ProductDetails' : 'ProductDetailsModal',
+          {
+            ProductId: resolvedProductId,
+            context: resolvedContext,
+            ...(resolvedContext === 'supplies' && productType
+              ? {
+                typeFilter: productType,
+                initialProductType: productType,
+              }
+              : {}),
+          },
+        )
       }
       activeOpacity={0.75}
       style={[

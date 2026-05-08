@@ -105,13 +105,25 @@ const buildEntityLabels = context => context === 'supplies'
       saveAction: 'Salvar Insumo',
       namePlaceholder: 'Nome do insumo',
       descriptionPlaceholder: 'Descreva o insumo...',
+      imageDisabled: 'Salve o insumo para habilitar anexos de imagem.',
     }
   : {
       saveSuccess: 'Produto salvo.',
       saveAction: 'Salvar Produto',
       namePlaceholder: 'Nome do produto',
       descriptionPlaceholder: 'Descreva o produto...',
+      imageDisabled: 'Salve o produto para habilitar anexos de imagem.',
     };
+
+const PRODUCT_TYPE_LABELS = {
+  product: 'Produto',
+  manufactured: 'Fabricado',
+  custom: 'Customizável',
+  service: 'Serviço',
+  feedstock: 'Matéria-prima',
+  component: 'Componente operacional',
+  package: 'Embalagem',
+};
 
 const normalizeProductForForm = data => {
   if (!data) return data;
@@ -300,12 +312,21 @@ const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
   </View>
 );
 
-const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedProductId, onSaved }) => {
+const ProductForm = ({
+  route,
+  ProductId: propProductId,
+  catalogContext,
+  contextTypes,
+  initialProductType,
+  onSavedProductId,
+  onSaved,
+}) => {
   const navigation = useNavigation();
   const { ProductId: routeProductId } = route.params || {};
   const routeCategoryIdParam = route.params?.categoryId || '';
   const routeInitialProductType = String(route.params?.initialProductType || '').trim().toLowerCase();
-  const context = normalizeCatalogContext(route.params?.context);
+  const normalizedInitialProductType = String(initialProductType || routeInitialProductType || '').trim().toLowerCase();
+  const context = normalizeCatalogContext(catalogContext || route.params?.context);
   const ProductId = propProductId || routeProductId;
   const productsStore = useStore('products');
   const categoriesStore = useStore('categories');
@@ -335,13 +356,14 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
   const [actionStatus, setActionStatus] = useState('');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
   const [controlarEstoque, setControlarEstoque] = useState(false);
+  const [categoriesRequestKey, setCategoriesRequestKey] = useState('');
 
   const getContextTypes = () => {
     if (!contextTypes || contextTypes.length === 0) return [];
 
     return contextTypes.map(ct => ({
       value: ct,
-      label: ct.charAt(0).toUpperCase() + ct.slice(1)
+      label: PRODUCT_TYPE_LABELS[ct] || ct.charAt(0).toUpperCase() + ct.slice(1),
     }));
   };
 
@@ -355,7 +377,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
 
     return source.map(ct => ({
       value: ct,
-      label: ct.charAt(0).toUpperCase() + ct.slice(1),
+      label: PRODUCT_TYPE_LABELS[ct] || ct.charAt(0).toUpperCase() + ct.slice(1),
     }));
   }, [contextTypes]);
 
@@ -386,9 +408,11 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
       setProduct(prev => {
         if (prev) return prev;
         const allowedTypes = typeOptions.map(option => option.value);
-        const defaultType = allowedTypes.includes(routeInitialProductType)
-          ? routeInitialProductType
-          : (allowedTypes[0] || 'product');
+        const defaultType = allowedTypes.includes(normalizedInitialProductType)
+          ? normalizedInitialProductType
+          : (context === 'supplies' && allowedTypes.includes('feedstock')
+            ? 'feedstock'
+            : (allowedTypes[0] || 'product'));
         return {
           sku: '',
           product: '',
@@ -407,9 +431,10 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
   }, [
     ProductId,
     currentCompany,
+    context,
+    normalizedInitialProductType,
     productCategoryActions,
     productActions,
-    routeInitialProductType,
     selectedRouteCategoryId,
     typeOptions,
   ]);
@@ -451,16 +476,30 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
   }, [currentCompany?.id, listsRequested]);
 
   useEffect(() => {
-    if (!currentCompany?.id) return;
-    if (!categoryGetters.items || categoryGetters.items.length === 0) {
-      categoryActions.getItems({
-        context,
-        company: currentCompany.id,
-        'order[name]': 'ASC',
-        itemsPerPage: 200,
-      }).catch(() => { });
-    }
-  }, [categoryActions, categoryGetters.items, context, currentCompany?.id]);
+    const companyId = currentCompany?.id;
+    if (!companyId) return;
+
+    const requestKey = `${context}:${companyId}`;
+    if (categoriesRequestKey === requestKey) return;
+    if (categoryGetters.isLoading) return;
+
+    setCategoriesRequestKey(requestKey);
+    categoryActions.getItems({
+      context,
+      company: companyId,
+      'order[name]': 'ASC',
+      itemsPerPage: 200,
+    }).catch(() => {
+      setCategoriesRequestKey('');
+    });
+  }, [
+    categoriesRequestKey,
+    categoryActions,
+    categoryGetters.isLoading,
+    categoryGetters.items,
+    context,
+    currentCompany?.id,
+  ]);
 
   const handleChange = (field, value) => {
     setProduct(prev => ({ ...prev, [field]: value }));
@@ -931,7 +970,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes, onSavedPro
         ) : (
           <View style={styles.infoBox}>
             <MaterialCommunityIcons name="image-off-outline" size={20} color="#94A3B8" />
-            <Text style={styles.infoBoxText}>Salve o produto para habilitar anexos de imagem.</Text>
+            <Text style={styles.infoBoxText}>{entityLabels.imageDisabled}</Text>
           </View>
         )}
 

@@ -44,13 +44,23 @@ const normalizeCatalogContext = value =>
     ? 'supplies'
     : 'products';
 
-const buildEntityLabels = context => context === 'supplies'
+const SUPPLY_TYPE_LABELS = {
+  feedstock: 'Matéria-prima',
+  component: 'Componente operacional',
+  package: 'Embalagem',
+};
+
+const getSupplyTypeLabel = value => SUPPLY_TYPE_LABELS[value] || 'Insumo';
+
+const buildEntityLabels = (context, typeValue) => context === 'supplies'
   ? {
       singular: 'Insumo',
-      editTitle: 'Editar Insumo',
-      createTitle: 'Adicionar Insumo',
+      editTitle: `Editar ${getSupplyTypeLabel(typeValue)}`,
+      createTitle: `Adicionar ${getSupplyTypeLabel(typeValue)}`,
       emptyDescription: 'Sem descrição informada.',
       createDescription: 'Preencha as abas abaixo para cadastrar um novo insumo.',
+      saleMetric: 'Preço cad.',
+      costMetric: 'Custo ficha',
     }
   : {
       singular: 'Produto',
@@ -58,6 +68,8 @@ const buildEntityLabels = context => context === 'supplies'
       createTitle: 'Adicionar Produto',
       emptyDescription: 'Sem descrição informada.',
       createDescription: 'Preencha as abas abaixo para cadastrar um novo produto.',
+      saleMetric: 'Venda',
+      costMetric: 'Custo',
     };
 
 const ProductDetails = ({ route, navigation }) => {
@@ -131,7 +143,6 @@ const ProductDetails = ({ route, navigation }) => {
 
   const inferredContext = productSummary ? inferProductContext(productSummary) : null;
   const context = normalizeCatalogContext(routeParams.context || inferredContext || 'products');
-  const entityLabels = useMemo(() => buildEntityLabels(context), [context]);
   const contextTypes = useMemo(() => {
     if (context === 'products') {
       return ['product', 'manufactured', 'custom', 'service'];
@@ -144,7 +155,69 @@ const ProductDetails = ({ route, navigation }) => {
     return [];
   }, [context]);
   const productType = String(productSummary?.type || '').toLowerCase();
+  const requestedProductType = String(routeParams.initialProductType || routeParams.typeFilter || productType || '').toLowerCase();
+  const effectiveSupplyType = context === 'supplies'
+    ? (requestedProductType || productType || 'feedstock')
+    : '';
+  const entityLabels = useMemo(
+    () => buildEntityLabels(context, effectiveSupplyType),
+    [context, effectiveSupplyType],
+  );
+  const typeLabel = context === 'supplies'
+    ? getSupplyTypeLabel(effectiveSupplyType)
+    : entityLabels.singular;
   const canHaveFeedstocks = Boolean(ProductId && productSummary && productType !== 'feedstock');
+
+  const normalizeSupplyDetailsBrowserUrl = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (context !== 'supplies') return;
+
+    const url = new URL(window.location.href);
+    if (!url.pathname.includes('/product-details')) return;
+
+    let changed = false;
+    const canonicalPathname = url.pathname.replace(
+      /\/(?:Dados|Fornecedores|Insumos|Grupos|Estoque)$/i,
+      '',
+    );
+
+    if (canonicalPathname !== url.pathname) {
+      url.pathname = canonicalPathname;
+      changed = true;
+    }
+
+    const ensureParam = (key, value) => {
+      if (!value) return;
+      if (url.searchParams.get(key) === value) return;
+      url.searchParams.set(key, value);
+      changed = true;
+    };
+
+    ensureParam('context', 'supplies');
+    ensureParam('typeFilter', effectiveSupplyType);
+    if (!ProductId) {
+      ensureParam('initialProductType', effectiveSupplyType);
+    }
+
+    if (changed) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    }
+  }, [context, effectiveSupplyType, ProductId]);
+
+  const scheduleNormalizeSupplyDetailsBrowserUrl = useCallback(() => {
+    if (typeof window === 'undefined') return;
+
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(normalizeSupplyDetailsBrowserUrl);
+      return;
+    }
+
+    setTimeout(normalizeSupplyDetailsBrowserUrl, 0);
+  }, [normalizeSupplyDetailsBrowserUrl]);
 
   useEffect(() => {
     loadProductSummary();
@@ -179,6 +252,10 @@ const ProductDetails = ({ route, navigation }) => {
   }, [ProductId, navigation, routeParams.ProductId, routeParams.id]);
 
   useEffect(() => {
+    scheduleNormalizeSupplyDetailsBrowserUrl();
+  }, [scheduleNormalizeSupplyDetailsBrowserUrl]);
+
+  useEffect(() => {
     navigation.setOptions?.({
       title: ProductId ? entityLabels.editTitle : entityLabels.createTitle,
     });
@@ -207,12 +284,12 @@ const ProductDetails = ({ route, navigation }) => {
                 </Text>
                 <View style={styles.summaryMetricsRow}>
                   <View style={styles.summaryMetricCard}>
-                    <Text style={styles.summaryMetricLabel}>Venda</Text>
+                    <Text style={styles.summaryMetricLabel}>{entityLabels.saleMetric}</Text>
                     <Text style={styles.summaryMetricValue}>{formatCurrency(productSummary?.price)}</Text>
                   </View>
                   <View style={styles.summaryMetricCard}>
                     <View style={styles.summaryMetricHeader}>
-                      <Text style={styles.summaryMetricLabel}>Custo</Text>
+                      <Text style={styles.summaryMetricLabel}>{entityLabels.costMetric}</Text>
                       <TouchableOpacity
                         style={styles.summaryMetricAction}
                         onPress={() => setPricingModalVisible(true)}
@@ -232,7 +309,7 @@ const ProductDetails = ({ route, navigation }) => {
             <View style={styles.summaryContentCreate}>
               <Text style={styles.summaryTitle}>{entityLabels.createTitle}</Text>
               <Text style={styles.summaryDescription} numberOfLines={2}>
-                {entityLabels.createDescription}
+                {entityLabels.createDescription} Tipo inicial: {typeLabel}.
               </Text>
             </View>
           )}
@@ -242,6 +319,15 @@ const ProductDetails = ({ route, navigation }) => {
       <View style={styles.tabsContainer}>
         <Tab.Navigator
           initialLayout={{ width }}
+          screenListeners={
+            context === 'supplies'
+              ? {
+                  focus: scheduleNormalizeSupplyDetailsBrowserUrl,
+                  state: scheduleNormalizeSupplyDetailsBrowserUrl,
+                  tabPress: scheduleNormalizeSupplyDetailsBrowserUrl,
+                }
+              : undefined
+          }
           screenOptions={{
             tabBarScrollEnabled: canHaveFeedstocks,
             tabBarActiveTintColor: brandColors.primary,
@@ -262,7 +348,9 @@ const ProductDetails = ({ route, navigation }) => {
               <ProductForm
                 {...props}
                 ProductId={ProductId}
+                catalogContext={context}
                 contextTypes={contextTypes}
+                initialProductType={requestedProductType}
                 onSaved={() => {
                   loadProductSummary();
                   loadCostSummary();
@@ -270,7 +358,12 @@ const ProductDetails = ({ route, navigation }) => {
                 onSavedProductId={newProductId => {
                   const normalizedProductId = normalizeEntityId(newProductId);
                   if (normalizedProductId) {
-                    navigation.setParams({ ProductId: normalizedProductId, context });
+                    navigation.setParams({
+                      ProductId: normalizedProductId,
+                      context,
+                      typeFilter: effectiveSupplyType,
+                      initialProductType: effectiveSupplyType,
+                    });
                   }
                 }}
               />

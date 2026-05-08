@@ -35,6 +35,7 @@ const buildCoverUrl = (files, coverRelationId) => {
 const ProductItem = ({
   product,
   category,
+  catalogContext = 'products',
   interactionMode = 'auto',
   marketplaceStatuses = [],
   onMarketplaceSync,
@@ -47,6 +48,18 @@ const ProductItem = ({
     APP_ENV.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
   const typeConf = TYPE_CONFIG[product.type] || null
   const queueLabel = product?.queue?.queue || product?.queue?.name || ''
+  const isSupplyCatalog = catalogContext === 'supplies'
+  const unitLabel =
+    product?.productUnit?.productUnit ||
+    product?.productUnit?.unit ||
+    product?.productUnity?.productUnit ||
+    product?.unit ||
+    ''
+  const priceLabel = isSupplyCatalog
+    ? product.type === 'component'
+      ? 'Preço opção'
+      : 'Preço cad.'
+    : ''
 
   const renderAction = () => {
     if (isManager) {
@@ -112,11 +125,19 @@ const ProductItem = ({
               syncingKey={marketplaceSyncingKey}
             />
           </View>
-          {typeConf && (
-            <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
-              <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
-            </View>
-          )}
+          <View style={styles.metaChipsRow}>
+            {typeConf && (
+              <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
+                <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
+              </View>
+            )}
+            {isSupplyCatalog && !!unitLabel && (
+              <View style={styles.unitChip}>
+                <MaterialCommunityIcons name="scale" size={10} color="#64748B" />
+                <Text style={styles.unitChipText}>{String(unitLabel).toUpperCase()}</Text>
+              </View>
+            )}
+          </View>
           {!!queueLabel && (
             <View style={styles.queueLine}>
               <MaterialCommunityIcons name="tray-full" size={12} color="#64748B" />
@@ -133,12 +154,15 @@ const ProductItem = ({
 
         <View style={styles.priceRow}>
           <View>
+            {!!priceLabel && (
+              <Text style={styles.priceLabel}>{priceLabel}</Text>
+            )}
             {product.quantity > 0 && (
               <Text style={styles.priceTotal}>
                 {Formatter.formatMoney(product.quantity * product.price)}
               </Text>
             )}
-            <Text style={styles.price}>
+            <Text style={[styles.price, isSupplyCatalog && styles.supplyPrice]}>
               {product.quantity > 0 ? `${product.quantity} × ` : ''}
               {Formatter.formatMoney(product.price)}
             </Text>

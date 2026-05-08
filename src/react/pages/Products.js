@@ -15,6 +15,7 @@ import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
+import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 
 import {
   readCachedCategories,
@@ -39,6 +40,62 @@ import {
 } from '@controleonline/ui-products/src/react/utils/categorySelection';
 
 import { inlineStyle_413_16 } from './Products.styles';
+
+const SUPPLY_TYPE_OPTIONS = [
+  {
+    value: 'feedstock',
+    label: 'Matérias-primas',
+    description: 'Fontes canônicas de custo, estoque e consumo.',
+    icon: 'flask-outline',
+  },
+  {
+    value: 'component',
+    label: 'Componentes operacionais',
+    description: 'Opções comerciais ou operacionais que podem receber insumos.',
+    icon: 'shape-outline',
+  },
+  {
+    value: 'package',
+    label: 'Embalagens',
+    description: 'Itens de embalagem separados da matéria-prima.',
+    icon: 'package-variant-closed',
+  },
+];
+
+const getSupplyTypeOption = value =>
+  SUPPLY_TYPE_OPTIONS.find(option => option.value === value) || SUPPLY_TYPE_OPTIONS[0];
+
+const getSupplyActionLabel = value => {
+  const option = getSupplyTypeOption(value);
+  if (option.value === 'feedstock') return 'Adicionar matéria-prima';
+  if (option.value === 'component') return 'Adicionar componente operacional';
+  if (option.value === 'package') return 'Adicionar embalagem';
+  return 'Adicionar insumo';
+};
+
+const SUPPLY_EMPTY_LABELS = {
+  feedstock: {
+    emptyFound: 'Nenhuma matéria-prima encontrada',
+    emptyAll: 'Nenhuma matéria-prima cadastrada',
+    emptyCategory: 'Nenhuma matéria-prima',
+    emptyAllSubtitle: 'Nenhuma matéria-prima foi cadastrada ainda.',
+    emptyCategorySubtitle: 'Nenhuma matéria-prima disponível nesta visualização',
+  },
+  component: {
+    emptyFound: 'Nenhum componente operacional encontrado',
+    emptyAll: 'Nenhum componente operacional cadastrado',
+    emptyCategory: 'Nenhum componente operacional',
+    emptyAllSubtitle: 'Nenhum componente operacional foi cadastrado ainda.',
+    emptyCategorySubtitle: 'Nenhum componente operacional disponível nesta visualização',
+  },
+  package: {
+    emptyFound: 'Nenhuma embalagem encontrada',
+    emptyAll: 'Nenhuma embalagem cadastrada',
+    emptyCategory: 'Nenhuma embalagem',
+    emptyAllSubtitle: 'Nenhuma embalagem foi cadastrada ainda.',
+    emptyCategorySubtitle: 'Nenhuma embalagem disponível nesta visualização',
+  },
+};
 
 const getPendingOrderProductKey = productId => `pending-add-product-${productId}`;
 
@@ -134,18 +191,19 @@ const normalizeCatalogContext = value =>
     ? 'supplies'
     : 'products';
 
-const buildCatalogLabels = context => {
+const buildCatalogLabels = (context, supplyType = 'feedstock') => {
   if (context === 'supplies') {
+    const supplyLabels = SUPPLY_EMPTY_LABELS[supplyType] || SUPPLY_EMPTY_LABELS.feedstock;
     return {
       singular: 'insumo',
       plural: 'insumos',
       addLabel: 'Adicionar Insumo',
-      emptyFound: 'Nenhum insumo encontrado',
-      emptyAll: 'Nenhum insumo cadastrado',
-      emptyCategory: 'Nenhum insumo',
+      emptyFound: supplyLabels.emptyFound,
+      emptyAll: supplyLabels.emptyAll,
+      emptyCategory: supplyLabels.emptyCategory,
       emptyFoundSubtitle: query => `Nenhum resultado para "${query}".`,
-      emptyAllSubtitle: 'Nenhum insumo foi cadastrado ainda.',
-      emptyCategorySubtitle: 'Nenhum insumo disponível nesta categoria',
+      emptyAllSubtitle: supplyLabels.emptyAllSubtitle,
+      emptyCategorySubtitle: supplyLabels.emptyCategorySubtitle,
     };
   }
 
@@ -224,8 +282,6 @@ const ProductsPage = ({ navigation, route }) => {
       ),
     [themeColors, currentCompany?.id],
   );
-  const labels = useMemo(() => buildCatalogLabels(context), [context]);
-
   const [categoryProducts, setCategoryProducts] = useState([]);
   const categoryProductsRef = useRef([]);
   const productsRequestKeyRef = useRef('');
@@ -233,7 +289,12 @@ const ProductsPage = ({ navigation, route }) => {
     () => normalizeProductTypeFilter(routeParams.typeFilter),
     [routeParams.typeFilter],
   );
+  const labels = useMemo(
+    () => buildCatalogLabels(context, typeFilter || 'feedstock'),
+    [context, typeFilter],
+  );
   const [visibleCount, setVisibleCount] = useState(50);
+  const [supplyTypeModalVisible, setSupplyTypeModalVisible] = useState(false);
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
   const actionsRef = useRef(actions);
   const categoryActionsRef = useRef(categoryActions);
@@ -297,14 +358,19 @@ const ProductsPage = ({ navigation, route }) => {
     setCategoryProducts(nextProducts);
   }, []);
 
+  const visibleTypeFilter = useMemo(
+    () => (context === 'supplies' ? typeFilter || 'feedstock' : typeFilter),
+    [context, typeFilter],
+  );
+
   const visibleProducts = useMemo(() => {
-    if (!typeFilter) return categoryProducts;
-    return categoryProducts.filter(p => p.type === typeFilter);
-  }, [categoryProducts, typeFilter]);
+    if (!visibleTypeFilter) return categoryProducts;
+    return categoryProducts.filter(p => p.type === visibleTypeFilter);
+  }, [categoryProducts, visibleTypeFilter]);
 
   useEffect(() => {
     setVisibleCount(50);
-  }, [typeFilter, categoryId, normalizedSearchQuery]);
+  }, [categoryId, normalizedSearchQuery, typeFilter]);
 
   const flushPendingAddProducts = useCallback(() => {
     const currentOrderId = String(
@@ -383,12 +449,15 @@ const ProductsPage = ({ navigation, route }) => {
       return;
     }
 
+    const effectiveTypeFilter = context === 'supplies'
+      ? (typeFilter || 'feedstock')
+      : typeFilter;
     const baseParams = {
       active: 1,
       'order[product]': 'ASC',
       'order[description]': 'ASC',
       company: currentCompany?.id,
-      type: typeFilter ? [typeFilter] : contextTypes,
+      type: effectiveTypeFilter ? [effectiveTypeFilter] : contextTypes,
     };
 
     if (normalizedSearchQuery) {
@@ -480,7 +549,7 @@ const ProductsPage = ({ navigation, route }) => {
     }, [context, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
   );
 
-  const buildCategoryRouteParams = useCallback(() => {
+  const buildCategoryRouteParams = useCallback((overrides = {}) => {
     const params = {
       context,
       interactionMode,
@@ -492,12 +561,25 @@ const ProductsPage = ({ navigation, route }) => {
       params.categoryId = categoryId;
     }
 
-    if (typeFilter) {
+    if (context === 'supplies') {
+      params.typeFilter = overrides.typeFilter || typeFilter || 'feedstock';
+      params.initialProductType = overrides.initialProductType || params.typeFilter;
+    } else if (typeFilter) {
       params.typeFilter = typeFilter;
     }
 
     return params;
   }, [categoryId, context, interactionMode, typeFilter]);
+
+  const selectedSupplyType = useMemo(
+    () => getSupplyTypeOption(typeFilter || 'feedstock'),
+    [typeFilter],
+  );
+
+  const handleSelectSupplyType = useCallback(value => {
+    setSupplyTypeModalVisible(false);
+    navigation.setParams({ typeFilter: value });
+  }, [navigation]);
 
   const handleProductPress = product => {
     if (!isManager) return;
@@ -505,7 +587,10 @@ const ProductsPage = ({ navigation, route }) => {
       name: 'ProductDetails',
       params: {
         ProductId: product.id,
-        ...buildCategoryRouteParams(),
+        ...buildCategoryRouteParams({
+          typeFilter: context === 'supplies' ? product.type : undefined,
+          initialProductType: context === 'supplies' ? product.type : undefined,
+        }),
       },
       merge: false,
     });
@@ -515,7 +600,10 @@ const ProductsPage = ({ navigation, route }) => {
     if (!isManager) return;
     navigation.navigate({
       name: 'ProductDetails',
-      params: buildCategoryRouteParams(),
+      params: buildCategoryRouteParams({
+        typeFilter: visibleTypeFilter,
+        initialProductType: visibleTypeFilter,
+      }),
       merge: false,
     });
   };
@@ -547,6 +635,34 @@ const ProductsPage = ({ navigation, route }) => {
         ? (isCompactMobile ? 96 : 104)
       : (isCompactMobile ? 12 : 16),
   };
+  const renderSupplyHeader = () => {
+    if (context !== 'supplies') return null;
+
+    return (
+      <View style={styles.supplyHeader}>
+        <View style={styles.supplyHeaderText}>
+          <Text style={styles.supplyHeaderTitle}>Cadastro mestre de insumos</Text>
+          <Text style={styles.supplyHeaderDescription}>
+            Separe fontes de custo dos componentes operacionais antes de vincular fichas técnicas.
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.supplyTypeSelector}
+          onPress={() => setSupplyTypeModalVisible(true)}
+          activeOpacity={0.75}
+        >
+          <View style={styles.supplyTypeSelectorIcon}>
+            <MaterialCommunityIcons name={selectedSupplyType.icon} size={16} color={brandColors.primary} />
+          </View>
+          <View style={styles.supplyTypeSelectorText}>
+            <Text style={styles.supplyTypeSelectorLabel}>Visualização</Text>
+            <Text style={styles.supplyTypeSelectorValue} numberOfLines={1}>{selectedSupplyType.label}</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -562,34 +678,42 @@ const ProductsPage = ({ navigation, route }) => {
           </View>
         </ScrollView>
       )}
-      {!storeLoading && categoryProducts.length === 0 && !error && (
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons
-            name={isAllProducts ? 'view-grid-outline' : 'package-variant-closed'}
-            size={48}
-            color="#CBD5E1"
-          />
-          <Text style={styles.emptyTitle}>
-            {normalizedSearchQuery
-              ? labels.emptyFound
-              : isAllProducts
-                ? labels.emptyAll
-                : labels.emptyCategory}
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            {normalizedSearchQuery
-              ? labels.emptyFoundSubtitle(normalizedSearchQuery)
-              : isAllProducts
-                ? labels.emptyAllSubtitle
-                : labels.emptyCategorySubtitle}
-          </Text>
+      {!storeLoading && visibleProducts.length === 0 && !error && (
+        <View style={context === 'supplies' ? styles.emptyWithHeader : styles.emptyContainer}>
+          {context === 'supplies' && (
+            <View style={styles.emptyHeaderWrap}>
+              {renderSupplyHeader()}
+            </View>
+          )}
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons
+              name={isAllProducts ? 'view-grid-outline' : 'package-variant-closed'}
+              size={48}
+              color="#CBD5E1"
+            />
+            <Text style={styles.emptyTitle}>
+              {normalizedSearchQuery
+                ? labels.emptyFound
+                : isAllProducts
+                  ? labels.emptyAll
+                  : labels.emptyCategory}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {normalizedSearchQuery
+                ? labels.emptyFoundSubtitle(normalizedSearchQuery)
+                : isAllProducts
+                  ? labels.emptyAllSubtitle
+                  : labels.emptyCategorySubtitle}
+            </Text>
+          </View>
         </View>
       )}
-      {!storeLoading && categoryProducts.length > 0 && (
+      {!storeLoading && visibleProducts.length > 0 && (
         <FlatList
           data={productsData}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={listContentStyle}
+          ListHeaderComponent={renderSupplyHeader}
           onEndReached={() => {
             if (visibleCount < visibleProducts.length)
               setVisibleCount(v => v + 50);
@@ -599,14 +723,63 @@ const ProductsPage = ({ navigation, route }) => {
               <ProductItem
                 product={item}
                 category={category}
+                catalogContext={context}
                 interactionMode={interactionMode}
                 marketplaceStatuses={isManager ? getProductStatuses(item) : []}
                 onMarketplaceSync={handleMarketplaceSync}
                 marketplaceSyncingKey={marketplaceSyncingKey}
               />
-            </TouchableOpacity>
+          </TouchableOpacity>
           )}
         />
+      )}
+      {context === 'supplies' && (
+        <AnimatedModal
+          visible={supplyTypeModalVisible}
+          onRequestClose={() => setSupplyTypeModalVisible(false)}
+          style={styles.supplyTypeModalWrap}
+        >
+          <View style={styles.supplyTypeModal}>
+            <View style={styles.supplyTypeModalHeader}>
+              <Text style={styles.supplyTypeModalTitle}>Visualização de insumos</Text>
+              <TouchableOpacity
+                style={styles.supplyTypeModalClose}
+                onPress={() => setSupplyTypeModalVisible(false)}
+                activeOpacity={0.75}
+              >
+                <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            {SUPPLY_TYPE_OPTIONS.map(option => {
+              const active = option.value === selectedSupplyType.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.supplyTypeOption, active && styles.supplyTypeOptionActive]}
+                  onPress={() => handleSelectSupplyType(option.value)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.supplyTypeOptionIcon, active && { backgroundColor: `${brandColors.primary}18` }]}>
+                    <MaterialCommunityIcons
+                      name={option.icon}
+                      size={18}
+                      color={active ? brandColors.primary : '#64748B'}
+                    />
+                  </View>
+                  <View style={styles.supplyTypeOptionText}>
+                    <Text style={[styles.supplyTypeOptionTitle, active && { color: brandColors.primary }]}>
+                      {option.label}
+                    </Text>
+                    <Text style={styles.supplyTypeOptionDescription}>{option.description}</Text>
+                  </View>
+                  {active && (
+                    <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </AnimatedModal>
       )}
       {isManager && (
         <View style={styles.bottomBar}>
@@ -615,7 +788,11 @@ const ProductsPage = ({ navigation, route }) => {
             onPress={handleAddProduct}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.bottomBarButtonText}>{labels.addLabel}</Text>
+            <Text style={styles.bottomBarButtonText}>
+              {context === 'supplies'
+                ? getSupplyActionLabel(visibleTypeFilter)
+                : labels.addLabel}
+            </Text>
           </TouchableOpacity>
         </View>
       )}

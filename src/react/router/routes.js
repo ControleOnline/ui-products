@@ -8,6 +8,7 @@ import InventoryDetail from '@controleonline/ui-products/src/react/pages/Invento
 import InventoryMovements from '@controleonline/ui-products/src/react/pages/InventoryMovements';
 import PurchaseSuggestions from '@controleonline/ui-products/src/react/pages/PurchaseSuggestions';
 import PurchaseForm from '@controleonline/ui-products/src/react/pages/PurchaseForm';
+import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 const isPosApp = String(env.APP_TYPE || '').toUpperCase() === 'POS';
 const normalizeNumericParam = value => String(value || '').replace(/\D+/g, '') || undefined;
@@ -21,11 +22,72 @@ const getCatalogCategoryLabel = context =>
   normalizeCatalogContext(context) === 'supplies'
     ? 'Categorias de Insumo'
     : 'Categorias';
+const getSupplyTypeLabel = value => {
+  const normalizedValue = String(value || '').trim().toLowerCase();
+  if (normalizedValue === 'feedstock') return 'Matéria-prima';
+  if (normalizedValue === 'component') return 'Componente operacional';
+  if (normalizedValue === 'package') return 'Embalagem';
+  return 'Insumo';
+};
 const getProductDetailsTitle = route => {
   const context = normalizeCatalogContext(route.params?.context);
-  const entityLabel = context === 'supplies' ? 'Insumo' : 'Produto';
+  const supplyType = route.params?.initialProductType || route.params?.typeFilter;
+  const entityLabel = context === 'supplies' ? getSupplyTypeLabel(supplyType) : 'Produto';
   return route.params?.ProductId ? `Editar ${entityLabel}` : `Adicionar ${entityLabel}`;
 };
+const resolveInteractionMode = route =>
+  route.params?.interactionMode ||
+  (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
+const buildCategoryFallbackParams = route => ({
+  store: 'category',
+  context: normalizeCatalogContext(route.params?.context),
+  interactionMode: resolveInteractionMode(route),
+});
+const buildProductsFallbackParams = route => {
+  const context = normalizeCatalogContext(route.params?.context);
+  const params = {
+    categoryId:
+      route.params?.categoryId ||
+      (context === 'supplies' ? ALL_PRODUCTS_SENTINEL_ID : undefined),
+    store: 'products',
+    context,
+    interactionMode: resolveInteractionMode(route),
+  };
+
+  if (context === 'supplies') {
+    params.typeFilter =
+      route.params?.typeFilter ||
+      route.params?.initialProductType ||
+      'feedstock';
+    params.initialProductType = params.typeFilter;
+    params.showBottomCart = false;
+  }
+
+  return params;
+};
+const buildProductsBackFallback = route => ({
+  resetRoutes: [
+    {
+      name: 'CategoriesPage',
+      params: buildCategoryFallbackParams(route),
+    },
+  ],
+});
+const buildProductDetailsBackFallback = route => ({
+  resetRoutes: [
+    {
+      name: 'CategoriesPage',
+      params: buildCategoryFallbackParams(route),
+    },
+    {
+      name: 'ProductsPage',
+      params: buildProductsFallbackParams(route),
+    },
+  ],
+});
+const buildCategoriesBackFallback = () => ({
+  resetRoutes: [{ name: 'HomePage' }],
+});
 
 const ordersRoutes = [
   {
@@ -35,6 +97,7 @@ const ordersRoutes = [
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
+      headerBackFallback: () => buildProductsBackFallback(route),
       title: getCatalogEntityLabel(route.params?.context),
       showBottomCart: isPosApp,
     }),
@@ -48,16 +111,11 @@ const ordersRoutes = [
       parse: {
         ProductId: normalizeNumericParam,
       },
-      screens: {
-        Dados: '',
-        Fornecedores: 'fornecedores',
-        Grupos: 'grupos',
-        Estoque: 'estoque',
-      },
     },
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
+      headerBackFallback: () => buildProductDetailsBackFallback(route),
       title: getProductDetailsTitle(route),
     }),
     initialParams: { store: 'products' },
@@ -85,6 +143,7 @@ const ordersRoutes = [
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
+      headerBackFallback: buildCategoriesBackFallback,
       title: getCatalogCategoryLabel(route.params?.context),
       showCompanyFilter: true,
       companyFilterMode: 'icon',

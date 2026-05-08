@@ -58,12 +58,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
-    marginBottom: 5,
   },
   typeChipText: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  metaChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 5,
+  },
+  unitChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    alignSelf: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  unitChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
   },
   queueLine: {
     flexDirection: 'row',
@@ -105,6 +126,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#16A34A',
+  },
+  supplyPrice: {
+    color: '#475569',
+  },
+  priceLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    marginBottom: 1,
   },
   priceTotal: {
     fontSize: 11,
