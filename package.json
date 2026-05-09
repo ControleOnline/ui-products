@@ -6,7 +6,12 @@
   "license": "MIT",
   "main": "src/vue/index.js",
   "scripts": {
-    "test:service-units": "node --test src/tests/react/domain/serviceUnitOptions.test.mjs"
+    "test": "npm run test:service-units",
+    "test:service-units": "node --test src/tests/react/domain/serviceUnitOptions.test.mjs",
+    "test:coverage": "c8 --reporter=clover --report-dir coverage npm test"
+  },
+  "devDependencies": {
+    "c8": "^10.1.3"
   },
   "repository": {
     "type": "git",
