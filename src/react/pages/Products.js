@@ -16,6 +16,10 @@ import { colors } from '@controleonline/../../src/styles/colors';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import {isPosKioskMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
+import {
+  shouldShowOperationalBottomNavigation,
+} from '@controleonline/ui-layout/src/react/utils/posBottomNavigation';
 
 import {
   readCachedCategories,
@@ -258,6 +262,8 @@ const ProductsPage = ({ navigation, route }) => {
 
   const peopleStore = useStore('people');
   const { currentCompany } = peopleStore.getters;
+  const deviceConfigStore = useStore('device_config');
+  const runtimeDeviceConfig = deviceConfigStore.getters?.item;
 
   const themeStore = useStore('theme');
   const { colors: themeColors } = themeStore.getters;
@@ -302,6 +308,15 @@ const ProductsPage = ({ navigation, route }) => {
 
   const isManager =
     env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
+  const shouldShowBottomNavigation = useMemo(
+    () =>
+      shouldShowOperationalBottomNavigation({
+        appType: env.APP_TYPE,
+        interactionMode,
+        isKioskMode: isPosKioskMode(runtimeDeviceConfig?.configs),
+      }),
+    [interactionMode, runtimeDeviceConfig?.configs],
+  );
   const {
     getProductStatuses,
     loadCatalogStatus,
@@ -338,6 +353,23 @@ const ProductsPage = ({ navigation, route }) => {
   useEffect(() => {
     currentOrderRef.current = ordersStore.getters?.item || null;
   }, [ordersStore.getters?.item]);
+
+  useEffect(() => {
+    if (!shouldShowBottomNavigation) {
+      if (routeParams.showBottomToolBar !== true) {
+        return;
+      }
+
+      navigation.setParams({showBottomToolBar: false});
+      return;
+    }
+
+    if (routeParams.showBottomToolBar === true) {
+      return;
+    }
+
+    navigation.setParams({showBottomToolBar: true});
+  }, [navigation, routeParams.showBottomToolBar, shouldShowBottomNavigation]);
 
   useEffect(() => {
     actionsRef.current = actions;
@@ -554,7 +586,7 @@ const ProductsPage = ({ navigation, route }) => {
       context,
       interactionMode,
       showBottomCart: interactionMode === 'pdv',
-      showBottomToolBar: false,
+      showBottomToolBar: interactionMode === 'pdv',
     };
 
     if (categoryId) {
