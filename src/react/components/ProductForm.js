@@ -30,6 +30,8 @@ import {
 
 import { inlineStyle_92_14 } from './ProductForm.styles';
 
+const tt = value => global.tt(value);
+
 const normalizeRelationId = value => {
   if (!value && value !== 0) return '';
   if (typeof value === 'number') return value;
@@ -562,15 +564,15 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct, product?.productUnit),
     [isServiceProduct, product?.productUnit, productUnitGetters.items],
   );
-  const productUnitLabel = isServiceProduct ? 'Unidade de cobrança *' : 'Unidade de Medida *';
+  const productUnitLabel = isServiceProduct ? tt('Unidade de cobrança *') : tt('Unidade de Medida *');
   const productUnitPlaceholder = isServiceProduct
-    ? 'Escolha como o serviço será cobrado'
-    : 'Selecionar...';
+    ? tt('Escolha como o serviço será cobrado')
+    : tt('Selecionar...');
   const productUnitHelperText = isServiceProduct
     ? (
       productUnitOptions.some(option => option.isRecommendedServiceUnit)
-        ? 'Para serviços, selecione uma unidade de cobrança compatível, como unitário, semanal, mensal ou por hora.'
-        : 'Para serviços, este campo aceita apenas unidades de cobrança compatíveis com execução única ou recorrência.'
+        ? tt('Para serviços, selecione uma unidade de cobrança compatível, como unitário, semanal, mensal ou por hora.')
+        : tt('Para serviços, este campo aceita apenas unidades de cobrança compatíveis com execução única ou recorrência.')
     )
     : '';
   const toggleSection = useCallback(key => setOpenSections(prev => {
