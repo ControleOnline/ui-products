@@ -71,7 +71,6 @@ const ProductReferenceLink = ({
         },
         style,
       ]}>
-      <MaterialCommunityIcons name="identifier" size={12} color={color} />
       <Text
         style={[
           {
