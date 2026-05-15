@@ -31,6 +31,7 @@ import {
 import { inlineStyle_92_14 } from './ProductForm.styles';
 
 const tt = value => global.tt(value);
+const humanizeContextType = value => tt(value.charAt(0).toUpperCase() + value.slice(1));
 
 const normalizeRelationId = value => {
   if (!value && value !== 0) return '';
@@ -114,7 +115,7 @@ const SkeletonTab = () => (
 );
 
 /* ─── SelectField fora do componente pai para evitar remount a cada render ─── */
-const SelectField = ({ label, value, options, onChange, placeholder = 'Selecionar...', brandColors }) => {
+const SelectField = ({ label, value, options, onChange, placeholder = tt('Selecionar...'), brandColors }) => {
   const [open, setOpen] = React.useState(false);
   const selectedOption = options.find(o => String(o.value) === String(value));
   return (
@@ -218,7 +219,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
 
     return contextTypes.map(ct => ({
       value: ct,
-      label: ct.charAt(0).toUpperCase() + ct.slice(1)
+      label: humanizeContextType(ct),
     }));
   };
 
@@ -232,7 +233,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
 
     return source.map(ct => ({
       value: ct,
-      label: ct.charAt(0).toUpperCase() + ct.slice(1),
+      label: humanizeContextType(ct),
     }));
   }, [contextTypes]);
 
@@ -390,7 +391,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
       const msg = e?.response?.data?.['hydra:description']
         || e?.response?.data?.detail
         || e?.message
-        || 'Erro ao salvar capa.';
+        || tt('Erro ao salvar capa.');
       setActionStatus(msg);
     }
   }, [product, productActions, reloadProduct]);
@@ -458,13 +459,13 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
     };
 
     if (!String(product.product || '').trim())
-      addError('product', 'Nome do produto é obrigatório.');
+      addError('product', tt('Nome do produto é obrigatório.'));
     if (!product.productUnit)
-      addError('productUnit', 'Unidade de Medida é obrigatória.');
+      addError('productUnit', tt('Unidade de medida é obrigatória.'));
     const priceRaw = String(product.price ?? '').replace(',', '.');
     const priceVal = parseFloat(priceRaw);
     if (priceRaw === '' || isNaN(priceVal) || priceVal < 0)
-      addError('price', 'Preço inválido (deve ser um número ≥ 0).');
+      addError('price', tt('Preço inválido (deve ser um número >= 0).'));
 
     if (errors.length > 0) {
       setErrorSections(sectionsWithError);
@@ -537,7 +538,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         await syncProductCategory(data);
         const refreshed = await productActions.get(data.id || ProductId);
         setProduct(normalizeProductForForm(refreshed || data));
-        setActionStatus('Produto salvo.');
+        setActionStatus(saveSuccessMessage);
         if (!propProductId) {
           const newId = data.id || (data['@id'] && String(data['@id']).split('/').pop());
           if (newId) {
@@ -551,7 +552,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         e?.response?.data?.detail ||
         e?.response?.data?.['hydra:description'] ||
         e?.message ||
-        'Falha ao salvar produto.';
+        tt('Falha ao salvar produto.');
       setActionStatus(detail);
     }
   };
@@ -559,6 +560,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
   const brandColors = useMemo(() => resolveThemePalette(), []);
   const [openSections, setOpenSections] = React.useState(new Set(['identificacao']));
   const [errorSections, setErrorSections] = React.useState(new Set());
+  const saveSuccessMessage = tt('Produto salvo.');
   const isServiceProduct = product?.type === SERVICE_TYPE;
   const productUnitOptions = useMemo(
     () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct, product?.productUnit),
@@ -621,94 +623,94 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         {!!actionStatus && (
           <View style={[
             styles.statusBanner,
-            actionStatus === 'Produto salvo.' ? styles.statusBannerSuccess : styles.statusBannerError,
+            actionStatus === saveSuccessMessage ? styles.statusBannerSuccess : styles.statusBannerError,
           ]}>
             <MaterialCommunityIcons
-              name={actionStatus === 'Produto salvo.' ? 'check-circle-outline' : 'alert-circle-outline'}
+              name={actionStatus === saveSuccessMessage ? 'check-circle-outline' : 'alert-circle-outline'}
               size={16}
-              color={actionStatus === 'Produto salvo.' ? '#166534' : '#9e1b1b'}
+              color={actionStatus === saveSuccessMessage ? '#166534' : '#9e1b1b'}
             />
             <Text style={[
               styles.statusBannerText,
-              actionStatus === 'Produto salvo.' ? { color: '#166534' } : { color: '#9e1b1b' },
+              actionStatus === saveSuccessMessage ? { color: '#166534' } : { color: '#9e1b1b' },
             ]}>{actionStatus}</Text>
           </View>
         )}
 
         {/* Seção: Identificação */}
-        <SectionCard title="Identificação" icon="tag-outline" isOpen={openSections.has('identificacao')} hasError={errorSections.has('identificacao')} onToggle={() => toggleSection('identificacao')}>
+        <SectionCard title={tt('Identificação')} icon="tag-outline" isOpen={openSections.has('identificacao')} hasError={errorSections.has('identificacao')} onToggle={() => toggleSection('identificacao')}>
           <View style={styles.fieldWrap}>
-            <Text style={styles.fieldLabel}>Nome *</Text>
+            <Text style={styles.fieldLabel}>{tt('Nome *')}</Text>
             <TextInput
               value={String(product.product || '')}
               onChangeText={val => handleChange('product', val)}
               style={styles.textInput}
-              placeholder="Nome do produto"
+              placeholder={tt('Nome do produto')}
               placeholderTextColor="#CBD5E1"
             />
           </View>
           <View style={styles.fieldWrap}>
-            <Text style={styles.fieldLabel}>Descrição</Text>
+            <Text style={styles.fieldLabel}>{tt('Descrição')}</Text>
             <TextInput
               value={String(product.description || '')}
               onChangeText={val => handleChange('description', val)}
               multiline
               style={styles.textInputMultiline}
-              placeholder="Descreva o produto..."
+              placeholder={tt('Descreva o produto...')}
               placeholderTextColor="#CBD5E1"
             />
           </View>
           <View style={styles.fieldWrap}>
-            <Text style={styles.fieldLabel}>SKU</Text>
+            <Text style={styles.fieldLabel}>{tt('SKU')}</Text>
             <TextInput
               value={String(product.sku || '')}
               onChangeText={val => handleChange('sku', val)}
               style={styles.textInput}
-              placeholder="SKU"
+              placeholder={tt('SKU')}
               placeholderTextColor="#CBD5E1"
             />
           </View>
         </SectionCard>
 
         {/* Seção: Preço e Classificação */}
-        <SectionCard title="Preço e Classificação" icon="currency-usd" isOpen={openSections.has('preco')} hasError={errorSections.has('preco')} onToggle={() => toggleSection('preco')}>
+        <SectionCard title={tt('Preço e Classificação')} icon="currency-usd" isOpen={openSections.has('preco')} hasError={errorSections.has('preco')} onToggle={() => toggleSection('preco')}>
           <View style={styles.fieldWrap}>
-            <Text style={styles.fieldLabel}>Preço (R$) *</Text>
+            <Text style={styles.fieldLabel}>{tt('Preço (R$) *')}</Text>
             <TextInput
               value={fmtN(product.price)}
               onChangeText={val => handleChange('price', val)}
               keyboardType="numeric"
               style={styles.textInput}
-              placeholder="0,00"
+              placeholder={tt('0,00')}
               placeholderTextColor="#CBD5E1"
             />
           </View>
           <SelectField
-            label="Categoria"
+            label={tt('Categoria')}
             value={selectedCategoryId || ''}
             onChange={val => setSelectedCategoryId(String(val || ''))}
             brandColors={brandColors}
             options={[
-              { value: '', label: 'Sem categoria' },
+              { value: '', label: tt('Sem categoria') },
               ...(categoryGetters.items || []).map(opt => ({ value: String(opt.id), label: opt.name || String(opt.id) })),
             ]}
           />
           <SelectField
-            label="Tipo"
+            label={tt('Tipo')}
             value={product.type || 'product'}
             onChange={val => handleChange('type', val)}
             brandColors={brandColors}
             options={getContextTypes()}
           />
           <SelectField
-            label="Condição"
+            label={tt('Condição')}
             value={product.productCondition || 'new'}
             onChange={val => handleChange('productCondition', val)}
             brandColors={brandColors}
             options={[
-              { value: 'new', label: 'Novo' },
-              { value: 'used', label: 'Usado' },
-              { value: 'recondicioned', label: 'Recondicionado' },
+              { value: 'new', label: tt('Novo') },
+              { value: 'used', label: tt('Usado') },
+              { value: 'recondicioned', label: tt('Recondicionado') },
             ]}
           />
           <SelectField
@@ -718,7 +720,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
             brandColors={brandColors}
             placeholder={productUnitPlaceholder}
             options={[
-              { value: '', label: 'Selecionar...' },
+              { value: '', label: tt('Selecionar...') },
               ...productUnitOptions.map(opt => ({ value: opt.value, label: opt.label })),
             ]}
           />
@@ -728,20 +730,20 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         </SectionCard>
 
         {/* Seção: Configurações */}
-        <SectionCard title="Configurações" icon="cog-outline" isOpen={openSections.has('config')} hasError={errorSections.has('config')} onToggle={() => toggleSection('config')}>
+        <SectionCard title={tt('Configurações')} icon="cog-outline" isOpen={openSections.has('config')} hasError={errorSections.has('config')} onToggle={() => toggleSection('config')}>
           <View style={styles.switchRow}>
-            <Text style={styles.switchLabel}>Ativo</Text>
+            <Text style={styles.switchLabel}>{tt('Ativo')}</Text>
             <Switch value={Boolean(product.active)} onValueChange={val => handleChange('active', val)} />
           </View>
           <View style={[styles.switchRow, styles.switchRowLast]}>
-            <Text style={styles.switchLabel}>Destaque</Text>
+            <Text style={styles.switchLabel}>{tt('Destaque')}</Text>
             <Switch value={Boolean(product.featured)} onValueChange={val => handleChange('featured', val)} />
           </View>
           <View style={styles.switchRow}>
             <View style={inlineStyle_673_18}>
-              <Text style={styles.switchLabel}>Controlar Estoque</Text>
+              <Text style={styles.switchLabel}>{tt('Controlar Estoque')}</Text>
               <Text style={inlineStyle_675_20}>
-                Define local de entrada e saída para este produto
+                {tt('Define local de entrada e saída para este produto')}
               </Text>
             </View>
             <Switch
@@ -758,39 +760,39 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
           {controlarEstoque && (
             <>
               <SelectField
-                label="Estoque de Saída *"
+                label={tt('Estoque de Saída *')}
                 value={product.defaultOutInventory || ''}
                 onChange={val => handleChange('defaultOutInventory', val)}
                 brandColors={brandColors}
                 options={[
-                  { value: '', label: 'Selecione...' },
+                  { value: '', label: tt('Selecione...') },
                   ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt.id) })),
                 ]}
               />
               <SelectField
-                label="Estoque de Entrada *"
+                label={tt('Estoque de Entrada *')}
                 value={product.defaultInInventory || ''}
                 onChange={val => handleChange('defaultInInventory', val)}
                 brandColors={brandColors}
                 options={[
-                  { value: '', label: 'Selecione...' },
+                  { value: '', label: tt('Selecione...') },
                   ...(inventoriesGetters.items || []).map(opt => ({ value: opt.id, label: opt.inventory || String(opt.id) })),
                 ]}
               />
             </>
           )}
           <SelectField
-            label="Fila"
+            label={tt('Fila')}
             value={product.queue || ''}
             onChange={val => handleChange('queue', val)}
             brandColors={brandColors}
             options={[
-              { value: '', label: 'Sem fila' },
+              { value: '', label: tt('Sem fila') },
               ...(queuesGetters.items || []).map(opt => ({ value: opt.id, label: opt.queue || opt.name || String(opt.id) })),
             ]}
           />
           <View style={styles.fieldWrap}>
-            <Text style={styles.fieldLabel}>Empresa</Text>
+            <Text style={styles.fieldLabel}>{tt('Empresa')}</Text>
             <View style={styles.displayField}>
               <Text style={styles.displayFieldText}>
                 {currentCompany?.name || (product.company ? String(product.company) : '—')}
@@ -801,7 +803,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
 
         {/* Seção: Imagens */}
         {!!product?.id ? (
-          <SectionCard title="Imagens" icon="image-multiple-outline" isOpen={openSections.has('imagens')} hasError={false} onToggle={() => toggleSection('imagens')}>
+          <SectionCard title={tt('Imagens')} icon="image-multiple-outline" isOpen={openSections.has('imagens')} hasError={false} onToggle={() => toggleSection('imagens')}>
             <AttachmentManager
               entityType="product"
               entityId={product.id}
@@ -816,7 +818,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
         ) : (
           <View style={styles.infoBox}>
             <MaterialCommunityIcons name="image-off-outline" size={20} color="#94A3B8" />
-            <Text style={styles.infoBoxText}>Salve o produto para habilitar anexos de imagem.</Text>
+            <Text style={styles.infoBoxText}>{tt('Salve o produto para habilitar anexos de imagem.')}</Text>
           </View>
         )}
 
@@ -828,7 +830,7 @@ const ProductForm = ({ route, ProductId: propProductId, contextTypes }) => {
           activeOpacity={0.85}
         >
           <MaterialCommunityIcons name="content-save-outline" size={20} color="#fff" />
-          <Text style={styles.saveButtonText}>Salvar Produto</Text>
+          <Text style={styles.saveButtonText}>{tt('Salvar Produto')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
