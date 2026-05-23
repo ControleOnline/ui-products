@@ -29,7 +29,7 @@ import { inlineStyle_101_14 } from './ProductGroups.styles';
 /*
  * Campos válidos de product_group (confirmados no banco):
  *  id, parent_product_id, product_group, price_calculation,
- *  required, minimum, maximum, active, group_order
+ *  required, minimum, maximum, active, show_in_display, group_order
  * A associação produto ↔ grupo também é gravada em product_group_parent.
  *
  * Removidos por não existirem no banco:
@@ -92,6 +92,7 @@ const isImportedGroup = (group, productId) => {
 const normalizeGroupDraft = group => ({
   productGroup: String(group?.productGroup || ''),
   required: Boolean(group?.required),
+  showInDisplay: group?.id ? group?.showInDisplay !== false : false,
   minimum: String(group?.minimum ?? ''),
   maximum: String(group?.maximum ?? ''),
   groupOrder: String(group?.groupOrder ?? '0'),
@@ -254,6 +255,20 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.required)}
                   onValueChange={v => onChangeDraft('required', v)}
+                  trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+
+            {/* Exibição */}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Exibir em displays e impressão</Text>
+              <View style={styles.switchRight}>
+                <Text style={styles.switchValue}>{draft.showInDisplay ? 'Sim' : 'Não'}</Text>
+                <Switch
+                  value={Boolean(draft.showInDisplay)}
+                  onValueChange={v => onChangeDraft('showInDisplay', v)}
                   trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
                   thumbColor="#fff"
                 />
@@ -750,6 +765,7 @@ const ProductGroups = ({ ProductId }) => {
             id: editingGroup.id,
             productGroup: String(modalDraft.productGroup).trim(),
             required: Boolean(modalDraft.required),
+            showInDisplay: Boolean(modalDraft.showInDisplay),
             minimum: minimum ?? null,
             maximum: maximum ?? null,
             groupOrder,
@@ -761,6 +777,7 @@ const ProductGroups = ({ ProductId }) => {
             people: currentCompany?.id,
             productGroup: String(modalDraft.productGroup || 'Novo Grupo').trim(),
             required: Boolean(modalDraft.required),
+            showInDisplay: Boolean(modalDraft.showInDisplay),
             minimum: minimum ?? 0,
             maximum: maximum ?? 1,
             groupOrder,
@@ -872,6 +889,11 @@ const ProductGroups = ({ ProductId }) => {
                     {group.required && (
                       <View style={[styles.badge, { backgroundColor: '#FEF3C7' }]}>
                         <Text style={[styles.badgeText, { color: '#92400E' }]}>Obrigatório</Text>
+                      </View>
+                    )}
+                    {group.showInDisplay === false && (
+                      <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
+                        <Text style={[styles.badgeText, { color: '#B91C1C' }]}>Oculto</Text>
                       </View>
                     )}
                     {imported && (
