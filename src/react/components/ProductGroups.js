@@ -28,7 +28,7 @@ import { inlineStyle_101_14 } from './ProductGroups.styles';
 
 /*
  * Campos válidos de product_group (confirmados no banco):
- *  id, parent_product_id, product_group, price_calculation,
+ *  id, company_id, product_group, price_calculation,
  *  required, minimum, maximum, active, show_in_display, group_order
  * A associação produto ↔ grupo também é gravada em product_group_parent.
  *
@@ -73,6 +73,11 @@ const toProductGroupIri = value => {
   return id ? `/product_groups/${id}` : null;
 };
 
+const toPeopleIri = value => {
+  const id = normalizeEntityId(value);
+  return id ? `/people/${id}` : null;
+};
+
 const isDuplicateError = error => {
   const raw = String(
     error?.response?.data?.['hydra:description'] ||
@@ -81,11 +86,6 @@ const isDuplicateError = error => {
     '',
   ).toLowerCase();
   return raw.includes('duplicate') || raw.includes('unique');
-};
-
-const isImportedGroup = (group, productId) => {
-  const parentId = normalizeEntityId(group?.parentProduct);
-  return !!parentId && String(parentId) !== String(productId || '');
 };
 
 /* Normaliza apenas campos que existem na entidade */
@@ -583,7 +583,7 @@ const ProductGroups = ({ ProductId }) => {
     setImportError('');
     try {
       const response = await actions.getItems({
-        'parentProduct.company': `/people/${currentCompany.id}`,
+        company: `/people/${currentCompany.id}`,
         itemsPerPage: 300,
         'order[productGroup]': 'ASC',
       });
@@ -681,6 +681,11 @@ const ProductGroups = ({ ProductId }) => {
     if (!modalDraft) return;
     setModalError('');
 
+    if (!editingGroup && !currentCompany?.id) {
+      setModalError('Selecione uma empresa antes de criar o grupo.');
+      return;
+    }
+
     /* Validação por campo */
     const errs = validateGroupDraft(modalDraft);
     if (Object.keys(errs).length > 0) {
@@ -712,8 +717,7 @@ const ProductGroups = ({ ProductId }) => {
             active: editingGroup.active ?? true,
           }
         : {
-            parentProduct: `/products/${ProductId}`,
-            people: currentCompany?.id,
+            company: toPeopleIri(currentCompany),
             productGroup: String(modalDraft.productGroup || 'Novo Grupo').trim(),
             required: Boolean(modalDraft.required),
             showInDisplay: Boolean(modalDraft.showInDisplay),
@@ -820,7 +824,6 @@ const ProductGroups = ({ ProductId }) => {
           const isExpanded = !!expanded[gid];
           const minMax = [group.minimum, group.maximum].filter(v => v != null).join(' – ');
           const calcLabel = PRICE_CALCULATION_OPTIONS.find(o => o.value === group.priceCalculation)?.label || '';
-          const imported = isImportedGroup(group, ProductId);
 
           return (
             <View key={gid} style={styles.card}>
@@ -849,11 +852,6 @@ const ProductGroups = ({ ProductId }) => {
                     {group.showInDisplay === false && (
                       <View style={[styles.badge, { backgroundColor: '#FEE2E2' }]}>
                         <Text style={[styles.badgeText, { color: '#B91C1C' }]}>Oculto</Text>
-                      </View>
-                    )}
-                    {imported && (
-                      <View style={[styles.badge, { backgroundColor: '#ECFEFF' }]}>
-                        <Text style={[styles.badgeText, { color: '#0E7490' }]}>Importado</Text>
                       </View>
                     )}
                     {!!calcLabel && (
