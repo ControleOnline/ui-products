@@ -36,28 +36,38 @@ export const resolveCustomizePalette = colors => {
   };
 };
 
-export const customizeScreenRootStyle = ({palette, isLargeScreen}) => ({
+export const customizeScreenRootStyle = ({
+  palette,
+  isLargeScreen,
+  isBottomSheet,
+}) => ({
   flex: 1,
   width: '100%',
   height: '100%',
-  backgroundColor: isLargeScreen ? 'rgba(10, 18, 26, 0.48)' : palette.page,
+  backgroundColor:
+    isLargeScreen || isBottomSheet ? 'rgba(10, 18, 26, 0.48)' : palette.page,
   paddingHorizontal: isLargeScreen ? 28 : 0,
   paddingVertical: isLargeScreen ? 24 : 0,
   alignItems: 'center',
-  justifyContent: isLargeScreen ? 'center' : 'flex-start',
+  justifyContent: isLargeScreen
+    ? 'center'
+    : isBottomSheet
+      ? 'flex-end'
+      : 'flex-start',
 });
 
 export const customizeScreenBackdropStyle = ({
   isLargeScreen,
+  isBottomSheet,
   modalHeight,
   modalWidth,
 }) => ({
   width: isLargeScreen ? modalWidth : '100%',
   maxWidth: isLargeScreen ? modalWidth : '100%',
-  height: isLargeScreen ? modalHeight : '100%',
-  minHeight: isLargeScreen ? modalHeight : '100%',
-  flex: isLargeScreen ? 0 : 1,
-  maxHeight: isLargeScreen ? modalHeight : '100%',
+  height: isLargeScreen || isBottomSheet ? modalHeight : '100%',
+  minHeight: isLargeScreen || isBottomSheet ? modalHeight : '100%',
+  flex: isLargeScreen || isBottomSheet ? 0 : 1,
+  maxHeight: isLargeScreen || isBottomSheet ? modalHeight : '100%',
   zIndex: 1,
 });
 
@@ -73,12 +83,13 @@ export const customizeBackdropPressableStyle = {
 export const customizeModalStyle = ({
   palette,
   isLargeScreen,
+  isBottomSheet,
   modalHeight,
   modalWidth,
 }) => ({
-  ...(isLargeScreen
+  ...(isLargeScreen || isBottomSheet
     ? {
-        width: modalWidth,
+        width: isLargeScreen ? modalWidth : '100%',
         height: modalHeight,
         minHeight: modalHeight,
       }
@@ -91,14 +102,17 @@ export const customizeModalStyle = ({
   flexDirection: isLargeScreen ? 'row' : 'column',
   overflow: 'hidden',
   backgroundColor: palette.modal,
-  borderRadius: isLargeScreen ? 24 : 0,
-  borderWidth: isLargeScreen ? 1 : 0,
+  borderTopLeftRadius: isLargeScreen || isBottomSheet ? 24 : 0,
+  borderTopRightRadius: isLargeScreen || isBottomSheet ? 24 : 0,
+  borderBottomLeftRadius: isLargeScreen ? 24 : 0,
+  borderBottomRightRadius: isLargeScreen ? 24 : 0,
+  borderWidth: isLargeScreen || isBottomSheet ? 1 : 0,
   borderColor: palette.border,
   shadowColor: palette.shadow,
   shadowOffset: {width: 0, height: 18},
-  shadowOpacity: isLargeScreen ? 0.24 : 0,
+  shadowOpacity: isLargeScreen || isBottomSheet ? 0.24 : 0,
   shadowRadius: 34,
-  elevation: isLargeScreen ? 12 : 0,
+  elevation: isLargeScreen || isBottomSheet ? 12 : 0,
 });
 
 export const customizeMainColumnStyle = ({palette, isLargeScreen}) => ({

@@ -261,8 +261,17 @@ const CustomizeScreen = () => {
         ? window.innerHeight
         : 768;
   const isLargeScreen = viewportWidth >= 960;
+  const requestedPresentation = route.params?.presentation || null;
+  const isBottomSheet =
+    requestedPresentation === 'bottomSheet' && !isLargeScreen;
+  const bottomSheetHeight = Math.min(
+    Math.max(360, viewportHeight - 20),
+    Math.max(420, Math.round(viewportHeight * 0.9)),
+  );
   const modalHeight = isLargeScreen
     ? Math.max(640, Math.min(viewportHeight - 64, 900))
+    : isBottomSheet
+      ? bottomSheetHeight
     : viewportHeight;
   const modalWidth = isLargeScreen
     ? Math.max(840, Math.min(viewportWidth - 56, 1180))
@@ -1489,10 +1498,12 @@ const CustomizeScreen = () => {
   return (
     <View
       style={[
-        customizeScreenRootStyle({palette, isLargeScreen}),
-        Platform.OS === 'web' && isLargeScreen ? {backdropFilter: 'blur(7px)'} : null,
+        customizeScreenRootStyle({palette, isLargeScreen, isBottomSheet}),
+        Platform.OS === 'web' && (isLargeScreen || isBottomSheet)
+          ? {backdropFilter: 'blur(7px)'}
+          : null,
       ]}>
-      {isLargeScreen ? (
+      {isLargeScreen || isBottomSheet ? (
         <TouchableOpacity
           onPress={closeCustomizeScreen}
           style={customizeBackdropPressableStyle}
@@ -1500,15 +1511,17 @@ const CustomizeScreen = () => {
         />
       ) : null}
       <View
-        style={customizeScreenBackdropStyle({
-          isLargeScreen,
-          modalHeight,
-          modalWidth,
-        })}>
+          style={customizeScreenBackdropStyle({
+            isLargeScreen,
+            isBottomSheet,
+            modalHeight,
+            modalWidth,
+          })}>
         <View
           style={customizeModalStyle({
             palette,
             isLargeScreen,
+            isBottomSheet,
             modalHeight,
             modalWidth,
           })}>
