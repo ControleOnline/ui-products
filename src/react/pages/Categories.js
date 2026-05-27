@@ -14,6 +14,9 @@ import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedM
 import {
   downloadMenuCatalog as downloadCompanyMenuCatalog,
 } from '@controleonline/ui-common/src/react/utils/menuCatalogDownload'
+import {
+  downloadNormalizedCatalog as downloadCompanyNormalizedCatalog,
+} from '@controleonline/ui-common/src/react/utils/normalizedCatalogDownload'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import { colors } from '@controleonline/../../src/styles/colors'
@@ -126,6 +129,7 @@ const SkeletonCard = ({ width }) => (
 const CategoriesPage = ({ route }) => {
   const [showImportModal, setShowImportModal] = useState(false)
   const [isDownloadingCatalog, setIsDownloadingCatalog] = useState(false)
+  const [isDownloadingNormalizedCatalog, setIsDownloadingNormalizedCatalog] = useState(false)
   const [isLoadingMenuModels, setIsLoadingMenuModels] = useState(false)
   const [showMenuModelModal, setShowMenuModelModal] = useState(false)
   const [menuModels, setMenuModels] = useState([])
@@ -537,6 +541,48 @@ const CategoriesPage = ({ route }) => {
     selectedMenuModel,
   ])
 
+  const downloadNormalizedCatalog = useCallback(async () => {
+    if (isDownloadingNormalizedCatalog) {
+      return
+    }
+
+    if (!currentCompany?.id) {
+      Alert.alert(
+        'Empresa nao selecionada',
+        'Selecione uma empresa para exportar o CSV normalizado.',
+      )
+      return
+    }
+
+    setIsDownloadingNormalizedCatalog(true)
+
+    try {
+      const downloadResult = await downloadCompanyNormalizedCatalog({
+        companyId: currentCompany.id,
+        companyName:
+          currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
+        context,
+      })
+
+      if (downloadResult?.savedUri && !downloadResult?.shared && Platform.OS !== 'web') {
+        Alert.alert('CSV salvo', `Arquivo salvo em ${downloadResult.savedUri}`)
+      }
+    } catch (error) {
+      Alert.alert(
+        'Erro ao exportar CSV',
+        error?.message || 'Nao foi possivel gerar o CSV normalizado.',
+      )
+    } finally {
+      setIsDownloadingNormalizedCatalog(false)
+    }
+  }, [
+    context,
+    currentCompany?.alias,
+    currentCompany?.id,
+    currentCompany?.name,
+    isDownloadingNormalizedCatalog,
+  ])
+
   const openIntegrationsPage = useCallback(() => {
     navigation.navigate('IntegrationsPage')
   }, [navigation])
@@ -901,6 +947,26 @@ const CategoriesPage = ({ route }) => {
                   )}
                   <Text style={[styles.actionButtonText, styles.syncEligibleButtonText]}>
                     {marketplaceSyncingKey === 'all' ? 'Sincronizando...' : 'Sincronizar todos os elegiveis'}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionButton,
+                    styles.normalizedCatalogButton,
+                    (isDownloadingNormalizedCatalog || !currentCompany?.id) && styles.disabledActionButton,
+                  ]}
+                  onPress={downloadNormalizedCatalog}
+                  activeOpacity={0.85}
+                  disabled={isDownloadingNormalizedCatalog || !currentCompany?.id}
+                >
+                  {isDownloadingNormalizedCatalog ? (
+                    <ActivityIndicator size="small" color="#9A3412" />
+                  ) : (
+                    <MaterialCommunityIcons name="file-download-outline" size={18} color="#9A3412" />
+                  )}
+                  <Text style={[styles.actionButtonText, styles.normalizedCatalogButtonText]}>
+                    {isDownloadingNormalizedCatalog ? 'Exportando...' : 'Exportar CSV'}
                   </Text>
                 </TouchableOpacity>
 

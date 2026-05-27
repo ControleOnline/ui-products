@@ -195,6 +195,13 @@ const styles = StyleSheet.create({
   syncEligibleButtonText: {
     color: '#047857',
   },
+  normalizedCatalogButton: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FDBA74',
+  },
+  normalizedCatalogButtonText: {
+    color: '#9A3412',
+  },
   catalogButton: {
     borderColor: '#0F172A',
   },
