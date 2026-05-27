@@ -85,6 +85,8 @@ const shouldShowInParentQueue = item =>
   item?.showProductGroupInQueue !== false &&
   item?.show_product_group_in_queue !== false;
 
+const isSharedModifierItem = item => item?.productType !== 'feedstock';
+
 const toProductGroupIri = value => {
   if (!value) return null;
   if (typeof value === 'string') {
@@ -543,13 +545,13 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
   const fetchItems = useCallback(async () => {
     if (!productGroupIri) { setCurrentItems([]); return []; }
     const response = await productGroupProductStore.actions.getItems({
-      product: `/products/${ProductId}`,
       productGroup: productGroupIri,
+      itemsPerPage: 500,
     });
-    const items = extractItems(response);
+    const items = extractItems(response).filter(isSharedModifierItem);
     setCurrentItems(items);
     return items;
-  }, [productGroupIri, ProductId]);
+  }, [productGroupIri, productGroupProductStore.actions, ProductId]);
 
   useEffect(() => {
     if (!ProductId) { setLoaded(false); return; }
@@ -814,7 +816,9 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
          */
         payload = {
           id: editingItem.id,
-          product: toProductIri(editingItem.product) || `/products/${ProductId}`,
+          product: editingItem.productType === 'feedstock'
+            ? (toProductIri(editingItem.product) || `/products/${ProductId}`)
+            : null,
           productGroup: toProductGroupIri(editingItem.productGroup) || productGroupIri,
           productChild: toProductIri(editingItem.productChild),
           productType: editingItem.productType || toGroupProductType(editingItem.productChild?.type),
@@ -829,7 +833,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
          * product_type enum: 'feedstock' | 'component' | 'package'
          */
         payload = {
-          product: `/products/${ProductId}`,
+          product: formDraft.productType === 'feedstock' ? `/products/${ProductId}` : null,
           productGroup: productGroupIri,
           productChild: `/products/${String(formDraft.productChild).replace(/\D/g, '')}`,
           productType: formDraft.productType,
@@ -874,7 +878,9 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
     try {
       await productGroupProductStore.actions.save({
         id: item.id || id,
-        product: toProductIri(item.product) || `/products/${ProductId}`,
+        product: item.productType === 'feedstock'
+          ? (toProductIri(item.product) || `/products/${ProductId}`)
+          : null,
         productGroup: toProductGroupIri(item.productGroup) || productGroupIri,
         productChild: toProductIri(item.productChild),
         productType: item.productType || toGroupProductType(item.productChild?.type),

@@ -480,12 +480,10 @@ const GroupImportModal = ({
 const ProductGroups = ({ ProductId }) => {
   const productGroupStore = useStore('product_group');
   const productGroupParentStore = useStore('product_group_parent');
-  const productGroupProductStore = useStore('product_group_product');
   const peopleStore = useStore('people');
 
   const { actions } = productGroupStore;
   const groupParentActions = productGroupParentStore.actions;
-  const groupProductActions = productGroupProductStore.actions;
   const { currentCompany } = peopleStore.getters;
   const brandColors = useMemo(() => resolveThemePalette(), []);
 
@@ -559,68 +557,10 @@ const ProductGroups = ({ ProductId }) => {
     }
   }, [ProductId, groupParentActions]);
 
-  const fetchGroupItems = useCallback(async (product, productGroup) => {
-    if (!productGroup) return [];
-    const params = {
-      productGroup,
-      itemsPerPage: 500,
-      ...(product ? { product } : {}),
-    };
-    const response = await groupProductActions.getItems(params);
-    return extractItems(response);
-  }, [groupProductActions]);
-
-  const copyGroupItemsToProduct = useCallback(async group => {
-    const productGroup = toProductGroupIri(group);
-    const targetProduct = toProductIri(ProductId);
-    if (!productGroup || !targetProduct) return;
-
-    const sourceProduct = toProductIri(group?.parentProduct);
-    const sourceItems = await fetchGroupItems(sourceProduct, productGroup);
-    const existingItems = await fetchGroupItems(targetProduct, productGroup);
-    const existingChildren = new Set(
-      existingItems
-        .map(item => normalizeEntityId(item?.productChild))
-        .filter(Boolean)
-    );
-
-    const itemsByChild = new Map();
-    sourceItems.forEach(item => {
-      const childIri = toProductIri(item?.productChild);
-      const childId = normalizeEntityId(item?.productChild);
-      if (!childIri || !childId || childId === String(ProductId || '') || existingChildren.has(childId)) {
-        return;
-      }
-      if (!itemsByChild.has(childId)) itemsByChild.set(childId, item);
-    });
-
-    for (const item of itemsByChild.values()) {
-      try {
-        await groupProductActions.save({
-          product: targetProduct,
-          productGroup,
-          productChild: toProductIri(item?.productChild),
-          productType: item?.productType || 'component',
-          quantity: Number(item?.quantity) > 0 ? Number(item.quantity) : 1,
-          price: Number(item?.price) || 0,
-          active: item?.active ?? true,
-        });
-      } catch (e) {
-        if (!isDuplicateError(e)) throw e;
-      }
-    }
-  }, [ProductId, fetchGroupItems, groupProductActions]);
-
   const removeImportedGroupFromProduct = useCallback(async group => {
     const productGroup = toProductGroupIri(group);
     const parentProduct = toProductIri(ProductId);
     if (!productGroup || !parentProduct) return;
-
-    const items = await fetchGroupItems(parentProduct, productGroup);
-    for (const item of items) {
-      const id = normalizeEntityId(item);
-      if (id) await groupProductActions.remove(id);
-    }
 
     const links = extractItems(await groupParentActions.getItems({
       productGroup,
@@ -631,7 +571,7 @@ const ProductGroups = ({ ProductId }) => {
       const id = normalizeEntityId(link);
       if (id) await groupParentActions.remove(id);
     }
-  }, [ProductId, fetchGroupItems, groupParentActions, groupProductActions]);
+  }, [ProductId, groupParentActions]);
 
   const loadImportCandidates = useCallback(async () => {
     if (!currentCompany?.id) {
@@ -685,7 +625,6 @@ const ProductGroups = ({ ProductId }) => {
     setImportingId(gid);
     try {
       await ensureGroupParentLink(group);
-      await copyGroupItemsToProduct(group);
       await loadData();
       setExpanded(prev => ({ ...prev, [toProductGroupIri(group) || gid]: true }));
       setImportModalVisible(false);
@@ -817,7 +756,23 @@ const ProductGroups = ({ ProductId }) => {
     if (!gid) { setConfirmDeleteGroup(null); return; }
     setRemoving(true);
     try {
-      if (isImportedGroup(confirmDeleteGroup, ProductId)) {
+      const productGroup = toProductGroupIri(confirmDeleteGroup);
+      const links = productGroup
+        ? extractItems(await groupParentActions.getItems({
+            productGroup,
+            itemsPerPage: 100,
+          }))
+        : [];
+      const hasOtherActiveLinks = links.some(link => {
+        if (link?.active === false) {
+          return false;
+        }
+
+        const linkParentId = normalizeEntityId(link?.parentProduct);
+        return linkParentId && linkParentId !== String(ProductId || '');
+      });
+
+      if (hasOtherActiveLinks) {
         await removeImportedGroupFromProduct(confirmDeleteGroup);
       } else {
         await actions.remove(gid);
@@ -1009,17 +964,7 @@ const ProductGroups = ({ ProductId }) => {
           />
           <Text style={styles.confirmTitle}>Excluir grupo?</Text>
           <Text style={styles.confirmSubtitle}>
-            {isImportedGroup(confirmDeleteGroup, ProductId)
-              ? (
-                <>
-                  O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> será removido deste produto.
-                </>
-              )
-              : (
-                <>
-                  O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> e todos os seus modificadores serão removidos. Esta ação não pode ser desfeita.
-                </>
-              )}
+            O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> será desvinculado deste produto. Se for o único vínculo ativo, o grupo inteiro será excluído.
           </Text>
           <View style={styles.confirmFooter}>
             <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeleteGroup(null)}>
