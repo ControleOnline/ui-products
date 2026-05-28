@@ -239,9 +239,13 @@ const ProductDetails = ({ route, navigation }) => {
       loadCostSummary();
     };
 
-    window.addEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+    if (typeof window !== 'undefined' && window.addEventListener) {
+      window.addEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+    }
     return () => {
-      window.removeEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+      if (typeof window !== 'undefined' && window.removeEventListener) {
+        window.removeEventListener(PRODUCT_EVENTS.BOM_CHANGED, handleBomChanged);
+      }
     };
   }, [ProductId, loadCostSummary, loadProductSummary]);
 
