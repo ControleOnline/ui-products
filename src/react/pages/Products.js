@@ -1,3 +1,16 @@
+/*
+ * Contract imported from AGENTS.md
+ * ## Escopo
+ * - `ui-products` e o modulo React de catalogo, selecao e manutencao de produtos.
+ * - Esta pagina centraliza a experiencia de produtos e a sincronizacao do catalogo.
+ *
+ * ## Estado
+ * - Se existir `src/vue`, ela e apenas legado e nao deve receber este contrato.
+ *
+ * ## Limites
+ * - Nao duplicar a regra do catalogo em outros modulos.
+ * - Manter aqui a coordenacao da tela React e dos filtros do catalogo.
+ */
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
