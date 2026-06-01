@@ -188,6 +188,28 @@ const CategoriesPage = ({ route }) => {
     () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
     [route?.params?.category, route?.params?.categoryId],
   )
+  const operationalRouteParams = useMemo(() => {
+    const params = route?.params || {}
+    const nextParams = {}
+
+    if (params?.id) {
+      nextParams.id = params.id
+    }
+
+    if (params?.resumeExistingOrder === true) {
+      nextParams.resumeExistingOrder = true
+    }
+
+    if (typeof params?.allowLinkedOrderManagement === 'boolean') {
+      nextParams.allowLinkedOrderManagement = params.allowLinkedOrderManagement
+    }
+
+    return nextParams
+  }, [
+    route?.params?.allowLinkedOrderManagement,
+    route?.params?.id,
+    route?.params?.resumeExistingOrder,
+  ])
   const {materializeOrderWithProducts, openOrderDetails} = usePosOrderMaterialization({
     interactionParams: route?.params,
     navigation,
@@ -278,6 +300,7 @@ const CategoriesPage = ({ route }) => {
     navigation.navigate({
       name: 'ProductsPage',
       params: {
+        ...operationalRouteParams,
         categoryId,
         context,
         interactionMode,
@@ -387,6 +410,7 @@ const CategoriesPage = ({ route }) => {
       navigation.navigate({
         name: 'ProductsPage',
         params: {
+          ...operationalRouteParams,
           categoryId: ALL_PRODUCTS_SENTINEL['@id'],
           context,
           interactionMode,
@@ -397,7 +421,7 @@ const CategoriesPage = ({ route }) => {
         merge: false,
       })
     },
-    [context, interactionMode, navigation],
+    [context, interactionMode, navigation, operationalRouteParams],
   )
   const handleAutocompleteProductSelect = useCallback(
     async product => {
