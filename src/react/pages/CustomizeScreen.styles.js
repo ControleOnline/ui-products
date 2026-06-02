@@ -13,8 +13,8 @@ const hexToRgba = (hex, alpha = 1) => {
 };
 
 export const resolveCustomizePalette = colors => {
-  const primary = colors?.primary || colors?.accent || '#1F8FBD';
-  const secondary = colors?.secondary || '#0F2D4A';
+  const primary = colors?.primary || colors?.accent;
+  const secondary = colors?.secondary;
 
   return {
     primary,

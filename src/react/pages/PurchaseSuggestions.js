@@ -398,7 +398,7 @@ const PurchaseSuggestionsPage = () => {
                 {/* linhas de produto */}
                 {!isCollapsed && group.rows.map((item, idx) => {
                   const isSel = selected.has(item.id);
-                  const typeColor = PRODUCT_TYPE_COLORS[item._prodType] || '#94A3B8';
+                  const typeColor = PRODUCT_TYPE_COLORS[item._prodType];
                   return (
                     <TouchableOpacity
                       key={item.id}

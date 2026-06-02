@@ -373,7 +373,7 @@ const CategoriesPage = ({ route }) => {
     await categoryActions.save({
       id: selectedCategory.id,
       name: selectedCategory.name || '',
-      color: selectedCategory.color || '#CBD5E1',
+      color: selectedCategory.color,
       icon: selectedCategory.icon || '',
       context,
       company: companyIri,
@@ -1098,7 +1098,7 @@ const CategoriesPage = ({ route }) => {
                         style={[
                           styles.cardImage,
                           isCompactMobile && styles.cardImageCompact,
-                          { backgroundColor: category.color || '#CBD5E1' },
+                          { backgroundColor: category.color },
                         ]}
                       >
                         {!!buildCoverUrl(category.categoryFiles, category?.extraData?.imageCoverRelationId) ? (

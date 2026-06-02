@@ -137,11 +137,11 @@ const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, br
               return (
                 <TouchableOpacity
                   key={String(u.id)}
-                  style={[styles.unitChip, active && { borderColor: brandColors?.primary || '#3B82F6', backgroundColor: '#EFF6FF' }]}
+                  style={[styles.unitChip, active && { borderColor: brandColors?.primary, backgroundColor: '#EFF6FF' }]}
                   onPress={() => setSelectedUnitId(String(u.id))}
                   activeOpacity={0.75}
                 >
-                  <Text style={[styles.unitChipText, active && { color: brandColors?.primary || '#3B82F6', fontWeight: '700' }]}>
+                  <Text style={[styles.unitChipText, active && { color: brandColors?.primary, fontWeight: '700' }]}>
                     {u.label}
                   </Text>
                 </TouchableOpacity>
@@ -157,7 +157,7 @@ const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, br
             <Text style={styles.cancelBtnText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary || '#3B82F6' }, !canSave && { opacity: 0.55 }]}
+            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, !canSave && { opacity: 0.55 }]}
             onPress={() => canSave && onSave(name.trim(), selectedUnitId)}
             disabled={!canSave}
           >
@@ -405,7 +405,7 @@ const FeedStockFormModal = ({
             <Text style={styles.cancelBtnText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary || '#3B82F6' }, saving && { opacity: 0.6 }]}
+            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, saving && { opacity: 0.6 }]}
             onPress={onSave}
             disabled={saving}
           >

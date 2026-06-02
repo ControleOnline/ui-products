@@ -343,7 +343,7 @@ const GroupEditModal = ({
             <Text style={styles.cancelBtnText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary || '#3B82F6' }, saving && { opacity: 0.6 }]}
+            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, saving && { opacity: 0.6 }]}
             onPress={onSave}
             disabled={saving}
           >
@@ -462,9 +462,9 @@ const GroupImportModal = ({
                     </View>
                   </View>
                   {importing ? (
-                    <ActivityIndicator size="small" color={brandColors?.primary || '#3B82F6'} />
+                    <ActivityIndicator size="small" color={brandColors?.primary} />
                   ) : (
-                    <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary || '#3B82F6'} />
+                    <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary} />
                   )}
                 </TouchableOpacity>
               );
@@ -910,8 +910,8 @@ const ProductGroups = ({ ProductId }) => {
               onPress={openImportModal}
               activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary || '#3B82F6'} />
-              <Text style={[styles.importGroupBtnText, { color: brandColors?.primary || '#3B82F6' }]}>Importar</Text>
+              <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary} />
+              <Text style={[styles.importGroupBtnText, { color: brandColors?.primary }]}>Importar</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.addGroupBtn, { backgroundColor: brandColors?.primary }]}

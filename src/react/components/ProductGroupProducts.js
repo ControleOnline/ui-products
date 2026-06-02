@@ -369,7 +369,7 @@ const ItemFormModal = ({
               <Switch
                 value={draft.showInParentQueue !== false}
                 onValueChange={value => onChangeDraft('showInParentQueue', value)}
-                trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#3B82F6' }}
+                trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
                 thumbColor="#fff"
               />
             </View>
@@ -381,7 +381,7 @@ const ItemFormModal = ({
             <Text style={styles.cancelBtnText}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary || '#3B82F6' }, saving && { opacity: 0.6 }]}
+            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, saving && { opacity: 0.6 }]}
             onPress={onSave}
             disabled={saving}
           >
@@ -476,7 +476,7 @@ const ItemCard = ({
               value={showInParentQueue}
               disabled={toggling}
               onValueChange={value => onToggleShowInParentQueue(item, value)}
-              trackColor={{ false: '#E2E8F0', true: brandColors?.primary || '#3B82F6' }}
+              trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
               thumbColor="#fff"
             />
             <TouchableOpacity
@@ -980,16 +980,16 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
       })}
       {/* Botão adicionar */}
       <TouchableOpacity
-        style={[styles.addItemBtn, { borderColor: brandColors?.primary || '#64748B' }]}
+        style={[styles.addItemBtn, { borderColor: brandColors?.primary }]}
         onPress={openProductSearchModal}
         activeOpacity={0.7}
       >
         <MaterialCommunityIcons
           name="plus-circle-outline"
           size={18}
-          color={brandColors?.primary || '#64748B'}
+          color={brandColors?.primary}
         />
-        <Text style={[styles.addItemBtnText, { color: brandColors?.primary || '#64748B' }]}>
+        <Text style={[styles.addItemBtnText, { color: brandColors?.primary }]}>
           Adicionar modificador / componente
         </Text>
       </TouchableOpacity>
