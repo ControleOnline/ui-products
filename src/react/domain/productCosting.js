@@ -123,6 +123,8 @@ const resolvePeopleLabel = entity =>
 
 export const fetchLatestPurchasesByProductIds = async ({
   companyId,
+  clientId = null,
+  clientIds = [],
   ordersActions,
   productIds,
   limitPerProduct = 1,
@@ -130,6 +132,13 @@ export const fetchLatestPurchasesByProductIds = async ({
   itemsPerPage = 10,
 }) => {
   const ids = Array.from(new Set((productIds || []).map(normalizeEntityId).filter(Boolean)));
+  const supplierIds = Array.from(
+    new Set(
+      [clientId, ...clientIds]
+        .map(normalizeEntityId)
+        .filter(Boolean),
+    ),
+  );
   const purchasesByProductId = {};
 
   ids.forEach(productId => {
@@ -154,8 +163,17 @@ export const fetchLatestPurchasesByProductIds = async ({
     const orders = extractItems(response);
     if (orders.length === 0) break;
 
+    const scopedOrders = supplierIds.length > 0
+      ? orders.filter(order => supplierIds.includes(normalizeEntityId(order?.client)))
+      : orders;
+
+    if (scopedOrders.length === 0) {
+      if (orders.length < itemsPerPage) break;
+      continue;
+    }
+
     const orderDetails = await Promise.all(
-      orders.map(async order => {
+      scopedOrders.map(async order => {
         const orderId = normalizeEntityId(order);
         if (!orderId) return null;
 
