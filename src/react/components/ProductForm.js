@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, TextInput, Text, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,10 @@ import {
   findRecommendedServiceUnit,
   SERVICE_TYPE,
 } from '../domain/serviceUnitOptions';
+import {
+  mergeProductDraftIntoExisting,
+  resolveDuplicateProductCandidate,
+} from '@controleonline/ui-products/src/react/domain/productDuplicates';
 
 import {
   inlineStyle_71_8,
@@ -512,6 +517,34 @@ const ProductForm = ({
     setProduct(prev => ({ ...prev, ...(normalized || {}) }));
   }, [ProductId, productActions]);
 
+  const findDuplicateFeedstockProduct = useCallback(async draft => {
+    if (context !== 'supplies') {
+      return null;
+    }
+
+    if (String(draft?.type || '').trim().toLowerCase() !== 'feedstock') {
+      return null;
+    }
+
+    const companyId = currentCompany?.id;
+    if (!companyId || !productActions?.getItems) {
+      return null;
+    }
+
+    const response = await productActions.getItems({
+      company: companyId,
+      type: ['feedstock'],
+      itemsPerPage: 500,
+    }).catch(() => []);
+
+    return resolveDuplicateProductCandidate({
+      products: collectionFrom(response),
+      draft,
+      currentProductId: ProductId,
+      type: 'feedstock',
+    });
+  }, [ProductId, context, currentCompany?.id, productActions]);
+
   const saveProductCover = useCallback(async relation => {
     if (!product?.id || !relation?.id) return;
     const toIri = (val, prefix) => {
@@ -682,12 +715,30 @@ const ProductForm = ({
     payload.price = priceVal;
 
     try {
+      const duplicateCandidate = await findDuplicateFeedstockProduct(payload);
+      const duplicateId = extractId(duplicateCandidate?.match);
+
+      if (duplicateCandidate?.match && duplicateId && String(duplicateId) !== String(ProductId || '')) {
+        if (ProductId) {
+          setActionStatus('Já existe um ingrediente com este nome ou SKU.');
+          return;
+        }
+
+        const mergedPayload = mergeProductDraftIntoExisting(duplicateCandidate.match, payload);
+        payload.id = duplicateId;
+        Object.assign(payload, mergedPayload, { id: duplicateId });
+      }
+
       const data = await productActions.save(payload);
       if (data) {
         await syncProductCategories(data);
         const refreshed = await productActions.get(data.id || ProductId);
         setProduct(normalizeProductForForm(refreshed || data));
-        setActionStatus(entityLabels.saveSuccess);
+        setActionStatus(
+          duplicateCandidate?.match && !ProductId
+            ? 'Ingrediente já existia. Cadastro existente atualizado.'
+            : entityLabels.saveSuccess,
+        );
         if (onSaved) onSaved(refreshed || data);
         if (!propProductId) {
           const newId = data.id || (data['@id'] && String(data['@id']).split('/').pop());

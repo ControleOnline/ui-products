@@ -1,9 +1,9 @@
+/* eslint-disable no-unused-vars */
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useWindowDimensions, View, Text, Image, TouchableOpacity } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
-import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
 import ProductFeedStock from '@controleonline/ui-products/src/react/components/ProductFeedStock';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
@@ -17,22 +17,12 @@ import {
   formatCurrency,
   normalizeEntityId,
 } from '@controleonline/ui-products/src/react/domain/productCosting';
+import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
 import { PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from './ProductDetails.styles';
 
 const Tab = createMaterialTopTabNavigator();
-
-const buildCoverUrl = (files, coverRelationId) => {
-  const arr = files || [];
-  let first = null;
-  if (coverRelationId) {
-    first = arr.find(item => String(item?.id) === String(coverRelationId) && item?.file?.id);
-  }
-  if (!first) first = arr.find(item => item?.file?.id);
-  if (!first) return null;
-  return resolveFileImageUrl(first.file);
-};
 
 const inferProductContext = product => {
   const type = String(product?.type || '').toLowerCase();
@@ -93,8 +83,8 @@ const ProductDetails = ({ route, navigation }) => {
     [themeStore?.getters?.theme],
   );
   const coverUrl = useMemo(
-    () => buildCoverUrl(productSummary?.productFiles, productSummary?.extraData?.imageCoverRelationId),
-    [productSummary?.productFiles, productSummary?.extraData?.imageCoverRelationId],
+    () => resolveProductCoverUrl(productSummary),
+    [productSummary],
   );
 
   const loadProductSummary = useCallback(async () => {

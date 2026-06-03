@@ -1,13 +1,14 @@
+/* eslint-disable no-unused-vars */
 import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
+import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
 import { APP_ENV } from '@controleonline/../../config/env.js';
 import styles from './ProductItem.styles';
 
@@ -21,17 +22,6 @@ const TYPE_CONFIG = {
   manufactured:{ label: 'Fabricado',     color: '#D97706', bg: '#FFFBEB' },
 };
 
-const buildCoverUrl = (files, coverRelationId) => {
-  const arr = files || []
-  let first = null
-  if (coverRelationId) {
-    first = arr.find(item => String(item?.id) === String(coverRelationId) && item?.file?.id)
-  }
-  if (!first) first = arr.find(item => item?.file?.id)
-  if (!first) return null
-  return resolveFileImageUrl(first.file)
-}
-
 const ProductItem = ({
   product,
   category,
@@ -42,7 +32,7 @@ const ProductItem = ({
   marketplaceSyncingKey = '',
 }) => {
   const navigation = useNavigation();
-  const coverUrl = buildCoverUrl(product.productFiles, product?.extraData?.imageCoverRelationId)
+  const coverUrl = resolveProductCoverUrl(product);
   const hasImage = !!coverUrl
   const isManager =
     APP_ENV.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
