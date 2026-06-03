@@ -5,7 +5,6 @@
  * - Esta pagina centraliza a experiencia de produtos e a sincronizacao do catalogo.
  *
  * ## Estado
- * - Se existir `src/vue`, ela e apenas legado e nao deve receber este contrato.
  *
  * ## Limites
  * - Nao duplicar a regra do catalogo em outros modulos.
