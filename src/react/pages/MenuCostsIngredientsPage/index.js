@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -19,6 +18,8 @@ import StateStore from '@controleonline/ui-layout/src/react/components/StateStor
 import styles, { MENU_COLORS } from '@controleonline/ui-manager/src/react/pages/MenuCostsPage/index.styles';
 import {
   MAIN_TABS,
+} from '@controleonline/ui-manager/src/react/pages/MenuCostsPage/tabs';
+import {
   RESOURCE_META,
   activeCostOptionsForRef,
   activeCostSummary,
@@ -33,7 +34,8 @@ import {
   purchaseItemsForResource,
   resourceParentUsageRows,
   safeArray,
-} from '@controleonline/ui-manager/src/react/pages/MenuCostsPage/viewModel';
+} from '@controleonline/ui-products/src/react/domain/menuCostsShared';
+import { MENU_COSTS_PAGE_SIZE } from '@controleonline/ui-products/src/react/domain/menuCostsPagination';
 import { resolveMenuCostsTabRoute } from '@controleonline/ui-manager/src/react/pages/MenuCostsPage/navigation';
 import {
   resolveCategoryCoverUrl,
@@ -285,6 +287,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   const [selectedId, setSelectedId] = useState(null);
   const [isLoadingDb, setIsLoadingDb] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [visibleCount, setVisibleCount] = useState(MENU_COSTS_PAGE_SIZE);
   const requestIdRef = useRef(0);
 
   const loadLiveDb = useCallback(async () => {
@@ -349,6 +352,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       setQuery('');
+      setVisibleCount(MENU_COSTS_PAGE_SIZE);
       void loadLiveDb();
       return undefined;
     }, [loadLiveDb]),
@@ -379,6 +383,30 @@ export default function MenuCostsIngredientsPage({ navigation }) {
     () => rows.find(item => String(item.id) === String(selectedId)) || rows[0] || null,
     [rows, selectedId],
   );
+
+  const visibleRows = useMemo(
+    () => rows.slice(0, visibleCount),
+    [rows, visibleCount],
+  );
+
+  const hasMoreRows = visibleCount < rows.length;
+
+  const loadMoreRows = useCallback(() => {
+    if (!hasMoreRows) return;
+    setVisibleCount(current => Math.min(current + MENU_COSTS_PAGE_SIZE, rows.length));
+  }, [hasMoreRows, rows.length]);
+
+  const handleContentScroll = useCallback(event => {
+    if (isLoadingDb || !hasMoreRows) return;
+
+    const layoutHeight = event?.nativeEvent?.layoutMeasurement?.height || 0;
+    const contentOffsetY = event?.nativeEvent?.contentOffset?.y || 0;
+    const contentHeight = event?.nativeEvent?.contentSize?.height || 0;
+
+    if (layoutHeight + contentOffsetY >= contentHeight - 360) {
+      loadMoreRows();
+    }
+  }, [hasMoreRows, isLoadingDb, loadMoreRows]);
 
   const handleTabPress = useCallback(
     tab => {
@@ -443,7 +471,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           <Badge tone={reviewCount ? 'warn' : 'good'}>{reviewCount} para revisar</Badge>
           <Badge tone={duplicateCount ? 'warn' : 'good'}>{duplicateCount} duplicidade(s)</Badge>
         </View>
-        {rows.map(item => (
+        {visibleRows.map(item => (
           <RowCard
             key={item.id}
             title={item.name}
@@ -461,6 +489,12 @@ export default function MenuCostsIngredientsPage({ navigation }) {
             meta={item.supplier || item.sourceReference || ''}
           />
         ))}
+        {hasMoreRows ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="small" color={MENU_COLORS.brand} />
+            <Text style={styles.emptyStateText}>Carregando mais ingredientes...</Text>
+          </View>
+        ) : null}
       </View>
 
       {selected ? (
@@ -599,7 +633,12 @@ export default function MenuCostsIngredientsPage({ navigation }) {
               />
             </View>
 
-            <ScrollView style={styles.contentScroll} contentContainerStyle={styles.contentScrollBody}>
+            <ScrollView
+              style={styles.contentScroll}
+              contentContainerStyle={styles.contentScrollBody}
+              onScroll={handleContentScroll}
+              scrollEventThrottle={200}
+            >
               {content}
             </ScrollView>
           </View>

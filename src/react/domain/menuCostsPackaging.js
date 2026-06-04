@@ -1,83 +1,83 @@
-import { mapProductToCatalogItem } from '@controleonline/ui-products/src/react/domain/productCatalog';
-import { MENU_COSTS_PAGE_SIZE } from '@controleonline/ui-products/src/react/domain/menuCostsPagination';
+import { mapProductToCatalogItem } from './productCatalog';
+import { MENU_COSTS_PAGE_SIZE } from './menuCostsPagination';
 import {
   fetchLatestPurchasesByProductIds,
   normalizeEntityId,
   toNumber,
-} from '@controleonline/ui-products/src/react/domain/productCosting';
+} from './productCosting';
 
 const safeArray = value => (Array.isArray(value) ? value : []);
-
-const normalizeCollection = response => {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
-  if (Array.isArray(response?.member)) return response.member;
-  return [];
-};
-
-const uniqueById = items => {
-  const seen = new Set();
-  return safeArray(items).filter(item => {
-    const id = String(item?.id || item?.['@id'] || item?.filePath || '').trim();
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-};
 
 const normalizeText = value =>
   String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
 
-const extractUnit = product => {
-  const unit =
-    product?.productUnit?.productUnit ||
-    product?.productUnit?.unit ||
-    product?.productUnity?.productUnit ||
-    product?.productUnity?.unit ||
-    product?.unit ||
-    product?.erpUnit ||
-    'UN';
-
-  return String(unit || 'UN').trim().toUpperCase();
+const extractItems = response => {
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
+  if (Array.isArray(response?.member)) return response.member;
+  return [];
 };
+
+const uniqueByIdentifier = items => {
+  const seen = new Set();
+  return safeArray(items).filter(item => {
+    const identifier = String(item?.id || item?.['@id'] || item?.filePath || '').trim();
+    if (!identifier || seen.has(identifier)) return false;
+    seen.add(identifier);
+    return true;
+  });
+};
+
+const extractUnit = product =>
+  String(
+    product?.productUnit?.productUnit ||
+      product?.productUnit?.unit ||
+      product?.productUnity?.productUnit ||
+      product?.productUnity?.unit ||
+      product?.unit ||
+      product?.erpUnit ||
+      'UN',
+  )
+    .trim()
+    .toUpperCase();
 
 const extractCategoryId = product =>
   normalizeEntityId(
-    product?.productCategory?.[0]?.category ||
-    product?.productCategories?.[0]?.category ||
-    product?.categoryId ||
-    product?.category?.id ||
-    product?.category ||
-    '',
+    product?.productCategory?.category ||
+      product?.productCategories?.[0]?.category ||
+      product?.category ||
+      product?.categoryId,
   );
 
 const fetchAllItems = async (actions, params, pageSize = MENU_COSTS_PAGE_SIZE, maxPages = 6) => {
   if (!actions?.getItems) return [];
 
-  const allItems = [];
+  const items = [];
 
   for (let page = 1; page <= maxPages; page += 1) {
     const response = await actions.getItems({
       ...params,
-      itemsPerPage: pageSize,
       page,
+      itemsPerPage: pageSize,
     });
-    const items = normalizeCollection(response);
-    allItems.push(...items);
-    if (items.length < pageSize) {
+    const batch = extractItems(response);
+    items.push(...batch);
+
+    if (!response?.['hydra:view']?.next || batch.length < pageSize) {
       break;
     }
   }
 
-  return uniqueById(allItems);
+  return uniqueByIdentifier(items);
 };
 
-const buildIngredientIdentifiers = product => {
+const buildPackagingIdentifiers = product => {
   const identifiers = [];
   const codeKey = normalizeText(product?.sku || product?.code || '');
   const nameKey = normalizeText(product?.product || product?.name || product?.description || '');
@@ -90,11 +90,11 @@ const buildIngredientIdentifiers = product => {
   return identifiers;
 };
 
-const groupFeedstockProducts = products => {
+const groupPackagingProducts = products => {
   const groups = [];
 
   safeArray(products).forEach(product => {
-    const identifiers = buildIngredientIdentifiers(product);
+    const identifiers = buildPackagingIdentifiers(product);
     const matches = groups.filter(group =>
       identifiers.some(identifier => group.identifiers.has(identifier)),
     );
@@ -124,9 +124,9 @@ const groupFeedstockProducts = products => {
   return groups;
 };
 
-const scoreIngredientProduct = (product, hasPurchase) => {
+const scorePackagingProduct = (product, hasPurchase) => {
   const normalized = mapProductToCatalogItem(product || {}, {});
-  const files = safeArray(product?.productFiles || normalized?.raw?.productFiles).length;
+  const files = safeArray(normalized?.raw?.productFiles).length;
   const extraDataScore = normalized?.raw?.extraData && typeof normalized.raw.extraData === 'object'
     ? Object.keys(normalized.raw.extraData).length
     : 0;
@@ -151,7 +151,7 @@ const pickMasterProduct = (group, latestPurchasesByProductId) => {
   group.products.forEach(product => {
     const rawId = String(normalizeEntityId(product) || product?.id || '').trim();
     const hasPurchase = safeArray(latestPurchasesByProductId?.[rawId]).length > 0;
-    const score = scoreIngredientProduct(product, hasPurchase);
+    const score = scorePackagingProduct(product, hasPurchase);
 
     if (!best || score > best.score) {
       best = {
@@ -166,7 +166,7 @@ const pickMasterProduct = (group, latestPurchasesByProductId) => {
 };
 
 const mergeProductFiles = products =>
-  uniqueById(safeArray(products).flatMap(product => safeArray(product?.productFiles)));
+  uniqueByIdentifier(safeArray(products).flatMap(product => safeArray(product?.productFiles)));
 
 const mergeExtraData = products =>
   safeArray(products).reduce((accumulator, product) => ({
@@ -188,7 +188,7 @@ const resolveLatestPurchaseForGroup = (group, latestPurchasesByProductId) => {
   )[0] || null;
 };
 
-const buildPurchaseCollections = ({ groups, ingredientsById, latestPurchasesByProductId, rawIdToMasterId }) => {
+const buildPurchaseCollections = ({ groups, packagingById, latestPurchasesByProductId, rawIdToMasterId }) => {
   const purchaseOrdersMap = new Map();
   const purchaseItemsMap = new Map();
 
@@ -196,7 +196,7 @@ const buildPurchaseCollections = ({ groups, ingredientsById, latestPurchasesByPr
     group.products.forEach(product => {
       const rawId = String(normalizeEntityId(product) || product?.id || '').trim();
       const masterId = rawIdToMasterId.get(rawId) || rawId;
-      const ingredient = ingredientsById.get(String(masterId));
+      const packaging = packagingById.get(String(masterId));
       const purchases = safeArray(latestPurchasesByProductId?.[rawId]);
 
       purchases.forEach(purchase => {
@@ -226,12 +226,12 @@ const buildPurchaseCollections = ({ groups, ingredientsById, latestPurchasesByPr
         purchaseItemsMap.set(purchaseKey, {
           id: purchaseKey,
           orderId: Number(orderId) || orderId,
-          resourceType: 'ingredient',
+          resourceType: 'packaging',
           resourceId: Number(masterId) || masterId,
           quantity,
           unitPrice,
           totalPrice,
-          description: ingredient?.name || product?.product || product?.name || `#${masterId}`,
+          description: packaging?.name || product?.product || product?.name || `#${masterId}`,
           supplierName: purchase?.supplierLabel || 'Fornecedor não vinculado',
           paymentStatus: 'paid',
           date: purchase?.orderDate || purchase?.alterDate || '',
@@ -306,7 +306,7 @@ const buildParentProducts = (relations, rawIdToMasterId) =>
         }
 
         accumulator[parentId].components.push({
-          refType: 'ingredient',
+          refType: 'packaging',
           refId: Number(childId) || childId,
           qty: toNumber(relation?.quantity) || 1,
           unit:
@@ -322,7 +322,7 @@ const buildParentProducts = (relations, rawIdToMasterId) =>
       }, {}),
   ).sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'));
 
-export const buildLiveIngredientsDb = async ({
+export const buildLivePackagingDb = async ({
   companyId,
   companyIri,
   productsActions,
@@ -345,14 +345,14 @@ export const buildLiveIngredientsDb = async ({
     };
   }
 
-  const [feedstockProducts, feedstockRelations, categories] = await Promise.all([
+  const [packagingProducts, packagingRelations, categories] = await Promise.all([
     fetchAllItems(
       productsActions,
       {
         company: companyId,
         people: companyIri,
         active: 1,
-        type: ['feedstock'],
+        type: ['package'],
         'order[product]': 'ASC',
       },
       MENU_COSTS_PAGE_SIZE,
@@ -361,7 +361,7 @@ export const buildLiveIngredientsDb = async ({
     fetchAllItems(
       productGroupProductActions,
       {
-        productType: 'feedstock',
+        productType: 'package',
         'order[product.product]': 'ASC',
         itemsPerPage: MENU_COSTS_PAGE_SIZE,
       },
@@ -382,15 +382,15 @@ export const buildLiveIngredientsDb = async ({
   const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
     companyId,
     ordersActions,
-    productIds: feedstockProducts.map(product => product?.id),
+    productIds: packagingProducts.map(product => product?.id),
     limitPerProduct: 1,
     maxPages: 6,
     itemsPerPage: MENU_COSTS_PAGE_SIZE,
   });
 
-  const groups = groupFeedstockProducts(feedstockProducts);
+  const groups = groupPackagingProducts(packagingProducts);
   const rawIdToMasterId = new Map();
-  const ingredients = groups
+  const packaging = groups
     .map(group => {
       const master = pickMasterProduct(group, latestPurchasesByProductId);
       const masterProduct = master.product || group.products[0] || {};
@@ -424,7 +424,7 @@ export const buildLiveIngredientsDb = async ({
         code: normalized?.sku || masterProduct?.sku || masterProduct?.code || String(masterId || ''),
         sku: normalized?.sku || masterProduct?.sku || '',
         categoryId: normalized?.categoryId || extractCategoryId(masterProduct),
-        type: 'feedstock',
+        type: 'package',
         active: group.products.some(product => product?.active !== false),
         description: normalized?.description || masterProduct?.description || '',
         notes: Array.from(
@@ -438,7 +438,6 @@ export const buildLiveIngredientsDb = async ({
         erpUnit: extractUnit(masterProduct),
         purchaseQty,
         purchaseCost,
-        wastePct: toNumber(masterProduct?.wastePct || masterProduct?.extraData?.wastePct),
         supplier: latestPurchase?.supplierLabel || masterProduct?.supplier || '',
         supplierMode: latestPurchase ? 'single' : (masterProduct?.supplierMode || 'single'),
         scope: masterProduct?.scope || 'erp',
@@ -455,20 +454,20 @@ export const buildLiveIngredientsDb = async ({
     })
     .sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'));
 
-  const ingredientsById = new Map(ingredients.map(item => [String(item.id), item]));
-  const products = buildParentProducts(feedstockRelations, rawIdToMasterId);
+  const packagingById = new Map(packaging.map(item => [String(item.id), item]));
+  const products = buildParentProducts(packagingRelations, rawIdToMasterId);
   const { purchaseOrders, purchaseItems } = buildPurchaseCollections({
     groups,
-    ingredientsById,
+    packagingById,
     latestPurchasesByProductId,
     rawIdToMasterId,
   });
 
   return {
     categories,
-    ingredients,
+    ingredients: [],
     recipes: [],
-    packaging: [],
+    packaging,
     products,
     purchaseOrders,
     purchaseItems,
@@ -478,4 +477,4 @@ export const buildLiveIngredientsDb = async ({
   };
 };
 
-export const dedupeFeedstockProducts = groupFeedstockProducts;
+export const dedupePackagingProducts = groupPackagingProducts;
