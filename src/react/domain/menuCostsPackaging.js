@@ -293,6 +293,61 @@ const buildParentProducts = (relations, rawIdToMasterId) =>
       }, {}),
   ).sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'));
 
+const buildPackagingParentRows = (relations, rawIdToMasterId, packagingById) => {
+  const parentRowsByPackagingId = new Map();
+
+  safeArray(relations)
+    .filter(relation => relation?.active !== false)
+    .forEach(relation => {
+      const parentProduct = relation?.product || null;
+      const parentSummary = mapProductToCatalogItem(parentProduct || {}, {});
+      const parentId = String(parentSummary?.id || normalizeEntityId(parentProduct)).trim();
+      const childIdRaw = String(
+        normalizeEntityId(
+          relation?.productChild?.id ||
+          relation?.product_child?.id ||
+          relation?.productChild ||
+          relation?.product_child ||
+          '',
+        ),
+      ).trim();
+      const childId = rawIdToMasterId.get(childIdRaw) || childIdRaw;
+
+      if (!parentId || !childId) {
+        return;
+      }
+
+      const masterPackaging = packagingById.get(String(childId));
+      const unitCost = Number(masterPackaging?.purchaseQty || 1) > 0
+        ? Number(masterPackaging?.purchaseCost || 0) / Number(masterPackaging?.purchaseQty || 1)
+        : Number(masterPackaging?.purchaseCost || 0);
+      const rowsByParentId = parentRowsByPackagingId.get(String(childId)) || new Map();
+      const parentKey = String(parentSummary?.id || normalizeEntityId(parentProduct) || parentId);
+      const currentRow = rowsByParentId.get(parentKey) || {
+        productId: parentSummary?.id || normalizeEntityId(parentProduct) || parentId,
+        productName: parentSummary?.name || parentProduct?.product || parentProduct?.name || '',
+        productCode: parentSummary?.sku || parentSummary?.raw?.code || String(parentSummary?.id || normalizeEntityId(parentProduct) || ''),
+        categoryId: parentSummary?.categoryId || extractCategoryId(parentProduct),
+        qty: 0,
+        unit:
+          relation?.unit ||
+          relation?.productChild?.productUnit?.productUnit ||
+          relation?.productChild?.unit ||
+          extractUnit(parentProduct) ||
+          'UN',
+        cost: 0,
+      };
+
+      const relationQty = toNumber(relation?.quantity) || 1;
+      currentRow.qty += relationQty;
+      currentRow.cost += relationQty * unitCost;
+      rowsByParentId.set(parentKey, currentRow);
+      parentRowsByPackagingId.set(String(childId), rowsByParentId);
+    });
+
+  return parentRowsByPackagingId;
+};
+
 export const buildLivePackagingDb = async ({
   companyId,
   companyIri,
@@ -424,6 +479,7 @@ export const buildLivePackagingDb = async ({
     .sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR'));
 
   const packagingById = new Map(packaging.map(item => [String(item.id), item]));
+  const parentRowsByPackagingId = buildPackagingParentRows(packagingRelations, rawIdToMasterId, packagingById);
   const products = buildParentProducts(packagingRelations, rawIdToMasterId);
   const { purchaseOrders, purchaseItems } = includePurchaseHistory
     ? buildPurchaseCollections({
@@ -438,7 +494,10 @@ export const buildLivePackagingDb = async ({
     categories,
     ingredients: [],
     recipes: [],
-    packaging,
+    packaging: packaging.map(item => ({
+      ...item,
+      parentRows: Array.from(parentRowsByPackagingId.get(String(item.id))?.values() || []),
+    })),
     products,
     purchaseOrders,
     purchaseItems,

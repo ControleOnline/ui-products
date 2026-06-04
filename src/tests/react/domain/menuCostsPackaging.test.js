@@ -81,6 +81,8 @@ describe('menuCostsPackaging', () => {
     assert.equal(db.packaging[0].duplicateCount, 2);
     assert.equal(db.packaging[0].purchaseCost, 12);
     assert.equal(db.packaging[0].purchaseQty, 2);
+    assert.equal(db.packaging[0].parentRows.length, 1);
+    assert.equal(db.packaging[0].parentRows[0].productName, 'Combo Pai');
     assert.equal(db.products.length, 1);
     assert.equal(db.products[0].components[0].refId, 20);
     assert.equal(db.purchaseItems.length, 2);
