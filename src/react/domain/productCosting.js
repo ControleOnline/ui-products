@@ -123,6 +123,8 @@ const resolvePeopleLabel = entity =>
 
 export const fetchLatestPurchasesByProductIds = async ({
   companyId,
+  providerId = null,
+  providerIds = [],
   clientId = null,
   clientIds = [],
   ordersActions,
@@ -134,7 +136,7 @@ export const fetchLatestPurchasesByProductIds = async ({
   const ids = Array.from(new Set((productIds || []).map(normalizeEntityId).filter(Boolean)));
   const supplierIds = Array.from(
     new Set(
-      [clientId, ...clientIds]
+      [providerId, ...providerIds, clientId, ...clientIds]
         .map(normalizeEntityId)
         .filter(Boolean),
     ),
@@ -153,7 +155,7 @@ export const fetchLatestPurchasesByProductIds = async ({
 
   for (let page = 1; page <= maxPages && pendingIds.size > 0; page += 1) {
     const response = await ordersActions.getItems({
-      provider: `/people/${companyId}`,
+      client: `/people/${companyId}`,
       orderType: 'purchase',
       itemsPerPage,
       page,
@@ -164,7 +166,7 @@ export const fetchLatestPurchasesByProductIds = async ({
     if (orders.length === 0) break;
 
     const scopedOrders = supplierIds.length > 0
-      ? orders.filter(order => supplierIds.includes(normalizeEntityId(order?.client)))
+      ? orders.filter(order => supplierIds.includes(normalizeEntityId(order?.provider)))
       : orders;
 
     if (scopedOrders.length === 0) {
@@ -198,7 +200,7 @@ export const fetchLatestPurchasesByProductIds = async ({
         currentItems.push({
           orderId: normalizeEntityId(order),
           orderDate: order?.orderDate || order?.alterDate || null,
-          supplierLabel: resolvePeopleLabel(order?.client),
+          supplierLabel: resolvePeopleLabel(order?.provider),
           quantity: toNumber(orderProduct?.quantity),
           unitPrice: toNumber(orderProduct?.price),
           totalPrice: toNumber(orderProduct?.total),

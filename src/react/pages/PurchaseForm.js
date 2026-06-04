@@ -37,8 +37,6 @@ const fmtN = v => {
   return isNaN(n) ? '0' : n.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
 };
 
-const toIRI   = v => (typeof v === 'string' ? v : v?.['@id'] || null);
-
 const getCompanyId = value => {
   if (!value) return null;
   if (typeof value === 'number') return value;
@@ -342,7 +340,7 @@ const ProductRow = ({ item, inventories, brandColors, onChange, onRemove, showAp
    ProductSearch
    ═══════════════════════════════════════════════════════════════════════ */
 
-const ProductSearch = ({ inventories, brandColors, onAdd }) => {
+const ProductSearch = ({ inventories: _inventories, brandColors, onAdd }) => {
   const productsStore      = useStore('products');
   const peopleStore        = useStore('people');
   const { currentCompany } = peopleStore.getters;
@@ -604,11 +602,11 @@ const PurchaseForm = () => {
       for (const [, group] of groups) {
         const orderPayload = {
           orderType: 'purchase',
-          provider:  `/people/${currentCompany.id}`,
+          client:     `/people/${currentCompany.id}`,
           app:       'StockAdjustment',
         };
         if (statusIRI)          orderPayload.status = statusIRI;
-        if (group.supplier?.id) orderPayload.client = `/people/${group.supplier.id}`;
+        if (group.supplier?.id) orderPayload.provider = `/people/${group.supplier.id}`;
 
         const order = await ordersStore.actions.save(orderPayload);
 

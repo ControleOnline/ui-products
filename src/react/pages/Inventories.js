@@ -49,13 +49,13 @@ const SkeletonCard = ({ width }) => (
 const InventoriesPage = () => {
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
-  const transferHistoryTitle = useMemo(
-    () => resolveHistoryTitle(global.t?.t('orders', 'label', 'tab_transfer'), 'Transferências'),
-    [],
+  const transferHistoryTitle = resolveHistoryTitle(
+    global.t?.t('orders', 'label', 'tab_transfer'),
+    'Transferências',
   );
-  const lossHistoryTitle = useMemo(
-    () => resolveHistoryTitle(global.t?.t('orders', 'label', 'tab_loss'), 'Perdas'),
-    [],
+  const lossHistoryTitle = resolveHistoryTitle(
+    global.t?.t('orders', 'label', 'tab_loss'),
+    'Perdas',
   );
 
   const inventoriesStore = useStore('inventories');
