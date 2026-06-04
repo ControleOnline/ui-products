@@ -1,5 +1,5 @@
 import { mapProductToCatalogItem } from '@controleonline/ui-products/src/react/domain/productCatalog';
-import { MENU_COSTS_PAGE_SIZE } from '@controleonline/ui-products/src/react/domain/menuCostsPagination';
+import { fetchAllPagedItems } from '@controleonline/ui-products/src/react/domain/menuCostsPagination';
 import {
   fetchLatestPurchasesByProductIds,
   normalizeEntityId,
@@ -7,23 +7,6 @@ import {
 } from '@controleonline/ui-products/src/react/domain/productCosting';
 
 const safeArray = value => (Array.isArray(value) ? value : []);
-
-const normalizeCollection = response => {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
-  if (Array.isArray(response?.member)) return response.member;
-  return [];
-};
-
-const uniqueById = items => {
-  const seen = new Set();
-  return safeArray(items).filter(item => {
-    const id = String(item?.id || item?.['@id'] || item?.filePath || '').trim();
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-};
 
 const normalizeText = value =>
   String(value || '')
@@ -55,27 +38,6 @@ const extractCategoryId = product =>
     product?.category ||
     '',
   );
-
-const fetchAllItems = async (actions, params, pageSize = MENU_COSTS_PAGE_SIZE, maxPages = 6) => {
-  if (!actions?.getItems) return [];
-
-  const allItems = [];
-
-  for (let page = 1; page <= maxPages; page += 1) {
-    const response = await actions.getItems({
-      ...params,
-      itemsPerPage: pageSize,
-      page,
-    });
-    const items = normalizeCollection(response);
-    allItems.push(...items);
-    if (items.length < pageSize) {
-      break;
-    }
-  }
-
-  return uniqueById(allItems);
-};
 
 const buildIngredientIdentifiers = product => {
   const identifiers = [];
@@ -346,37 +308,33 @@ export const buildLiveIngredientsDb = async ({
   }
 
   const [feedstockProducts, feedstockRelations, categories] = await Promise.all([
-    fetchAllItems(
+    fetchAllPagedItems({
       productsActions,
-      {
+      params: {
         company: companyId,
         people: companyIri,
         active: 1,
         type: ['feedstock'],
         'order[product]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      8,
-    ),
-    fetchAllItems(
+      maxPages: 8,
+    }),
+    fetchAllPagedItems({
       productGroupProductActions,
-      {
+      params: {
         productType: 'feedstock',
         'order[product.product]': 'ASC',
-        itemsPerPage: MENU_COSTS_PAGE_SIZE,
       },
-      MENU_COSTS_PAGE_SIZE,
-      8,
-    ),
-    fetchAllItems(
+      maxPages: 8,
+    }),
+    fetchAllPagedItems({
       categoriesActions,
-      {
+      params: {
         company: companyIri,
         'order[name]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      4,
-    ),
+      maxPages: 4,
+    }),
   ]);
 
   const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
@@ -385,7 +343,6 @@ export const buildLiveIngredientsDb = async ({
     productIds: feedstockProducts.map(product => product?.id),
     limitPerProduct: 1,
     maxPages: 6,
-    itemsPerPage: MENU_COSTS_PAGE_SIZE,
   });
 
   const groups = groupFeedstockProducts(feedstockProducts);

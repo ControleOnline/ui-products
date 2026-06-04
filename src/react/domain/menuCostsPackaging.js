@@ -1,5 +1,5 @@
 import { mapProductToCatalogItem } from './productCatalog';
-import { MENU_COSTS_PAGE_SIZE } from './menuCostsPagination';
+import { fetchAllPagedItems } from './menuCostsPagination';
 import {
   fetchLatestPurchasesByProductIds,
   normalizeEntityId,
@@ -16,13 +16,6 @@ const normalizeText = value =>
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
-
-const extractItems = response => {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
-  if (Array.isArray(response?.member)) return response.member;
-  return [];
-};
 
 const uniqueByIdentifier = items => {
   const seen = new Set();
@@ -54,28 +47,6 @@ const extractCategoryId = product =>
       product?.category ||
       product?.categoryId,
   );
-
-const fetchAllItems = async (actions, params, pageSize = MENU_COSTS_PAGE_SIZE, maxPages = 6) => {
-  if (!actions?.getItems) return [];
-
-  const items = [];
-
-  for (let page = 1; page <= maxPages; page += 1) {
-    const response = await actions.getItems({
-      ...params,
-      page,
-      itemsPerPage: pageSize,
-    });
-    const batch = extractItems(response);
-    items.push(...batch);
-
-    if (!response?.['hydra:view']?.next || batch.length < pageSize) {
-      break;
-    }
-  }
-
-  return uniqueByIdentifier(items);
-};
 
 const buildPackagingIdentifiers = product => {
   const identifiers = [];
@@ -346,37 +317,33 @@ export const buildLivePackagingDb = async ({
   }
 
   const [packagingProducts, packagingRelations, categories] = await Promise.all([
-    fetchAllItems(
+    fetchAllPagedItems({
       productsActions,
-      {
+      params: {
         company: companyId,
         people: companyIri,
         active: 1,
         type: ['package'],
         'order[product]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      8,
-    ),
-    fetchAllItems(
+      maxPages: 8,
+    }),
+    fetchAllPagedItems({
       productGroupProductActions,
-      {
+      params: {
         productType: 'package',
         'order[product.product]': 'ASC',
-        itemsPerPage: MENU_COSTS_PAGE_SIZE,
       },
-      MENU_COSTS_PAGE_SIZE,
-      8,
-    ),
-    fetchAllItems(
+      maxPages: 8,
+    }),
+    fetchAllPagedItems({
       categoriesActions,
-      {
+      params: {
         company: companyIri,
         'order[name]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      4,
-    ),
+      maxPages: 4,
+    }),
   ]);
 
   const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
@@ -385,7 +352,6 @@ export const buildLivePackagingDb = async ({
     productIds: packagingProducts.map(product => product?.id),
     limitPerProduct: 1,
     maxPages: 6,
-    itemsPerPage: MENU_COSTS_PAGE_SIZE,
   });
 
   const groups = groupPackagingProducts(packagingProducts);

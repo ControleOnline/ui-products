@@ -15,6 +15,8 @@ export const extractItems = response => {
   return [];
 };
 
+const hasHydraNext = response => Boolean(response?.['hydra:view']?.next);
+
 export const extractSummary = response => {
   if (response && typeof response === 'object' && response.summary && typeof response.summary === 'object') {
     return response.summary;
@@ -73,17 +75,21 @@ export const calculateProductFeedstockCost = async ({
   const params = {
     product: productIri,
     productType: 'feedstock',
-    itemsPerPage: 500,
+    ...(productGroupIri ? { productGroup: productGroupIri } : { 'exists[productGroup]': false }),
   };
 
-  if (productGroupIri) {
-    params.productGroup = productGroupIri;
-  } else {
-    params['exists[productGroup]'] = false;
+  const feedstocks = [];
+  for (let page = 1; page <= 8; page += 1) {
+    const response = await productGroupProductActions.getItems({
+      ...params,
+      page,
+    });
+    const batch = extractItems(response).filter(item => item?.active !== false);
+    feedstocks.push(...batch);
+    if (!hasHydraNext(response) || batch.length === 0) {
+      break;
+    }
   }
-
-  const response = await productGroupProductActions.getItems(params);
-  const feedstocks = extractItems(response).filter(item => item?.active !== false);
 
   return {
     cost: sumFeedstockCost(feedstocks),
@@ -106,7 +112,6 @@ export const buildProductCostBreakdown = async ({
   await productGroupProductActions.getItems({
     product: productIri,
     summary: 'pricing',
-    itemsPerPage: 1,
     ...(productGroupIri ? { productGroup: productGroupIri } : {}),
   });
 
@@ -131,7 +136,6 @@ export const fetchLatestPurchasesByProductIds = async ({
   productIds,
   limitPerProduct = 1,
   maxPages = 4,
-  itemsPerPage = 10,
 }) => {
   const ids = Array.from(new Set((productIds || []).map(normalizeEntityId).filter(Boolean)));
   const supplierIds = Array.from(
@@ -157,7 +161,6 @@ export const fetchLatestPurchasesByProductIds = async ({
     const response = await ordersActions.getItems({
       client: `/people/${companyId}`,
       orderType: 'purchase',
-      itemsPerPage,
       page,
       'order[id]': 'desc',
     });
@@ -170,7 +173,7 @@ export const fetchLatestPurchasesByProductIds = async ({
       : orders;
 
     if (scopedOrders.length === 0) {
-      if (orders.length < itemsPerPage) break;
+      if (!hasHydraNext(response)) break;
       continue;
     }
 
@@ -213,7 +216,7 @@ export const fetchLatestPurchasesByProductIds = async ({
       });
     });
 
-    if (orders.length < itemsPerPage) break;
+    if (!hasHydraNext(response)) break;
   }
 
   return purchasesByProductId;

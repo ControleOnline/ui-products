@@ -1,48 +1,10 @@
 import { buildImportedSuppliersFromPeople } from '@controleonline/ui-people/src/react/utils/menuCostsSuppliers';
 import { buildLiveIngredientsDb } from './menuCostsIngredients';
 import { buildLivePackagingDb } from './menuCostsPackaging';
-import { MENU_COSTS_PAGE_SIZE } from './menuCostsPagination';
+import { fetchAllPagedItems } from './menuCostsPagination';
 import { mapProductToCatalogItem } from './productCatalog';
 
 const safeArray = value => (Array.isArray(value) ? value : []);
-
-const extractItems = response => {
-  if (Array.isArray(response)) return response;
-  if (Array.isArray(response?.['hydra:member'])) return response['hydra:member'];
-  if (Array.isArray(response?.member)) return response.member;
-  return [];
-};
-
-const uniqueById = items => {
-  const seen = new Set();
-  return safeArray(items).filter(item => {
-    const id = String(item?.id || item?.['@id'] || item?.filePath || '').trim();
-    if (!id || seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-};
-
-const fetchAllItems = async (actions, params, pageSize = MENU_COSTS_PAGE_SIZE, maxPages = 8) => {
-  if (!actions?.getItems) return [];
-
-  const allItems = [];
-
-  for (let page = 1; page <= maxPages; page += 1) {
-    const response = await actions.getItems({
-      ...params,
-      itemsPerPage: pageSize,
-      page,
-    });
-    const items = extractItems(response);
-    allItems.push(...items);
-    if (items.length < pageSize) {
-      break;
-    }
-  }
-
-  return uniqueById(allItems);
-};
 
 const mergeProductRecord = (target, source) => ({
   ...target,
@@ -183,49 +145,44 @@ export const buildLiveMenuCostsDb = async ({
       ordersActions,
       categoriesActions,
     }),
-    fetchAllItems(
+    fetchAllPagedItems({
       peopleActions,
-      {
+      params: {
         'link.company': companyIri,
         'link.linkType': 'provider',
-        itemsPerPage: MENU_COSTS_PAGE_SIZE,
       },
-      MENU_COSTS_PAGE_SIZE,
-      8,
-    ),
-    fetchAllItems(
+      maxPages: 8,
+    }),
+    fetchAllPagedItems({
       productsActions,
-      {
+      params: {
         company: companyId,
         people: companyIri,
         active: 1,
         type: ['product', 'custom', 'drink'],
         'order[product]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      10,
-    ),
-    fetchAllItems(
+      maxPages: 10,
+    }),
+    fetchAllPagedItems({
       productsActions,
-      {
+      params: {
         company: companyId,
         people: companyIri,
         active: 1,
         type: ['manufactured', 'component'],
         'order[product]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      10,
-    ),
-    fetchAllItems(
+      maxPages: 10,
+    }),
+    fetchAllPagedItems({
       categoriesActions,
-      {
+      params: {
         company: companyIri,
         'order[name]': 'ASC',
       },
-      MENU_COSTS_PAGE_SIZE,
-      8,
-    ),
+      maxPages: 8,
+    }),
   ]);
 
   const suppliers = buildImportedSuppliersFromPeople(peopleRecords);
