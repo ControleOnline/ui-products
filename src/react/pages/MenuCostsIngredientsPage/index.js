@@ -31,10 +31,10 @@ import {
   formatDate,
   getById,
   money,
-  purchaseItemsForResource,
   resourceParentUsageRows,
   safeArray,
 } from '@controleonline/ui-products/src/react/domain/menuCostsShared';
+import { fetchLatestPurchasesByProductIds } from '@controleonline/ui-products/src/react/domain/productCosting';
 import { MENU_COSTS_PAGE_SIZE } from '@controleonline/ui-products/src/react/domain/menuCostsPagination';
 import { resolveMenuCostsTabRoute } from '@controleonline/ui-manager/src/react/pages/MenuCostsPage/navigation';
 import {
@@ -276,7 +276,6 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   const peopleStore = useStore('people');
   const productsStore = useStore('products');
   const productGroupProductStore = useStore('product_group_product');
-  const ordersStore = useStore('orders');
   const categoriesStore = useStore('categories');
   const { currentCompany } = peopleStore.getters || {};
   const { width } = useWindowDimensions();
@@ -288,7 +287,10 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   const [isLoadingDb, setIsLoadingDb] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [visibleCount, setVisibleCount] = useState(MENU_COSTS_PAGE_SIZE);
+  const [selectedPurchaseRows, setSelectedPurchaseRows] = useState([]);
   const requestIdRef = useRef(0);
+  const purchaseRequestIdRef = useRef(0);
+  const purchaseCacheRef = useRef(new Map());
 
   const loadLiveDb = useCallback(async () => {
     const companyId = currentCompany?.id;
@@ -311,8 +313,8 @@ export default function MenuCostsIngredientsPage({ navigation }) {
         companyIri,
         productsActions: productsStore.actions,
         productGroupProductActions: productGroupProductStore.actions,
-        ordersActions: ordersStore.actions,
         categoriesActions: categoriesStore.actions,
+        includePurchaseHistory: false,
       });
 
       if (requestId !== requestIdRef.current) {
@@ -343,7 +345,6 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   }, [
     categoriesStore.actions,
     currentCompany?.id,
-    ordersStore.actions,
     productGroupProductStore.actions,
     productsStore.actions,
     showError,
@@ -383,6 +384,48 @@ export default function MenuCostsIngredientsPage({ navigation }) {
     () => rows.find(item => String(item.id) === String(selectedId)) || rows[0] || null,
     [rows, selectedId],
   );
+
+  useEffect(() => {
+    const ingredientId = String(selected?.id || '').trim();
+    if (!ingredientId || !currentCompany?.id) {
+      setSelectedPurchaseRows([]);
+      return undefined;
+    }
+
+    const cachedRows = purchaseCacheRef.current.get(ingredientId);
+    if (cachedRows) {
+      setSelectedPurchaseRows(cachedRows);
+      return undefined;
+    }
+
+    const requestId = ++purchaseRequestIdRef.current;
+    setSelectedPurchaseRows([]);
+
+    const loadPurchaseHistory = async () => {
+      try {
+        const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
+          companyId: currentCompany.id,
+          productIds: [ingredientId],
+          limitPerProduct: 3,
+          maxPages: 1,
+        });
+
+        if (requestId !== purchaseRequestIdRef.current) {
+          return;
+        }
+
+        const rowsForIngredient = safeArray(latestPurchasesByProductId?.[ingredientId]);
+        purchaseCacheRef.current.set(ingredientId, rowsForIngredient);
+        setSelectedPurchaseRows(rowsForIngredient);
+      } catch {
+        if (requestId === purchaseRequestIdRef.current) {
+          setSelectedPurchaseRows([]);
+        }
+      }
+    };
+
+    loadPurchaseHistory();
+  }, [currentCompany?.id, selected?.id]);
 
   const visibleRows = useMemo(
     () => rows.slice(0, visibleCount),
@@ -541,7 +584,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
               },
               {
                 label: 'Compras',
-                value: String(purchaseItemsForResource(db, 'ingredient', selected.id).length),
+                value: String(selectedPurchaseRows.length),
                 helper: 'Últimas compras importadas do ERP',
               },
               {
@@ -583,7 +626,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
             )) : <EmptyState text="Nenhum produto pai encontrado." />}
           </View>
 
-          <PurchaseRows rows={purchaseItemsForResource(db, 'ingredient', selected.id)} />
+          <PurchaseRows rows={selectedPurchaseRows} />
         </DetailShell>
       ) : (
         <EmptyState text="Selecione um ingrediente para ver custos, pais e compras." />

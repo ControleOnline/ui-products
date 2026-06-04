@@ -84,6 +84,20 @@ describe('menuCostsLiveDb', () => {
       productsActions: {
         getItems: jest.fn(async params => {
           const type = Array.isArray(params?.type) ? params.type : [params?.type];
+          if (type.includes('recipe')) {
+            return [
+              {
+                id: 41,
+                product: 'Preparo Combo Alpha',
+                sku: 'RCP001',
+                type: 'recipe',
+                active: true,
+                price: 14,
+                yieldQty: 1,
+                yieldUnit: 'un',
+              },
+            ];
+          }
           if (type.includes('manufactured') || type.includes('component')) {
             return [
               {
@@ -136,6 +150,6 @@ describe('menuCostsLiveDb', () => {
     assert.equal(liveDb.settings.defaultMarkupPct, 180);
     assert.equal(liveDb.settings.targetMarginPct, 55);
     assert.equal(liveDb.products.find(item => item.id === 30).name, 'Coca-Cola 350ml');
-    assert.equal(liveDb.recipes[0].name, 'Combo Alpha');
+    assert.equal(liveDb.recipes[0].name, 'Preparo Combo Alpha');
   });
 });

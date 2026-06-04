@@ -282,7 +282,7 @@ const ProductsPage = ({ navigation, route }) => {
 
   const contextTypes = useMemo(() => {
     if (context === 'products') {
-      return ['product', 'manufactured', 'custom', 'service'];
+      return ['product', 'manufactured', 'custom', 'service', 'recipe'];
     }
 
     if (context === 'supplies') {

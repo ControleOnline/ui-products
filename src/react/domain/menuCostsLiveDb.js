@@ -75,6 +75,7 @@ const normalizeRecipeProduct = product => {
     active: normalized.active !== false && product?.active !== false,
     description: normalized.description || product?.description || '',
     notes: product?.notes || '',
+    erpProductType: product?.type || 'recipe',
     yieldQty: Number(product?.yieldQty || product?.extraData?.yieldQty || 1) || 1,
     yieldUnit: product?.yieldUnit || product?.extraData?.yieldUnit || product?.erpUnit || 'un',
     components: safeArray(product?.components),
@@ -136,6 +137,7 @@ export const buildLiveMenuCostsDb = async ({
       productGroupProductActions,
       ordersActions,
       categoriesActions,
+      includePurchaseHistory: false,
     }),
     buildLivePackagingDb({
       companyId,
@@ -144,9 +146,10 @@ export const buildLiveMenuCostsDb = async ({
       productGroupProductActions,
       ordersActions,
       categoriesActions,
+      includePurchaseHistory: false,
     }),
     fetchAllPagedItems({
-      peopleActions,
+      actions: peopleActions,
       params: {
         'link.company': companyIri,
         'link.linkType': 'provider',
@@ -154,7 +157,7 @@ export const buildLiveMenuCostsDb = async ({
       maxPages: 8,
     }),
     fetchAllPagedItems({
-      productsActions,
+      actions: productsActions,
       params: {
         company: companyId,
         people: companyIri,
@@ -165,18 +168,18 @@ export const buildLiveMenuCostsDb = async ({
       maxPages: 10,
     }),
     fetchAllPagedItems({
-      productsActions,
+      actions: productsActions,
       params: {
         company: companyId,
         people: companyIri,
         active: 1,
-        type: ['manufactured', 'component'],
+        type: ['manufactured', 'component', 'recipe'],
         'order[product]': 'ASC',
       },
       maxPages: 10,
     }),
     fetchAllPagedItems({
-      categoriesActions,
+      actions: categoriesActions,
       params: {
         company: companyIri,
         'order[name]': 'ASC',

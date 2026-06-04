@@ -52,6 +52,20 @@ const buildIngredientIdentifiers = product => {
   return identifiers;
 };
 
+const uniqueByIdentifier = items => {
+  const seen = new Set();
+
+  return safeArray(items).filter(item => {
+    const identifier = String(item?.id || item?.['@id'] || item?.filePath || '').trim();
+    if (!identifier || seen.has(identifier)) {
+      return false;
+    }
+
+    seen.add(identifier);
+    return true;
+  });
+};
+
 const groupFeedstockProducts = products => {
   const groups = [];
 
@@ -128,7 +142,7 @@ const pickMasterProduct = (group, latestPurchasesByProductId) => {
 };
 
 const mergeProductFiles = products =>
-  uniqueById(safeArray(products).flatMap(product => safeArray(product?.productFiles)));
+  uniqueByIdentifier(safeArray(products).flatMap(product => safeArray(product?.productFiles)));
 
 const mergeExtraData = products =>
   safeArray(products).reduce((accumulator, product) => ({
@@ -291,6 +305,7 @@ export const buildLiveIngredientsDb = async ({
   productGroupProductActions,
   ordersActions,
   categoriesActions,
+  includePurchaseHistory = true,
 }) => {
   if (!companyId) {
     return {
@@ -309,7 +324,7 @@ export const buildLiveIngredientsDb = async ({
 
   const [feedstockProducts, feedstockRelations, categories] = await Promise.all([
     fetchAllPagedItems({
-      productsActions,
+      actions: productsActions,
       params: {
         company: companyId,
         people: companyIri,
@@ -320,7 +335,7 @@ export const buildLiveIngredientsDb = async ({
       maxPages: 8,
     }),
     fetchAllPagedItems({
-      productGroupProductActions,
+      actions: productGroupProductActions,
       params: {
         productType: 'feedstock',
         'order[product.product]': 'ASC',
@@ -328,7 +343,7 @@ export const buildLiveIngredientsDb = async ({
       maxPages: 8,
     }),
     fetchAllPagedItems({
-      categoriesActions,
+      actions: categoriesActions,
       params: {
         company: companyIri,
         'order[name]': 'ASC',
@@ -337,13 +352,15 @@ export const buildLiveIngredientsDb = async ({
     }),
   ]);
 
-  const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
-    companyId,
-    ordersActions,
-    productIds: feedstockProducts.map(product => product?.id),
-    limitPerProduct: 1,
-    maxPages: 6,
-  });
+  const latestPurchasesByProductId = includePurchaseHistory
+    ? await fetchLatestPurchasesByProductIds({
+        companyId,
+        ordersActions,
+        productIds: feedstockProducts.map(product => product?.id),
+        limitPerProduct: 1,
+        maxPages: 6,
+      })
+    : {};
 
   const groups = groupFeedstockProducts(feedstockProducts);
   const rawIdToMasterId = new Map();
@@ -414,12 +431,14 @@ export const buildLiveIngredientsDb = async ({
 
   const ingredientsById = new Map(ingredients.map(item => [String(item.id), item]));
   const products = buildParentProducts(feedstockRelations, rawIdToMasterId);
-  const { purchaseOrders, purchaseItems } = buildPurchaseCollections({
-    groups,
-    ingredientsById,
-    latestPurchasesByProductId,
-    rawIdToMasterId,
-  });
+  const { purchaseOrders, purchaseItems } = includePurchaseHistory
+    ? buildPurchaseCollections({
+        groups,
+        ingredientsById,
+        latestPurchasesByProductId,
+        rawIdToMasterId,
+      })
+    : { purchaseOrders: [], purchaseItems: [] };
 
   return {
     categories,

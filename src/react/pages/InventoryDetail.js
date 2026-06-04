@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useEffect, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Platform, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -40,6 +40,7 @@ const PRODUCT_TYPE_CONFIG = {
   package:      { label: 'Embalagem',     color: '#0891B2', bg: '#ECFEFF' },
   custom:       { label: 'Custom',        color: '#DB2777', bg: '#FDF2F8' },
   manufactured: { label: 'Fabricado',     color: '#D97706', bg: '#FFFBEB' },
+  recipe:       { label: 'Preparo',       color: '#6B7280', bg: '#F3F4F6' },
 };
 
 const MOVEMENT_OPS = [
@@ -107,8 +108,8 @@ const fetchOrderStatus = async statusStore => {
 export const MovementModal = ({
   visible,
   row,
-  inventories,
-  brandColors,
+  inventories: _inventories,
+  brandColors: _brandColors,
   productInvStore,
   currentInventory,
   onClose,
@@ -586,7 +587,7 @@ const InventoryDetailPage = ({ route }) => {
       setRows(
         (piData || []).map(pi => ({ ...pi, _inventoryIRI: invIRI }))
       );
-    } catch (_) {
+    } catch {
       setRows([]);
     }
   }, [currentCompany?.id, inventory.id, isNoInventory]);
@@ -603,7 +604,7 @@ const InventoryDetailPage = ({ route }) => {
           navRef.navigate('PurchaseFormPage', params);
           return true;
         }
-      } catch (_) {}
+      } catch {}
       navRef = navRef?.getParent?.();
       guard += 1;
     }

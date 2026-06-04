@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React, { memo } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -20,6 +19,7 @@ const TYPE_CONFIG = {
   package:     { label: 'Embalagem',     color: '#0891B2', bg: '#ECFEFF' },
   custom:      { label: 'Custom',        color: '#DB2777', bg: '#FDF2F8' },
   manufactured:{ label: 'Fabricado',     color: '#D97706', bg: '#FFFBEB' },
+  recipe:      { label: 'Preparo',       color: '#6B7280', bg: '#F3F4F6' },
 };
 
 const ProductItem = ({

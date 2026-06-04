@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, TextInput, Text, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -125,6 +124,7 @@ const PRODUCT_TYPE_LABELS = {
   manufactured: 'Fabricado',
   custom: 'Customizável',
   service: 'Serviço',
+  recipe: 'Preparo',
   feedstock: 'Matéria-prima',
   component: 'Componente operacional',
   package: 'Embalagem',

@@ -300,6 +300,7 @@ export const buildLivePackagingDb = async ({
   productGroupProductActions,
   ordersActions,
   categoriesActions,
+  includePurchaseHistory = true,
 }) => {
   if (!companyId) {
     return {
@@ -318,7 +319,7 @@ export const buildLivePackagingDb = async ({
 
   const [packagingProducts, packagingRelations, categories] = await Promise.all([
     fetchAllPagedItems({
-      productsActions,
+      actions: productsActions,
       params: {
         company: companyId,
         people: companyIri,
@@ -329,7 +330,7 @@ export const buildLivePackagingDb = async ({
       maxPages: 8,
     }),
     fetchAllPagedItems({
-      productGroupProductActions,
+      actions: productGroupProductActions,
       params: {
         productType: 'package',
         'order[product.product]': 'ASC',
@@ -337,7 +338,7 @@ export const buildLivePackagingDb = async ({
       maxPages: 8,
     }),
     fetchAllPagedItems({
-      categoriesActions,
+      actions: categoriesActions,
       params: {
         company: companyIri,
         'order[name]': 'ASC',
@@ -346,13 +347,15 @@ export const buildLivePackagingDb = async ({
     }),
   ]);
 
-  const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
-    companyId,
-    ordersActions,
-    productIds: packagingProducts.map(product => product?.id),
-    limitPerProduct: 1,
-    maxPages: 6,
-  });
+  const latestPurchasesByProductId = includePurchaseHistory
+    ? await fetchLatestPurchasesByProductIds({
+        companyId,
+        ordersActions,
+        productIds: packagingProducts.map(product => product?.id),
+        limitPerProduct: 1,
+        maxPages: 6,
+      })
+    : {};
 
   const groups = groupPackagingProducts(packagingProducts);
   const rawIdToMasterId = new Map();
@@ -422,12 +425,14 @@ export const buildLivePackagingDb = async ({
 
   const packagingById = new Map(packaging.map(item => [String(item.id), item]));
   const products = buildParentProducts(packagingRelations, rawIdToMasterId);
-  const { purchaseOrders, purchaseItems } = buildPurchaseCollections({
-    groups,
-    packagingById,
-    latestPurchasesByProductId,
-    rawIdToMasterId,
-  });
+  const { purchaseOrders, purchaseItems } = includePurchaseHistory
+    ? buildPurchaseCollections({
+        groups,
+        packagingById,
+        latestPurchasesByProductId,
+        rawIdToMasterId,
+      })
+    : { purchaseOrders: [], purchaseItems: [] };
 
   return {
     categories,

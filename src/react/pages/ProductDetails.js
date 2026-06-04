@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { useWindowDimensions, View, Text, Image, TouchableOpacity } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
@@ -135,7 +134,7 @@ const ProductDetails = ({ route, navigation }) => {
   const context = normalizeCatalogContext(routeParams.context || inferredContext || 'products');
   const contextTypes = useMemo(() => {
     if (context === 'products') {
-      return ['product', 'manufactured', 'custom', 'service'];
+      return ['product', 'manufactured', 'custom', 'service', 'recipe'];
     }
 
     if (context === 'supplies') {

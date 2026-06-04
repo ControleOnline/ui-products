@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect, useLayoutEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform, useWindowDimensions, ActivityIndicator, Modal, FlatList } from 'react-native';
+import React, { useState, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -29,12 +29,12 @@ const fmtN = v => {
 const PRODUCT_TYPE_LABELS = {
   product: 'Produto', service: 'Serviço', component: 'Componente',
   feedstock: 'Matéria Prima', package: 'Embalagem',
-  custom: 'Custom', manufactured: 'Fabricado',
+  custom: 'Custom', manufactured: 'Fabricado', recipe: 'Preparo',
 };
 
 const PRODUCT_TYPE_COLORS = {
   product: '#3B82F6', service: '#8B5CF6', component: '#F97316',
-  feedstock: '#16A34A', package: '#0891B2', custom: '#DB2777', manufactured: '#D97706',
+  feedstock: '#16A34A', package: '#0891B2', custom: '#DB2777', manufactured: '#D97706', recipe: '#6B7280',
 };
 
 /* classifica criticidade: 'critical' (vermelho) ou 'low' (laranja) */
@@ -186,7 +186,7 @@ const PurchaseSuggestionsPage = () => {
       setItems(enriched);
       setVisibleCount(50);
       setSelected(new Set(enriched.map(e => e.id)));
-    } catch (_) {
+    } catch {
       setItems([]);
     } finally {
       runningRef.current = false;

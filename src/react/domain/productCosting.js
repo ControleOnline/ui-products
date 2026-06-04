@@ -1,3 +1,5 @@
+import {api} from '@controleonline/ui-common/src/api';
+
 export const normalizeEntityId = value => {
   if (!value && value !== 0) return '';
 
@@ -126,6 +128,64 @@ const resolvePeopleLabel = entity =>
   entity?.document ||
   '';
 
+const normalizePurchaseRow = row => ({
+  orderId: normalizeEntityId(row?.orderId),
+  orderDate: row?.orderDate || row?.alterDate || null,
+  supplierLabel: row?.supplierLabel || resolvePeopleLabel(row?.provider) || 'Fornecedor não vinculado',
+  quantity: toNumber(row?.quantity),
+  unitPrice: toNumber(row?.unitPrice),
+  totalPrice: toNumber(row?.totalPrice),
+});
+
+const fetchLatestPurchasesViaHistoryEndpoint = async ({
+  companyId,
+  providerIds = [],
+  productIds,
+}) => {
+  const ids = Array.from(new Set((productIds || []).map(normalizeEntityId).filter(Boolean)));
+  if (!companyId || ids.length === 0) {
+    return null;
+  }
+
+  try {
+    const response = await api.fetch('orders/purchase-history-by-products', {
+      params: {
+        company: companyId,
+        productIds: ids.join(','),
+        ...(providerIds.length > 0 ? {providerIds: providerIds.map(normalizeEntityId).filter(Boolean).join(',')} : {}),
+      },
+    });
+
+    const rows = extractItems(response);
+    if (!rows.length) {
+      return {};
+    }
+
+    const purchasesByProductId = {};
+    ids.forEach(productId => {
+      purchasesByProductId[productId] = [];
+    });
+
+    rows.forEach(row => {
+      const productId = normalizeEntityId(row?.productId || row?.product || row?.id);
+      if (!productId || !purchasesByProductId[productId]) {
+        return;
+      }
+
+      const currentItems = purchasesByProductId[productId];
+      if (currentItems.length >= 1) {
+        return;
+      }
+
+      currentItems.push(normalizePurchaseRow(row));
+    });
+
+    return purchasesByProductId;
+  } catch {
+    return null;
+  }
+};
+
 export const fetchLatestPurchasesByProductIds = async ({
   companyId,
   providerId = null,
@@ -151,7 +211,33 @@ export const fetchLatestPurchasesByProductIds = async ({
     purchasesByProductId[productId] = [];
   });
 
-  if (!companyId || ids.length === 0 || !ordersActions?.getItems || !ordersActions?.get) {
+  if (!companyId || ids.length === 0) {
+    return purchasesByProductId;
+  }
+
+  const endpointPurchases = await fetchLatestPurchasesViaHistoryEndpoint({
+    companyId,
+    providerIds: supplierIds,
+    productIds: ids,
+  });
+
+  if (endpointPurchases) {
+    const missingIds = ids.filter(productId => !Array.isArray(endpointPurchases[productId]) || endpointPurchases[productId].length === 0);
+
+    ids.forEach(productId => {
+      if (Array.isArray(endpointPurchases[productId]) && endpointPurchases[productId].length > 0) {
+        purchasesByProductId[productId] = endpointPurchases[productId].slice(0, limitPerProduct);
+      }
+    });
+
+    if (missingIds.length === 0 || !ordersActions?.getItems || !ordersActions?.get) {
+      return purchasesByProductId;
+    }
+
+    ids.splice(0, ids.length, ...missingIds);
+  }
+
+  if (!ordersActions?.getItems || !ordersActions?.get) {
     return purchasesByProductId;
   }
 

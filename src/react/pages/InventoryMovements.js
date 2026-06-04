@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Platform, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -32,6 +32,7 @@ const PRODUCT_TYPE_LABELS = {
   package:      'Embalagem',
   custom:       'Custom',
   manufactured: 'Fabricado',
+  recipe:       'Preparo',
 };
 
 const fmtDate = iso => {
@@ -236,7 +237,7 @@ const InventoryMovementsPage = ({ route }) => {
       });
 
       setMovements(enriched);
-    } catch (_) {
+    } catch {
       setMovements([]);
     }
   }, [currentCompany?.id, preInventoryId, preInventoryName]);
