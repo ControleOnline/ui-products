@@ -43,7 +43,6 @@ export default {
         name: 'priceCalculation',
         externalFilter: false,
         editable: false,
-        translate: true,
         align: 'left',
         label: 'priceCalculation',
         list: [

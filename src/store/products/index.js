@@ -107,7 +107,6 @@ export default {
       {
         sortable: true,
         externalFilter: false,
-        translate: true,
         name: 'type',
         align: 'left',
         list: [
@@ -128,7 +127,6 @@ export default {
         sortable: true,
         name: 'productCondition',
         externalFilter: false,
-        translate: true,
         list: [
           {value: 'new', label: 'Novo'},
           {value: 'used', label: 'Usado'},
@@ -158,7 +156,6 @@ export default {
       },
       {
         sortable: true,
-        translate: true,
         name: 'featured',
         align: 'left',
         label: 'featured',
@@ -175,7 +172,6 @@ export default {
       },
       {
         sortable: true,
-        translate: true,
         name: 'active',
         align: 'left',
         label: 'active',

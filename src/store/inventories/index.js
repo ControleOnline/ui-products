@@ -41,7 +41,6 @@ export default {
       },
       {
         sortable: true,
-        translate: true,
         name: 'type',
         align: 'left',
         label: 'type',
