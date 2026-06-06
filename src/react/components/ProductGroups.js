@@ -874,7 +874,7 @@ const ProductGroups = ({ ProductId }) => {
                     onPress={() => setConfirmDeleteGroup(group)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <MaterialCommunityIcons name="trash-can-outline" size={16} color="#EF4444" />
+                    <MaterialCommunityIcons name="trash-can-outline" size={16} color="#c10015" />
                   </TouchableOpacity>
                   <MaterialCommunityIcons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -957,7 +957,7 @@ const ProductGroups = ({ ProductId }) => {
           <MaterialCommunityIcons
             name="alert-circle-outline"
             size={40}
-            color="#EF4444"
+            color="#c10015"
             style={inlineStyle_602_12}
           />
           <Text style={styles.confirmTitle}>Excluir grupo?</Text>

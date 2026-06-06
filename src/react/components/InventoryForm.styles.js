@@ -17,7 +17,7 @@ const styles = StyleSheet.create({
 
   field: { gap: 6 },
   label: { fontSize: 13, fontWeight: '600', color: '#475569' },
-  required: { color: '#EF4444' },
+  required: { color: '#c10015' },
 
   input: {
     borderWidth: 1.5,
@@ -29,8 +29,8 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     backgroundColor: '#F8FAFC',
   },
-  inputError: { borderColor: '#EF4444' },
-  fieldError: { fontSize: 12, color: '#EF4444' },
+  inputError: { borderColor: '#c10015' },
+  fieldError: { fontSize: 12, color: '#c10015' },
 
   typeRow: { flexDirection: 'row', gap: 10 },
   typeChip: {

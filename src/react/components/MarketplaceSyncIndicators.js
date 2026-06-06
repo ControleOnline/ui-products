@@ -26,7 +26,7 @@ const getPlatformLabel = status => {
 
 const getStatusTone = status => {
   if (status?.synced) return '#16A34A';
-  if (status?.dirty) return '#F59E0B';
+  if (status?.dirty) return '#e67e22';
   return '#94A3B8';
 };
 

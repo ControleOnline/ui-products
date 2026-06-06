@@ -890,7 +890,7 @@ const ProductFeedStock = ({
                     onPress={() => setConfirmDelete(item)}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    <MaterialCommunityIcons name="trash-can-outline" size={14} color="#EF4444" />
+                    <MaterialCommunityIcons name="trash-can-outline" size={14} color="#c10015" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -957,7 +957,7 @@ const ProductFeedStock = ({
           <MaterialCommunityIcons
             name="alert-circle-outline"
             size={30}
-            color="#EF4444"
+            color="#c10015"
             style={inlineStyle_889_12}
           />
           <Text style={styles.confirmTitle}>Remover insumo?</Text>

@@ -305,13 +305,13 @@ const SectionCard = ({ title, icon, isOpen, onToggle, hasError, children }) => (
           <MaterialCommunityIcons
             name={hasError ? 'alert-circle' : icon}
             size={16}
-            color={hasError ? '#EF4444' : '#94A3B8'}
+            color={hasError ? '#c10015' : '#94A3B8'}
             style={inlineStyle_150_12}
           />
         )}
         <Text style={[styles.sectionCardTitle, hasError && styles.sectionCardTitleError]}>{title}</Text>
       </View>
-      <MaterialCommunityIcons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={hasError ? '#EF4444' : '#94A3B8'} />
+      <MaterialCommunityIcons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={hasError ? '#c10015' : '#94A3B8'} />
     </TouchableOpacity>
     {isOpen && <View style={styles.sectionCardBody}>{children}</View>}
   </View>

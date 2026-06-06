@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   barTrack:    { height: 4, backgroundColor: '#F1F5F9', borderRadius: 2, marginTop: 2 },
   barFill:     { height: '100%', borderRadius: 2, minWidth: 3 },
   barFillCritical: { backgroundColor: '#DC2626' },
-  barFillLow:      { backgroundColor: '#F59E0B' },
+  barFillLow:      { backgroundColor: '#e67e22' },
   stockNumbers: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 1 },
   stockAvail:   { fontSize: 10, fontWeight: '600', color: '#64748B' },
   stockMin:     { fontSize: 10, color: '#CBD5E1' },

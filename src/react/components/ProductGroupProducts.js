@@ -491,7 +491,7 @@ const ItemCard = ({
               onPress={onRemove}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MaterialCommunityIcons name="trash-can-outline" size={16} color="#EF4444" />
+              <MaterialCommunityIcons name="trash-can-outline" size={16} color="#c10015" />
             </TouchableOpacity>
           </View>
         </View>
@@ -1034,7 +1034,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
           <MaterialCommunityIcons
             name="alert-circle-outline"
             size={36}
-            color="#EF4444"
+            color="#c10015"
             style={inlineStyle_812_12}
           />
           <Text style={styles.confirmTitle}>Remover modificador?</Text>

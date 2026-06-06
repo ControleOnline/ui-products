@@ -368,17 +368,17 @@ const styles = StyleSheet.create({
   },
   errorText: { color: '#9e1b1b', fontSize: 14 },
   inputError: {
-    borderColor: '#EF4444',
+    borderColor: '#c10015',
     backgroundColor: '#FFF5F5',
   },
   fieldErrorText: {
     fontSize: 11,
-    color: '#EF4444',
+    color: '#c10015',
     marginTop: 4,
     fontWeight: '500',
   },
   required: {
-    color: '#EF4444',
+    color: '#c10015',
     fontSize: 11,
   },
 
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#c10015',
     alignItems: 'center',
   },
   deleteBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
