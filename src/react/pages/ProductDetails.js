@@ -7,6 +7,7 @@ import ProductForm from '@controleonline/ui-products/src/react/components/Produc
 import ProductFeedStock from '@controleonline/ui-products/src/react/components/ProductFeedStock';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';
 import ProductPricingModal from '@controleonline/ui-products/src/react/components/ProductPricingModal';
+import ProductSalesTab from '@controleonline/ui-products/src/react/components/ProductSalesTab';
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
 import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
@@ -157,16 +158,15 @@ const ProductDetails = ({ route, navigation }) => {
     : entityLabels.singular;
   const canHaveFeedstocks = Boolean(ProductId && productSummary && productType !== 'feedstock');
 
-  const normalizeSupplyDetailsBrowserUrl = useCallback(() => {
+  const normalizeProductDetailsBrowserUrl = useCallback(() => {
     if (typeof window === 'undefined') return;
-    if (context !== 'supplies') return;
 
     const url = new URL(window.location.href);
     if (!url.pathname.includes('/product-details')) return;
 
     let changed = false;
     const canonicalPathname = url.pathname.replace(
-      /\/(?:Dados|Fornecedores|Insumos|Grupos|Estoque)$/i,
+      /\/(?:Dados|Fornecedores|Insumos|Grupos|Estoque|Vendas)$/i,
       '',
     );
 
@@ -182,10 +182,12 @@ const ProductDetails = ({ route, navigation }) => {
       changed = true;
     };
 
-    ensureParam('context', 'supplies');
-    ensureParam('typeFilter', effectiveSupplyType);
-    if (!ProductId) {
-      ensureParam('initialProductType', effectiveSupplyType);
+    if (context === 'supplies') {
+      ensureParam('context', 'supplies');
+      ensureParam('typeFilter', effectiveSupplyType);
+      if (!ProductId) {
+        ensureParam('initialProductType', effectiveSupplyType);
+      }
     }
 
     if (changed) {
@@ -197,16 +199,16 @@ const ProductDetails = ({ route, navigation }) => {
     }
   }, [context, effectiveSupplyType, ProductId]);
 
-  const scheduleNormalizeSupplyDetailsBrowserUrl = useCallback(() => {
+  const scheduleNormalizeProductDetailsBrowserUrl = useCallback(() => {
     if (typeof window === 'undefined') return;
 
     if (typeof window.requestAnimationFrame === 'function') {
-      window.requestAnimationFrame(normalizeSupplyDetailsBrowserUrl);
+      window.requestAnimationFrame(normalizeProductDetailsBrowserUrl);
       return;
     }
 
-    setTimeout(normalizeSupplyDetailsBrowserUrl, 0);
-  }, [normalizeSupplyDetailsBrowserUrl]);
+    setTimeout(normalizeProductDetailsBrowserUrl, 0);
+  }, [normalizeProductDetailsBrowserUrl]);
 
   useEffect(() => {
     loadProductSummary();
@@ -245,14 +247,16 @@ const ProductDetails = ({ route, navigation }) => {
   }, [ProductId, navigation, routeParams.ProductId, routeParams.id]);
 
   useEffect(() => {
-    scheduleNormalizeSupplyDetailsBrowserUrl();
-  }, [scheduleNormalizeSupplyDetailsBrowserUrl]);
+    scheduleNormalizeProductDetailsBrowserUrl();
+  }, [scheduleNormalizeProductDetailsBrowserUrl]);
 
   useEffect(() => {
     navigation.setOptions?.({
       title: ProductId ? entityLabels.editTitle : entityLabels.createTitle,
     });
   }, [ProductId, entityLabels.createTitle, entityLabels.editTitle, navigation]);
+
+  const shouldScrollTabs = canHaveFeedstocks || (context === 'products' && Boolean(ProductId));
 
   return (
     <View style={styles.container}>
@@ -313,20 +317,18 @@ const ProductDetails = ({ route, navigation }) => {
         <Tab.Navigator
           initialLayout={{ width }}
           screenListeners={
-            context === 'supplies'
-              ? {
-                  focus: scheduleNormalizeSupplyDetailsBrowserUrl,
-                  state: scheduleNormalizeSupplyDetailsBrowserUrl,
-                  tabPress: scheduleNormalizeSupplyDetailsBrowserUrl,
-                }
-              : undefined
+            {
+              focus: scheduleNormalizeProductDetailsBrowserUrl,
+              state: scheduleNormalizeProductDetailsBrowserUrl,
+              tabPress: scheduleNormalizeProductDetailsBrowserUrl,
+            }
           }
           screenOptions={{
-            tabBarScrollEnabled: canHaveFeedstocks,
+            tabBarScrollEnabled: shouldScrollTabs,
             tabBarActiveTintColor: brandColors.primary,
             tabBarIndicatorStyle: { backgroundColor: brandColors.primary, height: 3 },
             tabBarLabelStyle: { fontWeight: '600', fontSize: 12, textTransform: 'none' },
-            tabBarItemStyle: canHaveFeedstocks ? { width: 'auto', minWidth: 96 } : undefined,
+            tabBarItemStyle: shouldScrollTabs ? { width: 'auto', minWidth: 96 } : undefined,
             tabBarStyle: {
               backgroundColor: '#fff',
               elevation: 0,
@@ -371,6 +373,19 @@ const ProductDetails = ({ route, navigation }) => {
                   product={productSummary}
                   isLoading={isLoadingSummary}
                   onRefresh={loadProductSummary}
+                />
+              )}
+            </Tab.Screen>
+          ) : null}
+
+          {ProductId && context === 'products' ? (
+            <Tab.Screen name="Vendas">
+              {props => (
+                <ProductSalesTab
+                  {...props}
+                  product={productSummary}
+                  isLoading={isLoadingSummary}
+                  brandColors={brandColors}
                 />
               )}
             </Tab.Screen>
