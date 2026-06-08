@@ -17,6 +17,7 @@ import {
   formatCurrency,
   normalizeEntityId,
 } from '@controleonline/ui-products/src/react/domain/productCosting';
+import { buildProductDetailsBrowserPath } from '@controleonline/ui-products/src/react/domain/productDetailsUrl';
 import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
 import { PRODUCT_EVENTS } from '@controleonline/ui-products/src/react/domain/productEvents';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -165,10 +166,11 @@ const ProductDetails = ({ route, navigation }) => {
     if (!url.pathname.includes('/product-details')) return;
 
     let changed = false;
-    const canonicalPathname = url.pathname.replace(
-      /\/(?:Dados|Fornecedores|Insumos|Grupos|Estoque|Vendas)$/i,
-      '',
-    );
+    const canonicalPathname = buildProductDetailsBrowserPath({
+      pathname: url.pathname,
+      routeName: route?.name,
+      productId: ProductId,
+    });
 
     if (canonicalPathname !== url.pathname) {
       url.pathname = canonicalPathname;
@@ -197,7 +199,7 @@ const ProductDetails = ({ route, navigation }) => {
         `${url.pathname}${url.search}${url.hash}`,
       );
     }
-  }, [context, effectiveSupplyType, ProductId]);
+  }, [context, effectiveSupplyType, ProductId, route?.name]);
 
   const scheduleNormalizeProductDetailsBrowserUrl = useCallback(() => {
     if (typeof window === 'undefined') return;

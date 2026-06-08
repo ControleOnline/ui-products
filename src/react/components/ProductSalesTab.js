@@ -301,9 +301,9 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
   const loadSales = useCallback(async () => {
     const currentRequestId = ++requestIdRef.current;
 
-    if (!productId || !companyId) {
+    if (!productId) {
       setSalesSummary(null);
-      setError('Abra um produto vinculado a uma empresa para visualizar as vendas.');
+      setError('Abra um produto para visualizar as vendas.');
       setIsRefreshing(false);
       return;
     }
@@ -313,17 +313,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
     setSalesSummary(null);
 
     try {
-      const params = {
-        summary: 'sales',
-        provider: `/people/${companyId}`,
-        orderType: 'sale',
-        'status.realStatus': 'closed',
-        product: `/products/${productId}`,
-        productId,
-        'orderProducts.product': `/products/${productId}`,
-        itemsPerPage: 1,
-        page: 1,
-      };
+      const params = {};
 
       if (selectedRange.start) {
         params['orderDate[after]'] = formatDateApi(selectedRange.start);
@@ -333,7 +323,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
         params['orderDate[before]'] = formatDateApi(selectedRange.end);
       }
 
-      const response = await api.fetch('orders', { params });
+      const response = await api.fetch(`/products/${productId}/summary`, { params });
 
       if (currentRequestId !== requestIdRef.current) {
         return;
@@ -353,7 +343,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
         setIsRefreshing(false);
       }
     }
-  }, [companyId, productId, selectedRange.end, selectedRange.start]);
+  }, [productId, selectedRange.end, selectedRange.start]);
 
   useFocusEffect(
     useCallback(() => {
@@ -485,7 +475,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
 
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>
-              O resumo considera apenas pedidos de venda fechados da empresa vinculada ao produto.
+              O resumo considera apenas pedidos de venda fechados do produto selecionado.
             </Text>
           </View>
         </View>
