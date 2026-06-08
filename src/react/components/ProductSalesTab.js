@@ -8,11 +8,15 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useStore } from '@store';
+import DateShortcutFilter from '@controleonline/ui-default/src/react/components/filters/DateShortcutFilter';
 import { api } from '@controleonline/ui-common/src/api';
+import {
+  getDateRange,
+  resolveDateRangeSummary,
+} from '@controleonline/ui-common/src/react/utils/dateRangeFilter';
 import { withOpacity } from '@controleonline/../../src/styles/branding';
 import {
   formatCurrency,
@@ -20,26 +24,19 @@ import {
 } from '@controleonline/ui-products/src/react/domain/productCosting';
 import styles from './ProductSalesTab.styles';
 
-const RANGE_PRESETS = [
-  { key: '7d', label: '7 dias', description: 'Últimos 7 dias' },
-  { key: '30d', label: '30 dias', description: 'Últimos 30 dias' },
-  { key: '90d', label: '90 dias', description: 'Últimos 90 dias' },
-  { key: 'custom', label: 'Personalizado', description: 'Escolher datas' },
-];
-
 const CHART_PERIODS = [
   { key: 'day', label: 'Dia', icon: 'calendar-today' },
   { key: 'week', label: 'Semana', icon: 'view-week' },
   { key: 'month', label: 'Mês', icon: 'calendar-month' },
 ];
 
+const DATE_FILTER_OPTION_KEYS = ['7d', '30d', '90d', 'custom'];
+
 const CHART_METRICS = [
   { key: 'revenue', label: 'Receita', icon: 'cash-multiple' },
   { key: 'units', label: 'Unidades', icon: 'package-variant-closed' },
   { key: 'orders', label: 'Pedidos', icon: 'receipt-text-outline' },
 ];
-
-const pad2 = value => String(value).padStart(2, '0');
 
 const extractId = value => {
   if (value === null || value === undefined || value === '') {
@@ -65,84 +62,6 @@ const extractId = value => {
 const toNumber = value => {
   const parsed = Number.parseFloat(String(value ?? 0).replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
-};
-
-const createDayStart = date =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
-
-const createDayEnd = date =>
-  new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
-
-const addDays = (date, days) => {
-  const next = new Date(date);
-  next.setDate(next.getDate() + Number(days || 0));
-  return next;
-};
-
-const formatDateShort = date => {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toLocaleDateString('pt-BR');
-};
-
-const formatDateApi = date => {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
-};
-
-const normalizeRange = (start, end) => {
-  if (!(start instanceof Date) || !(end instanceof Date)) {
-    return {
-      start: null,
-      end: null,
-      label: '',
-    };
-  }
-
-  const from = start <= end ? createDayStart(start) : createDayStart(end);
-  const to = start <= end ? createDayEnd(end) : createDayEnd(start);
-
-  return {
-    start: from,
-    end: to,
-    label: `${formatDateShort(from)} - ${formatDateShort(to)}`,
-  };
-};
-
-const resolvePresetRange = preset => {
-  const today = new Date();
-
-  switch (preset) {
-    case '7d':
-      return {
-        start: createDayStart(addDays(today, -6)),
-        end: createDayEnd(today),
-        label: 'Últimos 7 dias',
-      };
-    case '30d':
-      return {
-        start: createDayStart(addDays(today, -29)),
-        end: createDayEnd(today),
-        label: 'Últimos 30 dias',
-      };
-    case '90d':
-      return {
-        start: createDayStart(addDays(today, -89)),
-        end: createDayEnd(today),
-        label: 'Últimos 90 dias',
-      };
-    default:
-      return {
-        start: createDayStart(addDays(today, -29)),
-        end: createDayEnd(today),
-        label: 'Últimos 30 dias',
-      };
-  }
 };
 
 const resolveSalesSummary = response => {
@@ -190,6 +109,33 @@ const resolvePeriodLabel = period =>
 
 const resolveMetricLabel = metric =>
   CHART_METRICS.find(item => item.key === metric)?.label || 'Receita';
+
+const renderChip = (option, currentValue, onPress, extraStyle = null) => {
+  const active = currentValue === option.key;
+
+  return (
+    <TouchableOpacity
+      key={option.key}
+      style={[
+        styles.chip,
+        active && [styles.chipActive, extraStyle],
+      ]}
+      onPress={() => onPress(option.key)}
+      activeOpacity={0.8}
+    >
+      {option.icon ? (
+        <MaterialCommunityIcons
+          name={option.icon}
+          size={14}
+          color={active ? '#0369A1' : '#475569'}
+        />
+      ) : null}
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+        {option.label}
+      </Text>
+    </TouchableOpacity>
+  );
+};
 
 const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
   const { width } = useWindowDimensions();
@@ -242,28 +188,25 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
     ],
   );
 
-  const [rangePreset, setRangePreset] = useState('30d');
-  const [customRange, setCustomRange] = useState(() => {
-    const base = resolvePresetRange('30d');
-    return {
-      start: base.start,
-      end: base.end,
-    };
+  const [dateFilterKey, setDateFilterKey] = useState('30d');
+  const [customRange, setCustomRange] = useState({
+    from: '',
+    to: '',
   });
   const [chartPeriod, setChartPeriod] = useState('day');
   const [chartMetric, setChartMetric] = useState('revenue');
   const [salesSummary, setSalesSummary] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [activePicker, setActivePicker] = useState(null);
 
-  const selectedRange = useMemo(() => {
-    if (rangePreset === 'custom') {
-      return normalizeRange(customRange.start, customRange.end);
-    }
-
-    return resolvePresetRange(rangePreset);
-  }, [customRange.end, customRange.start, rangePreset]);
+  const dateRange = useMemo(
+    () => getDateRange(dateFilterKey, customRange),
+    [customRange.from, customRange.to, dateFilterKey],
+  );
+  const selectedRangeLabel = useMemo(
+    () => resolveDateRangeSummary(dateFilterKey, customRange),
+    [customRange.from, customRange.to, dateFilterKey],
+  );
 
   const series = useMemo(() => {
     const seriesKey =
@@ -296,7 +239,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
   const isInitialLoading = isRefreshing && !salesSummary && !error;
   const chartWidth = Math.max(width - 32, Math.max(series.length, 1) * 66);
   const chartTitle = `${resolveMetricLabel(chartMetric)} por ${resolvePeriodLabel(chartPeriod).toLowerCase()}`;
-  const chartSubtitle = selectedRange.label || 'Período selecionado';
+  const chartSubtitle = selectedRangeLabel || 'Período selecionado';
 
   const loadSales = useCallback(async () => {
     const currentRequestId = ++requestIdRef.current;
@@ -315,12 +258,12 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
     try {
       const params = {};
 
-      if (selectedRange.start) {
-        params['orderDate[after]'] = formatDateApi(selectedRange.start);
+      if (dateRange.after) {
+        params['orderDate[after]'] = dateRange.after;
       }
 
-      if (selectedRange.end) {
-        params['orderDate[before]'] = formatDateApi(selectedRange.end);
+      if (dateRange.before) {
+        params['orderDate[before]'] = dateRange.before;
       }
 
       const response = await api.fetch(`/products/${productId}/summary`, { params });
@@ -343,7 +286,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
         setIsRefreshing(false);
       }
     }
-  }, [productId, selectedRange.end, selectedRange.start]);
+  }, [dateRange.after, dateRange.before, productId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -352,75 +295,12 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
     }, [loadSales]),
   );
 
-  const handlePresetPress = preset => {
-    setActivePicker(null);
-    setRangePreset(preset);
-
-    if (preset !== 'custom') {
-      const nextRange = resolvePresetRange(preset);
-      setCustomRange({
-        start: nextRange.start,
-        end: nextRange.end,
-      });
-    }
-  };
-
-  const handlePickerChange = (field, _event, selectedDate) => {
-    if (!selectedDate) {
-      setActivePicker(null);
-      return;
-    }
-
-    const normalizedDate =
-      field === 'start' ? createDayStart(selectedDate) : createDayEnd(selectedDate);
-
-    setCustomRange(current => {
-      const nextStart = field === 'start' ? normalizedDate : current.start;
-      const nextEnd = field === 'end' ? normalizedDate : current.end;
-      const normalized = normalizeRange(nextStart || normalizedDate, nextEnd || normalizedDate);
-      return {
-        start: normalized.start,
-        end: normalized.end,
-      };
-    });
-
-    setRangePreset('custom');
-    setActivePicker(null);
-  };
-
-  const renderChip = (option, currentValue, onPress, extraStyle = null) => {
-    const active = currentValue === option.key;
-
-    return (
-      <TouchableOpacity
-        key={option.key}
-        style={[
-          styles.chip,
-          active && [styles.chipActive, extraStyle],
-        ]}
-        onPress={() => onPress(option.key)}
-        activeOpacity={0.8}
-      >
-        {option.icon ? (
-          <MaterialCommunityIcons
-            name={option.icon}
-            size={14}
-            color={active ? '#0369A1' : '#475569'}
-          />
-        ) : null}
-        <Text style={[styles.chipText, active && styles.chipTextActive]}>
-          {option.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-
   const summaryCards = [
     {
       key: 'orders',
       label: 'Pedidos fechados',
       value: totalOrders,
-      helper: rangePreset === 'custom' ? 'Pedidos no intervalo' : 'Pedidos no período',
+      helper: dateFilterKey === 'custom' ? 'Pedidos no intervalo' : 'Pedidos no período',
     },
     {
       key: 'units',
@@ -469,7 +349,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
               {productName}
             </Text>
             <Text style={styles.subtitle} numberOfLines={2}>
-              {companyLabel} · {selectedRange.label || 'Sem período selecionado'}
+              {companyLabel} · {selectedRangeLabel || 'Sem período selecionado'}
             </Text>
           </View>
 
@@ -482,79 +362,31 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
 
         <View style={styles.controlsCard}>
           <View style={styles.controlGroup}>
-            <Text style={styles.controlLabel}>Range de datas</Text>
-            <View style={styles.chipsRow}>
-              {RANGE_PRESETS.map(option => renderChip(option, rangePreset, handlePresetPress, { borderColor: withOpacity(accentColor, 0.22) }))}
-            </View>
+            <Text style={styles.controlLabel}>Selecionar intervalo</Text>
+            <DateShortcutFilter
+              dense
+              value={dateFilterKey}
+              onChange={setDateFilterKey}
+              customRange={customRange}
+              onCustomRangeChange={setCustomRange}
+              labelCaption="Período"
+              colors={{
+                accent: accentColor,
+                appBg: 'transparent',
+                border: '#CBD5E1',
+                borderSoft: '#E2E8F0',
+                cardBg: '#FFFFFF',
+                cardBgSoft: '#F8FAFC',
+                danger: '#DC2626',
+                isLight: true,
+                panelBg: '#EFF6FF',
+                pillTextDark: '#FFFFFF',
+                textPrimary: '#0F172A',
+                textSecondary: '#64748B',
+              }}
+              optionKeys={DATE_FILTER_OPTION_KEYS}
+            />
           </View>
-
-          {rangePreset === 'custom' ? (
-            <View style={styles.controlGroup}>
-              <Text style={styles.controlLabel}>Selecionar intervalo</Text>
-              <View style={styles.rangeRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.dateButton,
-                    activePicker === 'start' && styles.dateButtonActive,
-                  ]}
-                  onPress={() => setActivePicker('start')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.dateButtonLabel}>Início</Text>
-                  <Text
-                    style={[
-                      styles.dateButtonValue,
-                      activePicker === 'start' && styles.dateButtonValueActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {formatDateShort(selectedRange.start) || 'Selecionar'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.dateButton,
-                    activePicker === 'end' && styles.dateButtonActive,
-                  ]}
-                  onPress={() => setActivePicker('end')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.dateButtonLabel}>Fim</Text>
-                  <Text
-                    style={[
-                      styles.dateButtonValue,
-                      activePicker === 'end' && styles.dateButtonValueActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {formatDateShort(selectedRange.end) || 'Selecionar'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {activePicker ? (
-                <View style={styles.pickerCard}>
-                  <Text style={styles.pickerLabel}>
-                    {activePicker === 'start' ? 'Selecionar data inicial' : 'Selecionar data final'}
-                  </Text>
-                  <Text style={styles.pickerHint}>
-                    {activePicker === 'start'
-                      ? 'Toque em uma data para começar a janela.'
-                      : 'Toque em uma data para encerrar a janela.'}
-                  </Text>
-                  <DateTimePicker
-                    value={activePicker === 'start' ? (selectedRange.start || new Date()) : (selectedRange.end || new Date())}
-                    mode="date"
-                    display="default"
-                    onChange={(event, selectedDate) =>
-                      handlePickerChange(activePicker, event, selectedDate)
-                    }
-                  />
-                </View>
-              ) : null}
-            </View>
-          ) : null}
 
           <View style={styles.controlGroup}>
             <Text style={styles.controlLabel}>Agrupamento</Text>
