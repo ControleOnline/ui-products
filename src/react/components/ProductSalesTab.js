@@ -8,7 +8,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { DateTimePicker } from '@react-native-community/datetimepicker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useStore } from '@store';
@@ -145,11 +145,23 @@ const resolvePresetRange = preset => {
   }
 };
 
-const resolveSalesSummary = response =>
-  response?.summary?.sales ||
-  response?.summary?.report?.sales ||
-  response?.sales ||
-  null;
+const resolveSalesSummary = response => {
+  const summary =
+    response?.summary?.sales ||
+    response?.summary?.report?.sales ||
+    response?.sales ||
+    null;
+
+  if (!summary || typeof summary !== 'object') {
+    return null;
+  }
+
+  if (summary.sales && typeof summary.sales === 'object' && !Array.isArray(summary.sales)) {
+    return summary.sales;
+  }
+
+  return summary;
+};
 
 const extractApiError = (error, fallback) => {
   const message = String(
@@ -298,6 +310,7 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
 
     setIsRefreshing(true);
     setError('');
+    setSalesSummary(null);
 
     try {
       const params = {
@@ -305,6 +318,8 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
         provider: `/people/${companyId}`,
         orderType: 'sale',
         'status.realStatus': 'closed',
+        product: `/products/${productId}`,
+        productId,
         'orderProducts.product': `/products/${productId}`,
         itemsPerPage: 1,
         page: 1,

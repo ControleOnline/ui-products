@@ -123,6 +123,12 @@ const ordersRoutes = [
   {
     name: 'ProductDetailsModal',
     component: ProductDetails,
+    path: {
+      path: 'product-details-modal/:ProductId?',
+      parse: {
+        ProductId: normalizeNumericParam,
+      },
+    },
     options: ({ route }) => ({
       headerShown: true,
       headerBackVisible: true,
