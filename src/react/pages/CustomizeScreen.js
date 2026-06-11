@@ -834,20 +834,20 @@ const CustomizeScreen = () => {
     navigation.navigate('ShopIndex', {store: 'categories'});
   }, [navigation]);
 
-  const finishCustomizeScreen = useCallback(() => {
+  const finishCustomizeScreen = useCallback((nextOrderId = activeOrderId) => {
     if (redirectToCart) {
       navigation.navigate('ShopCartPage');
       return;
     }
 
     if (
-      String(interactionMode || '').trim().toLowerCase() === 'pdv' &&
-      activeOrderId
+      isPdvCustomizationFlow &&
+      nextOrderId
     ) {
       navigation.replace(
         'OrderDetails',
         buildOrderDetailsRouteParams(
-          activeOrderId,
+          nextOrderId,
           buildManagerPdvRouteParams({showBottomCart: false}),
         ),
       );
@@ -855,7 +855,13 @@ const CustomizeScreen = () => {
     }
 
     navigation.pop(Math.max(1, Number(returnDepth || 1)));
-  }, [activeOrderId, interactionMode, navigation, redirectToCart, returnDepth]);
+  }, [
+    activeOrderId,
+    isPdvCustomizationFlow,
+    navigation,
+    redirectToCart,
+    returnDepth,
+  ]);
 
   const refreshSavedOrderProducts = useCallback(async () => {
     if (!activeOrderId) {
@@ -1302,7 +1308,7 @@ const CustomizeScreen = () => {
   };
 
   const addHandle = async () => {
-    if (!activeProductIri || !activeOrderIri) {
+    if (!activeProductIri) {
       const message =
         'Nao foi possivel identificar produto ou carrinho para adicionar.';
       if (typeof window !== 'undefined' && typeof window.alert === 'function') {
@@ -1327,11 +1333,50 @@ const CustomizeScreen = () => {
       return;
     }
 
+    let targetOrderIri = activeOrderIri;
+    let targetOrderId = activeOrderId;
+
+    if (!targetOrderIri && isPdvCustomizationFlow) {
+      try {
+        const ensuredOrder = await ensureActiveOrder();
+        const ensuredOrderId = normalizeEntityId(
+          ensuredOrder?.id || ensuredOrder?.['@id'],
+        );
+        targetOrderId = ensuredOrderId || targetOrderId;
+        targetOrderIri =
+          ensuredOrder?.['@id'] ||
+          (ensuredOrderId ? `/orders/${ensuredOrderId}` : null);
+      } catch (error) {
+        const message =
+          error?.message ||
+          'Nao foi possivel salvar a customizacao do item.';
+
+        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+          window.alert(message);
+        } else {
+          Alert.alert('Atencao', message);
+        }
+
+        return;
+      }
+    }
+
+    if (!targetOrderIri) {
+      const message =
+        'Nao foi possivel identificar produto ou carrinho para adicionar.';
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(message);
+      } else {
+        Alert.alert('Atencao', message);
+      }
+      return;
+    }
+
     const orderProductData = {
       ...(activeOrderProductId ? {id: activeOrderProductId} : {}),
       product: activeProductIri,
       sub_products: getSubproducts(),
-      order: activeOrderIri,
+      order: targetOrderIri,
       quantity: resolvedItemQuantity,
     };
 
@@ -1345,7 +1390,7 @@ const CustomizeScreen = () => {
         // order state in a shallow-merged, inconsistent hierarchy.
       }
 
-      finishCustomizeScreen();
+      finishCustomizeScreen(targetOrderId);
     } catch (error) {
       const message =
         error?.message ||
