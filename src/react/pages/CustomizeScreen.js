@@ -19,6 +19,7 @@ import {
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import {useStore} from '@store';
 import {env} from '@env';
+import usePosCartSession from '@controleonline/ui-orders/src/react/hooks/usePosCartSession';
 
 import {
   customizeChipRowStyle,
@@ -61,6 +62,8 @@ import {
   customizeQuantityPillStyle,
   customizeQuantityPillTextStyle,
   customizeQuantityRowStyle,
+  customizeQuantityStepperButtonStyle,
+  customizeQuantityStepperStyle,
   customizeScreenBackdropStyle,
   customizeScreenRootStyle,
   customizeScrollContentStyle,
@@ -85,6 +88,10 @@ import {
   resolveCustomizePalette,
 } from './CustomizeScreen.styles';
 import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
+import {
+  buildManagerPdvRouteParams,
+  buildOrderDetailsRouteParams,
+} from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {resolveFileImageUrl} from '@controleonline/ui-common/src/react/utils/fileUrl';
 
@@ -96,6 +103,11 @@ const normalizeEntityId = value => {
 const parseNumericValue = value => {
   const parsedValue = parseFloat(String(value ?? '').replace(',', '.'));
   return Number.isFinite(parsedValue) ? parsedValue : 0;
+};
+
+const resolvePositiveQuantity = value => {
+  const quantity = parseNumericValue(value);
+  return quantity > 0 ? quantity : 1;
 };
 
 const parseNullableInteger = value => {
@@ -281,9 +293,14 @@ const CustomizeScreen = () => {
     productId: routeProductId = null,
     orderProduct: routeOrderProduct = null,
     orderProductId: routeOrderProductId = null,
+    interactionMode = null,
     redirectToCart = false,
     returnDepth = 3,
   } = route.params || {};
+  const isPdvCustomizationFlow =
+    String(interactionMode || '').trim().toLowerCase() === 'pdv';
+  const [fetchedProductGroups, setFetchedProductGroups] = useState([]);
+  const [isLoadingProductGroups, setIsLoadingProductGroups] = useState(false);
   const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
   const [selectedItems, setSelectedItems] = useState({});
   const [optionProductsById, setOptionProductsById] = useState({});
@@ -291,10 +308,12 @@ const CustomizeScreen = () => {
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
   const ordersGetters = ordersStore.getters;
+  const peopleStore = useStore('people');
+  const {currentCompany, defaultCompany} = peopleStore.getters;
+  const deviceStore = useStore('device');
+  const {item: storagedDevice} = deviceStore.getters;
   const product_groupStore = useStore('product_group');
-  const productGroupsGetters = product_groupStore.getters;
   const productGroupActions = product_groupStore.actions;
-  const {items: productGroups} = productGroupsGetters;
   const productsStore = useStore('products');
   const productsActions = productsStore.actions;
   const productsGetters = productsStore.getters;
@@ -316,6 +335,11 @@ const CustomizeScreen = () => {
   const isSavingCustomization = Boolean(orderProductsGetters?.isSaving);
   const {item: order} = ordersGetters;
   const {item: cart} = cartGetters;
+  const {ensureActiveOrder} = usePosCartSession({
+    companyId: currentCompany?.id,
+    deviceId: storagedDevice?.id,
+    defaultStatusId: defaultCompany?.configs?.['pos-default-status'],
+  });
   const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
   const productGroupActionsRef = useRef(productGroupActions);
   const productsActionsRef = useRef(productsActions);
@@ -323,6 +347,7 @@ const CustomizeScreen = () => {
   const productGroupProductActionsRef = useRef(productGroupProductActions);
   const loadedGroupProductsRef = useRef({});
   const loadedOptionProductsRef = useRef({});
+  const quantityTouchedRef = useRef(false);
 
   const activeOrderProductId = useMemo(
     () =>
@@ -427,6 +452,13 @@ const CustomizeScreen = () => {
     () => normalizeEntityId(activeProduct?.id || activeProduct?.['@id']),
     [activeProduct],
   );
+  const activeOrderProductQuantity = useMemo(
+    () => resolvePositiveQuantity(activeOrderProduct?.quantity || 1),
+    [activeOrderProduct?.quantity],
+  );
+  const [itemQuantity, setItemQuantity] = useState(
+    () => activeOrderProductQuantity,
+  );
 
   const activeProductIri = useMemo(() => {
     if (activeProduct?.['@id']) {
@@ -495,12 +527,24 @@ const CustomizeScreen = () => {
 
       mappedSelections[groupId][productId] = {
         selected: true,
-        quantity: parseFloat(String(component?.quantity || 1).replace(',', '.')) || 1,
+        quantity: (() => {
+          const componentQuantity = resolvePositiveQuantity(
+            component?.quantity || 1,
+          );
+
+          if (activeOrderProductQuantity > 1) {
+            const normalizedQuantity =
+              componentQuantity / activeOrderProductQuantity;
+            return normalizedQuantity > 0 ? normalizedQuantity : 1;
+          }
+
+          return componentQuantity;
+        })(),
       };
     });
 
     return mappedSelections;
-  }, [activeOrderProduct]);
+  }, [activeOrderProduct, activeOrderProductQuantity]);
 
   const orderProductGroupsById = useMemo(() => {
     const mappedGroups = {};
@@ -528,7 +572,7 @@ const CustomizeScreen = () => {
   const resolvedProductGroups = useMemo(() => {
     const mappedGroups = {};
 
-    ;(Array.isArray(productGroups) ? productGroups : []).forEach(group => {
+    ;(Array.isArray(fetchedProductGroups) ? fetchedProductGroups : []).forEach(group => {
       const groupId = normalizeEntityId(group?.id || group?.['@id']);
 
       if (!groupId) {
@@ -560,7 +604,7 @@ const CustomizeScreen = () => {
         parseNumericValue(normalizeEntityId(rightGroup?.id))
       );
     });
-  }, [orderProductGroupsById, productGroups]);
+  }, [fetchedProductGroups, orderProductGroupsById]);
 
   const resolvedProductGroupsById = useMemo(
     () =>
@@ -618,17 +662,53 @@ const CustomizeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      let isActive = true;
+
       if (!activeProductId) {
+        setFetchedProductGroups([]);
+        setIsLoadingProductGroups(false);
         return undefined;
       }
 
-      productGroupActionsRef.current.getItems({
-        product: activeProductId,
-        'product.productType': 'component',
-      });
-      return undefined;
+      setFetchedProductGroups([]);
+      setIsLoadingProductGroups(true);
+
+      productGroupActionsRef.current
+        .getItems({
+          product: activeProductId,
+          'product.productType': 'component',
+        })
+        .then(items => {
+          if (!isActive) {
+            return;
+          }
+
+          setFetchedProductGroups(Array.isArray(items) ? items : []);
+          setIsLoadingProductGroups(false);
+        })
+        .catch(() => {
+          if (isActive) {
+            setFetchedProductGroups([]);
+            setIsLoadingProductGroups(false);
+          }
+        });
+
+      return () => {
+        isActive = false;
+      };
     }, [activeProductId]),
   );
+
+  useEffect(() => {
+    quantityTouchedRef.current = false;
+    setItemQuantity(activeOrderProductQuantity);
+  }, [activeOrderProductId, activeProductId]);
+
+  useEffect(() => {
+    if (!quantityTouchedRef.current) {
+      setItemQuantity(activeOrderProductQuantity);
+    }
+  }, [activeOrderProductQuantity]);
 
   useEffect(() => {
     setSelectedItems({});
@@ -760,8 +840,22 @@ const CustomizeScreen = () => {
       return;
     }
 
+    if (
+      String(interactionMode || '').trim().toLowerCase() === 'pdv' &&
+      activeOrderId
+    ) {
+      navigation.replace(
+        'OrderDetails',
+        buildOrderDetailsRouteParams(
+          activeOrderId,
+          buildManagerPdvRouteParams({showBottomCart: false}),
+        ),
+      );
+      return;
+    }
+
     navigation.pop(Math.max(1, Number(returnDepth || 1)));
-  }, [navigation, redirectToCart, returnDepth]);
+  }, [activeOrderId, interactionMode, navigation, redirectToCart, returnDepth]);
 
   const refreshSavedOrderProducts = useCallback(async () => {
     if (!activeOrderId) {
@@ -1013,6 +1107,7 @@ const CustomizeScreen = () => {
   const canSubmitCustomization =
     !!activeProductIri &&
     !!activeOrderIri &&
+    !isLoadingProductGroups &&
     invalidGroupSummaries.length === 0;
   const productCoverUrl = useMemo(
     () => buildCoverUrl(activeProduct),
@@ -1030,8 +1125,8 @@ const CustomizeScreen = () => {
     0,
   );
   const basePrice = parseNumericValue(activeProduct?.price || activeOrderProduct?.price);
-  const itemQuantity = Number(activeOrderProduct?.quantity || 1);
-  const itemTotal = (basePrice + complementsTotal) * itemQuantity;
+  const resolvedItemQuantity = resolvePositiveQuantity(itemQuantity);
+  const itemTotal = (basePrice + complementsTotal) * resolvedItemQuantity;
   const submitLabel = isSavingCustomization
     ? 'SALVANDO...'
     : isEditingExistingOrderProduct
@@ -1194,10 +1289,11 @@ const CustomizeScreen = () => {
     Object.entries(selectedItems).forEach(([groupId, groupItems]) => {
       groupItems.forEach(item => {
         if (item.selected) {
+          const selectedQuantity = resolvePositiveQuantity(item.quantity || 1);
           subProducts.push({
             product: item.productChild['@id'].replace(/\D/g, ''),
             productGroup: parseInt(groupId),
-            quantity: parseFloat(String(item.quantity || 1).replace(',', '.')) || 1,
+            quantity: Number((selectedQuantity * resolvedItemQuantity).toFixed(2)),
           });
         }
       });
@@ -1236,7 +1332,7 @@ const CustomizeScreen = () => {
       product: activeProductIri,
       sub_products: getSubproducts(),
       order: activeOrderIri,
-      quantity: Number(activeOrderProduct?.quantity || 1),
+      quantity: resolvedItemQuantity,
     };
 
     try {
@@ -1463,10 +1559,44 @@ const CustomizeScreen = () => {
       ) : null}
       <View style={customizeQuantityRowStyle}>
         <Text style={customizeSummaryLabelStyle({palette})}>Quantidade</Text>
-        <View style={customizeQuantityPillStyle({palette})}>
-          <Text style={customizeQuantityPillTextStyle({palette})}>
-            {itemQuantity} un
-          </Text>
+        <View style={customizeQuantityStepperStyle}>
+          <TouchableOpacity
+            onPress={() => {
+              quantityTouchedRef.current = true;
+              setItemQuantity(current =>
+                Math.max(1, resolvePositiveQuantity(current) - 1),
+              );
+            }}
+            disabled={resolvedItemQuantity <= 1}
+            style={customizeQuantityStepperButtonStyle({
+              palette,
+              disabled: resolvedItemQuantity <= 1,
+            })}
+            activeOpacity={0.82}>
+            <MaterialCommunityIcons
+              name="minus"
+              size={16}
+              color={resolvedItemQuantity <= 1 ? palette.faint : palette.primary}
+            />
+          </TouchableOpacity>
+          <View style={customizeQuantityPillStyle({palette})}>
+            <Text style={customizeQuantityPillTextStyle({palette})}>
+              {formatOptionQuantity(resolvedItemQuantity)} un
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => {
+              quantityTouchedRef.current = true;
+              setItemQuantity(current => resolvePositiveQuantity(current) + 1);
+            }}
+            style={customizeQuantityStepperButtonStyle({palette})}
+            activeOpacity={0.82}>
+            <MaterialCommunityIcons
+              name="plus"
+              size={16}
+              color={palette.primary}
+            />
+          </TouchableOpacity>
         </View>
       </View>
     </View>

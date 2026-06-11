@@ -475,6 +475,27 @@ export const customizeQuantityRowStyle = {
   marginTop: 16,
 };
 
+export const customizeQuantityStepperStyle = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+};
+
+export const customizeQuantityStepperButtonStyle = ({
+  palette,
+  disabled = false,
+}) => ({
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: disabled ? palette.panelStrong : palette.panel,
+  borderWidth: 1,
+  borderColor: disabled ? palette.borderSoft : palette.border,
+  opacity: disabled ? 0.72 : 1,
+});
+
 export const customizeQuantityPillStyle = ({palette}) => ({
   paddingHorizontal: 12,
   paddingVertical: 7,
