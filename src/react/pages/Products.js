@@ -329,6 +329,7 @@ const ProductsPage = ({ navigation, route }) => {
       }),
     [interactionMode, runtimeDeviceConfig?.configs],
   );
+  const isSingleItemMode = routeParams.singleItemMode === true;
   const {
     getProductStatuses,
     loadCatalogStatus,
@@ -769,6 +770,7 @@ const ProductsPage = ({ navigation, route }) => {
                 category={category}
                 catalogContext={context}
                 interactionMode={interactionMode}
+                singleItemMode={isSingleItemMode}
                 marketplaceStatuses={isManager ? getProductStatuses(item) : []}
                 onMarketplaceSync={handleMarketplaceSync}
                 marketplaceSyncingKey={marketplaceSyncingKey}

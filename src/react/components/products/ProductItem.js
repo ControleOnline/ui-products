@@ -27,6 +27,7 @@ const ProductItem = ({
   category,
   catalogContext = 'products',
   interactionMode = 'auto',
+  singleItemMode = false,
   marketplaceStatuses = [],
   onMarketplaceSync,
   marketplaceSyncingKey = '',
@@ -77,7 +78,7 @@ const ProductItem = ({
         </TouchableOpacity>
       );
     }
-    if (APP_ENV.APP_TYPE === 'TOTEM') {
+    if (singleItemMode || APP_ENV.APP_TYPE === 'TOTEM') {
       return <ProductTotem product={product} category={category} />;
     }
     return <ProductQuantity product={product} category={category} />;
