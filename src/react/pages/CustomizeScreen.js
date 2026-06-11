@@ -1106,7 +1106,7 @@ const CustomizeScreen = () => {
 
   const canSubmitCustomization =
     !!activeProductIri &&
-    !!activeOrderIri &&
+    (isPdvCustomizationFlow || !!activeOrderIri) &&
     !isLoadingProductGroups &&
     invalidGroupSummaries.length === 0;
   const productCoverUrl = useMemo(
