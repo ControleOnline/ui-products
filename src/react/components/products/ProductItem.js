@@ -79,7 +79,13 @@ const ProductItem = ({
       );
     }
     if (singleItemMode || APP_ENV.APP_TYPE === 'TOTEM') {
-      return <ProductTotem product={product} category={category} />;
+      return (
+        <ProductTotem
+          product={product}
+          category={category}
+          singleItemMode={singleItemMode || APP_ENV.APP_TYPE === 'TOTEM'}
+        />
+      );
     }
     return <ProductQuantity product={product} category={category} />;
   };

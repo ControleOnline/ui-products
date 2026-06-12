@@ -763,20 +763,27 @@ const ProductsPage = ({ navigation, route }) => {
             if (visibleCount < visibleProducts.length)
               setVisibleCount(v => v + 50);
           }}
-          renderItem={({ item }) => (
-            <TouchableOpacity onPress={() => handleProductPress(item)}>
-              <ProductItem
-                product={item}
-                category={category}
-                catalogContext={context}
-                interactionMode={interactionMode}
-                singleItemMode={isSingleItemMode}
-                marketplaceStatuses={isManager ? getProductStatuses(item) : []}
-                onMarketplaceSync={handleMarketplaceSync}
-                marketplaceSyncingKey={marketplaceSyncingKey}
-              />
-          </TouchableOpacity>
-          )}
+          renderItem={({ item }) => {
+            const CardWrapper = isManager ? TouchableOpacity : View;
+            const wrapperProps = isManager
+              ? { onPress: () => handleProductPress(item) }
+              : {};
+
+            return (
+              <CardWrapper {...wrapperProps}>
+                <ProductItem
+                  product={item}
+                  category={category}
+                  catalogContext={context}
+                  interactionMode={interactionMode}
+                  singleItemMode={isSingleItemMode}
+                  marketplaceStatuses={isManager ? getProductStatuses(item) : []}
+                  onMarketplaceSync={handleMarketplaceSync}
+                  marketplaceSyncingKey={marketplaceSyncingKey}
+                />
+              </CardWrapper>
+            );
+          }}
         />
       )}
       {context === 'supplies' && (
