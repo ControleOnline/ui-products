@@ -11,3 +11,4 @@
 - A regra de ingredientes nao deve ser duplicada em `ui-manager`; a tela de menu costs apenas registra a rota e consome o componente daqui.
 - Quando o PDV estiver em modo `single-item`, `ProductsPage` vira a entrada efetiva do catalogo e `ProductItem` deve renderizar a selecao unitaria via `ProductTotem`, sem voltar para a navegacao por categoria.
 - No mesmo `single-item`, os produtos `custom` devem passar `singleItemMode` para `CustomizeScreen`, esconder a quantidade, confirmar com quantidade implicita 1 e voltar direto para `Checkout`; `OrderDetails` nao faz parte desse caminho.
+- A liberacao de itens para fila de producao deve respeitar o contrato do pedido: apenas pedidos ja `paid` ou entregas com `order-charge-on-delivery-enabled` ativo podem enfileirar producao.
