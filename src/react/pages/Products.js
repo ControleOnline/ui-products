@@ -28,7 +28,10 @@ import { colors } from '@controleonline/../../src/styles/colors';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
-import {isPosKioskMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
+import {
+  isPosKioskMode,
+  isPosSingleItemMode,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import {
   shouldShowOperationalBottomNavigation,
 } from '@controleonline/ui-layout/src/react/utils/posBottomNavigation';
@@ -317,6 +320,13 @@ const ProductsPage = ({ navigation, route }) => {
   const actionsRef = useRef(actions);
   const categoryActionsRef = useRef(categoryActions);
   const ordersActionsRef = useRef(ordersActions);
+  const currentOrderId = String(
+    routeParams.id ||
+      routeParams.order ||
+      currentOrderRef.current?.id ||
+      currentOrderRef.current?.['@id'] ||
+      '',
+  ).replace(/\D+/g, '');
 
   const isManager =
     env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
@@ -329,7 +339,9 @@ const ProductsPage = ({ navigation, route }) => {
       }),
     [interactionMode, runtimeDeviceConfig?.configs],
   );
-  const isSingleItemMode = routeParams.singleItemMode === true;
+  const isSingleItemMode =
+    routeParams.singleItemMode === true ||
+    isPosSingleItemMode(runtimeDeviceConfig?.configs);
   const {
     getProductStatuses,
     loadCatalogStatus,
@@ -426,34 +438,61 @@ const ProductsPage = ({ navigation, route }) => {
     const pendingSelections = listPendingAddProducts();
 
     if (currentOrderId && pendingSelections.length > 0) {
-      const payload = pendingSelections.map(selection => ({
-        product: selection.productId,
-        quantity: selection.quantity,
-      }));
+      const lastSelection = pendingSelections[pendingSelections.length - 1];
+      if (isSingleItemMode && !lastSelection?.productId) {
+        return;
+      }
+
+      const payload = isSingleItemMode
+        ? [{
+            product: lastSelection?.productId,
+            quantity: 1,
+          }]
+        : pendingSelections.map(selection => ({
+            product: selection.productId,
+            quantity: selection.quantity,
+          }));
 
       const currentOrdersActions = ordersActionsRef.current;
-      currentOrdersActions.addToQueue(() => currentOrdersActions.addProducts(currentOrderId, payload));
+      currentOrdersActions.addToQueue(() =>
+        isSingleItemMode
+          ? currentOrdersActions.replaceProducts(currentOrderId, payload)
+          : currentOrdersActions.addProducts(currentOrderId, payload),
+      );
     }
 
     clearPendingAddProducts();
     ordersActionsRef.current.initQueue();
-  }, []);
+  }, [isSingleItemMode]);
 
   const handlePendingSelectionChange = useCallback(
     payload => {
       const currentOrder = currentOrderRef.current;
       if (!currentOrder) return;
 
-      const nextOrder = applyPendingSelectionToOrder({
-        order: currentOrder,
-        product: payload?.product,
-        quantity: payload?.quantity,
-      });
+      const nextOrder = isSingleItemMode
+        ? mergeOrderWithOrderProducts(
+            currentOrder,
+            payload?.product
+              ? [
+                  buildPendingOrderProduct({
+                    order: currentOrder,
+                    product: payload.product,
+                    quantity: 1,
+                  }),
+                ]
+              : [],
+          )
+        : applyPendingSelectionToOrder({
+            order: currentOrder,
+            product: payload?.product,
+            quantity: payload?.quantity,
+          });
 
       currentOrderRef.current = nextOrder;
       ordersActionsRef.current.syncOrder?.(nextOrder);
     },
-    [],
+    [isSingleItemMode],
   );
 
   useEffect(() => {
@@ -764,6 +803,7 @@ const ProductsPage = ({ navigation, route }) => {
               setVisibleCount(v => v + 50);
           }}
           renderItem={({ item }) => {
+            // No PDV/single-item, o card nao pode roubar o toque do botao interno.
             const CardWrapper = isManager ? TouchableOpacity : View;
             const wrapperProps = isManager
               ? { onPress: () => handleProductPress(item) }
@@ -777,6 +817,7 @@ const ProductsPage = ({ navigation, route }) => {
                   catalogContext={context}
                   interactionMode={interactionMode}
                   singleItemMode={isSingleItemMode}
+                  orderId={currentOrderId}
                   marketplaceStatuses={isManager ? getProductStatuses(item) : []}
                   onMarketplaceSync={handleMarketplaceSync}
                   marketplaceSyncingKey={marketplaceSyncingKey}

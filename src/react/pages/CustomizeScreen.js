@@ -20,6 +20,7 @@ import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import {useStore} from '@store';
 import {env} from '@env';
 import usePosCartSession from '@controleonline/ui-orders/src/react/hooks/usePosCartSession';
+import {isPosSingleItemMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 
 import {
   customizeChipRowStyle,
@@ -90,6 +91,7 @@ import {
 import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
 import {
   buildManagerPdvRouteParams,
+  buildCheckoutRouteParams,
   buildOrderDetailsRouteParams,
 } from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
@@ -294,11 +296,14 @@ const CustomizeScreen = () => {
     orderProduct: routeOrderProduct = null,
     orderProductId: routeOrderProductId = null,
     interactionMode = null,
+    singleItemMode = false,
     redirectToCart = false,
     returnDepth = 3,
   } = route.params || {};
   const isPdvCustomizationFlow =
     String(interactionMode || '').trim().toLowerCase() === 'pdv';
+  const isSingleItemCustomizationFlow =
+    singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const [fetchedProductGroups, setFetchedProductGroups] = useState([]);
   const [isLoadingProductGroups, setIsLoadingProductGroups] = useState(false);
   const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
@@ -840,6 +845,19 @@ const CustomizeScreen = () => {
       return;
     }
 
+    if (isSingleItemCustomizationFlow && nextOrderId) {
+      // No single-item, o customizado vai direto para o pagamento;
+      // a tela de order details nao deve virar destino desse fluxo.
+      navigation.replace(
+        'Checkout',
+        buildCheckoutRouteParams(
+          nextOrderId,
+          buildManagerPdvRouteParams({showBottomCart: false}),
+        ),
+      );
+      return;
+    }
+
     if (
       isPdvCustomizationFlow &&
       nextOrderId
@@ -858,6 +876,7 @@ const CustomizeScreen = () => {
   }, [
     activeOrderId,
     isPdvCustomizationFlow,
+    isSingleItemCustomizationFlow,
     navigation,
     redirectToCart,
     returnDepth,
@@ -1131,7 +1150,10 @@ const CustomizeScreen = () => {
     0,
   );
   const basePrice = parseNumericValue(activeProduct?.price || activeOrderProduct?.price);
-  const resolvedItemQuantity = resolvePositiveQuantity(itemQuantity);
+  // No single-item, a quantidade eh implicita e a tela nao mostra o stepper.
+  const resolvedItemQuantity = isSingleItemCustomizationFlow
+    ? 1
+    : resolvePositiveQuantity(itemQuantity);
   const itemTotal = (basePrice + complementsTotal) * resolvedItemQuantity;
   const submitLabel = isSavingCustomization
     ? 'SALVANDO...'
@@ -1381,7 +1403,13 @@ const CustomizeScreen = () => {
     };
 
     try {
-      await orderProductsActions.save(orderProductData);
+      if (isSingleItemCustomizationFlow) {
+        // No single-item, a troca precisa substituir o pai e manter os filhos
+        // do customizado no mesmo envio para nao reaparecerem itens extras.
+        await ordersActions.replaceProducts(targetOrderId, orderProductData);
+      } else {
+        await orderProductsActions.save(orderProductData);
+      }
 
       try {
         await refreshSavedOrderProducts();
@@ -1602,48 +1630,50 @@ const CustomizeScreen = () => {
           ))}
         </View>
       ) : null}
-      <View style={customizeQuantityRowStyle}>
-        <Text style={customizeSummaryLabelStyle({palette})}>Quantidade</Text>
-        <View style={customizeQuantityStepperStyle}>
-          <TouchableOpacity
-            onPress={() => {
-              quantityTouchedRef.current = true;
-              setItemQuantity(current =>
-                Math.max(1, resolvePositiveQuantity(current) - 1),
-              );
-            }}
-            disabled={resolvedItemQuantity <= 1}
-            style={customizeQuantityStepperButtonStyle({
-              palette,
-              disabled: resolvedItemQuantity <= 1,
-            })}
-            activeOpacity={0.82}>
-            <MaterialCommunityIcons
-              name="minus"
-              size={16}
-              color={resolvedItemQuantity <= 1 ? palette.faint : palette.primary}
-            />
-          </TouchableOpacity>
-          <View style={customizeQuantityPillStyle({palette})}>
-            <Text style={customizeQuantityPillTextStyle({palette})}>
-              {formatOptionQuantity(resolvedItemQuantity)} un
-            </Text>
+      {!isSingleItemCustomizationFlow ? (
+        <View style={customizeQuantityRowStyle}>
+          <Text style={customizeSummaryLabelStyle({palette})}>Quantidade</Text>
+          <View style={customizeQuantityStepperStyle}>
+            <TouchableOpacity
+              onPress={() => {
+                quantityTouchedRef.current = true;
+                setItemQuantity(current =>
+                  Math.max(1, resolvePositiveQuantity(current) - 1),
+                );
+              }}
+              disabled={resolvedItemQuantity <= 1}
+              style={customizeQuantityStepperButtonStyle({
+                palette,
+                disabled: resolvedItemQuantity <= 1,
+              })}
+              activeOpacity={0.82}>
+              <MaterialCommunityIcons
+                name="minus"
+                size={16}
+                color={resolvedItemQuantity <= 1 ? palette.faint : palette.primary}
+              />
+            </TouchableOpacity>
+            <View style={customizeQuantityPillStyle({palette})}>
+              <Text style={customizeQuantityPillTextStyle({palette})}>
+                {formatOptionQuantity(resolvedItemQuantity)} un
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                quantityTouchedRef.current = true;
+                setItemQuantity(current => resolvePositiveQuantity(current) + 1);
+              }}
+              style={customizeQuantityStepperButtonStyle({palette})}
+              activeOpacity={0.82}>
+              <MaterialCommunityIcons
+                name="plus"
+                size={16}
+                color={palette.primary}
+              />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() => {
-              quantityTouchedRef.current = true;
-              setItemQuantity(current => resolvePositiveQuantity(current) + 1);
-            }}
-            style={customizeQuantityStepperButtonStyle({palette})}
-            activeOpacity={0.82}>
-            <MaterialCommunityIcons
-              name="plus"
-              size={16}
-              color={palette.primary}
-            />
-          </TouchableOpacity>
         </View>
-      </View>
+      ) : null}
     </View>
   );
 

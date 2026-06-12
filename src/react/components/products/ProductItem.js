@@ -28,6 +28,7 @@ const ProductItem = ({
   catalogContext = 'products',
   interactionMode = 'auto',
   singleItemMode = false,
+  orderId = '',
   marketplaceStatuses = [],
   onMarketplaceSync,
   marketplaceSyncingKey = '',
@@ -70,6 +71,8 @@ const ProductItem = ({
             navigation.navigate('CustomizeScreen', {
               productId: product?.id || product?.['@id'],
               interactionMode,
+              // O custom do fluxo single-item precisa manter a mesma saida do PDV.
+              singleItemMode: singleItemMode === true,
             })
           }
           style={styles.customizeButton}
@@ -84,6 +87,7 @@ const ProductItem = ({
           product={product}
           category={category}
           singleItemMode={singleItemMode || APP_ENV.APP_TYPE === 'TOTEM'}
+          orderId={orderId}
         />
       );
     }
