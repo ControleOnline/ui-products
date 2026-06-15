@@ -302,8 +302,6 @@ const CustomizeScreen = () => {
   } = route.params || {};
   const isPdvCustomizationFlow =
     String(interactionMode || '').trim().toLowerCase() === 'pdv';
-  const isSingleItemCustomizationFlow =
-    singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const [fetchedProductGroups, setFetchedProductGroups] = useState([]);
   const [isLoadingProductGroups, setIsLoadingProductGroups] = useState(false);
   const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
@@ -317,6 +315,8 @@ const CustomizeScreen = () => {
   const {currentCompany, defaultCompany} = peopleStore.getters;
   const deviceStore = useStore('device');
   const {item: storagedDevice} = deviceStore.getters;
+  const isSingleItemCustomizationFlow =
+    singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const product_groupStore = useStore('product_group');
   const productGroupActions = product_groupStore.actions;
   const productsStore = useStore('products');
