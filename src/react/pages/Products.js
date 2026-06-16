@@ -985,7 +985,7 @@ const ProductsPage = ({ navigation, route }) => {
     [syncEntity],
   );
 
-  const maxContentWidth = 860;
+  const maxContentWidth = isDesktopList ? 1600 : 860;
   const containerWidth = Math.min(width, maxContentWidth);
   const isCompactMobile = width < 360;
   const shouldWaitForGroupedProducts = shouldGroupByType && !groupedProductsReady;
@@ -1001,6 +1001,12 @@ const ProductsPage = ({ navigation, route }) => {
     !shouldWaitForGroupedProducts &&
     visibleProducts.length > 0;
   const listContentStyle = {
+    ...(isDesktopList
+      ? {
+          alignSelf: 'center',
+          width: containerWidth,
+        }
+      : {}),
     paddingTop: isCompactMobile ? 12 : 16,
     paddingHorizontal: isCompactMobile ? 12 : 16,
     paddingBottom: interactionMode === 'pdv'
@@ -1185,35 +1191,44 @@ const ProductsPage = ({ navigation, route }) => {
       </View>
     );
   };
-  const renderTypeHeader = item => (
-    <View
-      style={[
-        isDesktopList ? styles.tableTypeSectionHeader : styles.typeSectionHeader,
-        {
-          backgroundColor: isDesktopList
-            ? brandColors['bg-headers-light'] || brandColors['bg-even-light'] || brandColors.background
-            : brandColors.background,
-          borderColor: brandColors.border,
-        },
-      ]}
-    >
-      <Text
+  const renderTypeHeader = item => {
+    const typeKey = String(item.key || '').replace(`${MOBILE_TYPE_HEADER_PREFIX}-`, '');
+    const typeConf = PRODUCT_TYPE_CONFIG[typeKey] || {};
+    const desktopTypeColor = typeConf.color || brandColors.primary;
+    const desktopTypeBackground = typeConf.bg || brandColors['bg-headers-light'] || brandColors.background;
+
+    return (
+      <View
         style={[
-          isDesktopList ? styles.tableTypeSectionTitle : styles.typeSectionTitle,
-          { color: brandColors.text },
+          isDesktopList ? styles.tableTypeSectionHeader : styles.typeSectionHeader,
+          {
+            backgroundColor: isDesktopList
+              ? desktopTypeBackground
+              : brandColors.background,
+            borderColor: isDesktopList
+              ? `${desktopTypeColor}33`
+              : brandColors.border,
+          },
         ]}
       >
-        {isDesktopList
-          ? `${item.label} · ${item.count} ${item.count === 1 ? labels.singular : labels.plural}`
-          : item.label}
-      </Text>
-      {!isDesktopList && (
-        <Text style={[styles.typeSectionCount, { color: brandColors.textSecondary }]}>
-          {item.count}
+        <Text
+          style={[
+            isDesktopList ? styles.tableTypeSectionTitle : styles.typeSectionTitle,
+            { color: isDesktopList ? desktopTypeColor : brandColors.text },
+          ]}
+        >
+          {isDesktopList
+            ? `${item.label} · ${item.count} ${item.count === 1 ? 'item' : 'itens'}`
+            : item.label}
         </Text>
-      )}
-    </View>
-  );
+        {!isDesktopList && (
+          <Text style={[styles.typeSectionCount, { color: brandColors.textSecondary }]}>
+            {item.count}
+          </Text>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1267,6 +1282,7 @@ const ProductsPage = ({ navigation, route }) => {
           keyExtractor={item => String(shouldGroupByType ? item.key : item.id)}
           contentContainerStyle={listContentStyle}
           ListHeaderComponent={renderListHeader}
+          stickyHeaderIndices={isDesktopList ? [0] : undefined}
           onScrollToIndexFailed={info => {
             setTimeout(() => {
               productListRef.current?.scrollToIndex?.({

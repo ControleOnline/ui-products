@@ -84,6 +84,7 @@ const ProductItem = ({
   const resolvedPalette = {
     background: palette.background || colors.background,
     border: palette.border || colors.border,
+    primary: palette.primary || colors.primary,
     textSecondary: palette.textSecondary || colors.textSecondary,
   };
   const resolvedCategories = useMemo(() => {
@@ -130,7 +131,11 @@ const ProductItem = ({
               singleItemMode: singleItemMode === true,
             })
           }
-          style={styles.customizeButton}
+          style={[
+            styles.customizeButton,
+            isTableMode && styles.tableCustomizeButton,
+            isTableMode && { backgroundColor: resolvedPalette.primary },
+          ]}
         >
           <Text style={styles.customizeButtonText}>CUSTOMIZAR</Text>
         </TouchableOpacity>
@@ -244,7 +249,7 @@ const ProductItem = ({
         </View>
         <View style={styles.tableTypeCell}>
           {typeConf ? (
-            <View style={[styles.typeChip, { backgroundColor: typeConf.bg }]}>
+            <View style={[styles.typeChip, styles.tableTypeChip, { backgroundColor: typeConf.bg }]}>
               <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
             </View>
           ) : (
