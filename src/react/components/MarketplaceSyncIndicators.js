@@ -48,6 +48,7 @@ export default function MarketplaceSyncIndicators({
   entityLabel = '',
   entityType = 'product',
   onSync,
+  size = 'default',
   statuses = [],
   syncingKey = '',
 }) {
@@ -66,6 +67,7 @@ export default function MarketplaceSyncIndicators({
   const selectedSyncKey = `${entityType}:${selectedKey}:${selectedStatus?.id || ''}`;
   const isSyncing = syncingKey === selectedSyncKey || syncingKey === 'all';
   const canSync = selectedStatus?.eligible !== false && typeof onSync === 'function';
+  const isComfortable = size === 'comfortable';
 
   const handleSync = async () => {
     if (!selectedStatus || !canSync) return;
@@ -95,6 +97,7 @@ export default function MarketplaceSyncIndicators({
               }}
               style={[
                 styles.iconButton,
+                isComfortable && styles.iconButtonComfortable,
                 !status?.synced && styles.iconButtonMuted,
                 { borderColor: `${tone}55` },
               ]}
@@ -104,14 +107,21 @@ export default function MarketplaceSyncIndicators({
                   source={logo}
                   style={[
                     styles.logo,
+                    isComfortable && styles.logoComfortable,
                     !status?.synced && styles.logoMuted,
                   ]}
                   resizeMode="contain"
                 />
               ) : (
-                <MaterialCommunityIcons name="cloud-sync-outline" size={14} color={tone} />
+                <MaterialCommunityIcons name="cloud-sync-outline" size={isComfortable ? 16 : 14} color={tone} />
               )}
-              <View style={[styles.statusDot, { backgroundColor: tone }]} />
+              <View
+                style={[
+                  styles.statusDot,
+                  isComfortable && styles.statusDotComfortable,
+                  { backgroundColor: tone },
+                ]}
+              />
             </TouchableOpacity>
           );
         })}

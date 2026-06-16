@@ -16,12 +16,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
+  iconButtonComfortable: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+  },
   iconButtonMuted: {
     backgroundColor: '#F8FAFC',
   },
   logo: {
     width: 16,
     height: 16,
+  },
+  logoComfortable: {
+    width: 18,
+    height: 18,
   },
   logoMuted: {
     opacity: 0.32,
@@ -35,6 +44,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: -2,
     bottom: -2,
+  },
+  statusDotComfortable: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   modalRoot: {
     flex: 1,

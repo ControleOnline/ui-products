@@ -19,7 +19,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
-import ProductItem from '@controleonline/ui-products/src/react/components/products/ProductItem';
+import ProductItem, {
+  PRODUCT_TYPE_CONFIG,
+  getProductTypeLabel,
+} from '@controleonline/ui-products/src/react/components/products/ProductItem';
 import { useFocusEffect } from '@react-navigation/native';
 import { env } from '@env';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -116,6 +119,16 @@ const SUPPLY_EMPTY_LABELS = {
   },
 };
 
+const ALL_PRODUCTS_PAGE_SIZE = 50;
+const DESKTOP_LIST_MIN_WIDTH = 900;
+const MOBILE_TYPE_HEADER_PREFIX = 'type-header';
+const MOBILE_PRODUCT_ROW_PREFIX = 'product-row';
+const SYNC_STATUS_LEGEND = [
+  { key: 'not-synced', label: 'Nao sinc.', color: '#94A3B8' },
+  { key: 'pending', label: 'Pendente', color: '#e67e22' },
+  { key: 'synced', label: 'Sinc.', color: '#16A34A' },
+];
+
 const getPendingOrderProductKey = productId => `pending-add-product-${productId}`;
 
 const buildPendingOrderProduct = ({ product, quantity, order }) => {
@@ -205,6 +218,16 @@ const normalizeProductTypeFilter = value => {
   return normalizedValue || null;
 };
 
+const normalizeProductId = value => {
+  if (!value && value !== 0) return '';
+
+  const raw = typeof value === 'object'
+    ? value?.id || value?.['@id'] || value?.value || ''
+    : value;
+
+  return String(raw || '').replace(/\D+/g, '').trim();
+};
+
 const normalizeCatalogContext = value =>
   String(value || 'products').trim().toLowerCase() === 'supplies'
     ? 'supplies'
@@ -266,6 +289,8 @@ const ProductsPage = ({ navigation, route }) => {
   const actions = productsStore.actions;
   const { isLoading: storeLoading } = productsStore.getters;
   const error = productsStore.error;
+  const productCategoryStore = useStore('product_category');
+  const productCategoryActions = productCategoryStore.actions;
 
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
@@ -304,8 +329,18 @@ const ProductsPage = ({ navigation, route }) => {
     [themeColors, currentCompany?.id],
   );
   const [categoryProducts, setCategoryProducts] = useState([]);
+  const [productCategoriesByProductId, setProductCategoriesByProductId] = useState({});
+  const [groupedProductsReady, setGroupedProductsReady] = useState(true);
   const categoryProductsRef = useRef([]);
   const productsRequestKeyRef = useRef('');
+  const productCategoryRequestKeyRef = useRef('');
+  const allProductsPaginationRef = useRef({
+    baseParams: null,
+    hasMore: false,
+    isLoading: false,
+    page: 0,
+    requestKey: '',
+  });
   const typeFilter = useMemo(
     () => normalizeProductTypeFilter(routeParams.typeFilter),
     [routeParams.typeFilter],
@@ -317,9 +352,11 @@ const ProductsPage = ({ navigation, route }) => {
   const [visibleCount, setVisibleCount] = useState(50);
   const [supplyTypeModalVisible, setSupplyTypeModalVisible] = useState(false);
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
+  const productListRef = useRef(null);
   const actionsRef = useRef(actions);
   const categoryActionsRef = useRef(categoryActions);
   const ordersActionsRef = useRef(ordersActions);
+  const productCategoryActionsRef = useRef(productCategoryActions);
   const currentOrderId = String(
     routeParams.id ||
       routeParams.order ||
@@ -401,6 +438,10 @@ const ProductsPage = ({ navigation, route }) => {
   }, [actions]);
 
   useEffect(() => {
+    productCategoryActionsRef.current = productCategoryActions;
+  }, [productCategoryActions]);
+
+  useEffect(() => {
     categoryActionsRef.current = categoryActions;
   }, [categoryActions]);
 
@@ -425,9 +466,72 @@ const ProductsPage = ({ navigation, route }) => {
     return categoryProducts.filter(p => p.type === visibleTypeFilter);
   }, [categoryProducts, visibleTypeFilter]);
 
+  const categoryProductIdsKey = useMemo(() => {
+    const ids = Array.from(
+      new Set(
+        categoryProducts
+          .map(product => normalizeProductId(product))
+          .filter(Boolean),
+      ),
+    );
+
+    return ids.join('|');
+  }, [categoryProducts]);
+
   useEffect(() => {
     setVisibleCount(50);
   }, [categoryId, normalizedSearchQuery, typeFilter]);
+
+  useEffect(() => {
+    const productIds = categoryProductIdsKey
+      ? categoryProductIdsKey.split('|').filter(Boolean)
+      : [];
+
+    if (productIds.length === 0) {
+      productCategoryRequestKeyRef.current = '';
+      setProductCategoriesByProductId({});
+      return;
+    }
+
+    const requestKey = JSON.stringify([context, currentCompany?.id, productIds]);
+    if (productCategoryRequestKeyRef.current === requestKey) {
+      return;
+    }
+
+    productCategoryRequestKeyRef.current = requestKey;
+
+    productCategoryActionsRef.current
+      .getItems({
+        product: productIds.map(productId => `/products/${productId}`),
+        itemsPerPage: Math.max(50, productIds.length * 5),
+      })
+      .then(data => {
+        if (productCategoryRequestKeyRef.current !== requestKey) {
+          return;
+        }
+
+        const nextCategoriesByProductId = {};
+        (Array.isArray(data) ? data : []).forEach(relation => {
+          const productId = normalizeProductId(relation?.product);
+          if (!productId) {
+            return;
+          }
+
+          if (!nextCategoriesByProductId[productId]) {
+            nextCategoriesByProductId[productId] = [];
+          }
+
+          nextCategoriesByProductId[productId].push(relation);
+        });
+
+        setProductCategoriesByProductId(nextCategoriesByProductId);
+      })
+      .catch(() => {
+        if (productCategoryRequestKeyRef.current === requestKey) {
+          setProductCategoriesByProductId({});
+        }
+      });
+  }, [categoryProductIdsKey, context, currentCompany?.id]);
 
   const flushPendingAddProducts = useCallback(() => {
     const currentOrderId = String(
@@ -500,9 +604,73 @@ const ProductsPage = ({ navigation, route }) => {
     return () => eventBus.off(ADD_PRODUCT_SELECTION_CHANGE_EVENT, handlePendingSelectionChange);
   }, [handlePendingSelectionChange]);
 
+  const isDesktopList = width >= DESKTOP_LIST_MIN_WIDTH;
+  const shouldGroupByType =
+    isAllProducts &&
+    context === 'products' &&
+    !normalizedSearchQuery;
   const productsData = useMemo(
-    () => visibleProducts.slice(0, visibleCount),
-    [visibleProducts, visibleCount],
+    () => (shouldGroupByType ? visibleProducts : visibleProducts.slice(0, visibleCount)),
+    [shouldGroupByType, visibleProducts, visibleCount],
+  );
+  const shouldShowTypeJumpBar = !isDesktopList && shouldGroupByType;
+  const typeGroups = useMemo(() => {
+    if (!shouldGroupByType) {
+      return [];
+    }
+
+    const groupsByType = {};
+    productsData.forEach(product => {
+      const type = String(product?.type || '').trim() || 'product';
+      if (!groupsByType[type]) {
+        groupsByType[type] = {
+          key: type,
+          label: getProductTypeLabel(type),
+          products: [],
+        };
+      }
+      groupsByType[type].products.push(product);
+    });
+
+    return Object.values(groupsByType).sort((first, second) =>
+      first.label.localeCompare(second.label, 'pt-BR', { sensitivity: 'base' }),
+    );
+  }, [context, isAllProducts, normalizedSearchQuery, productsData, shouldGroupByType]);
+  const groupedProductsData = useMemo(() => {
+    if (!shouldGroupByType) {
+      return productsData.map(product => ({
+        key: `${MOBILE_PRODUCT_ROW_PREFIX}-${product.id}`,
+        product,
+        type: 'product',
+      }));
+    }
+
+    return typeGroups.flatMap(group => [
+      {
+        count: group.products.length,
+        key: `${MOBILE_TYPE_HEADER_PREFIX}-${group.key}`,
+        label: group.label,
+        type: 'header',
+      },
+      ...group.products.map(product => ({
+        key: `${MOBILE_PRODUCT_ROW_PREFIX}-${product.id}`,
+        product,
+        type: 'product',
+      })),
+    ]);
+  }, [productsData, shouldGroupByType, typeGroups]);
+  const typeJumpTargets = useMemo(() => {
+    const targets = {};
+    groupedProductsData.forEach((item, index) => {
+      if (item.type === 'header') {
+        targets[item.key.replace(`${MOBILE_TYPE_HEADER_PREFIX}-`, '')] = index;
+      }
+    });
+    return targets;
+  }, [groupedProductsData]);
+  const listData = useMemo(
+    () => (shouldGroupByType ? groupedProductsData : productsData),
+    [groupedProductsData, productsData, shouldGroupByType],
   );
 
   const changeCategoryProduct = (p, changeStorage = false) => {
@@ -526,9 +694,100 @@ const ProductsPage = ({ navigation, route }) => {
       writeCachedCategories(currentCompany?.id, c, context);
   };
 
+  const resetAllProductsPagination = useCallback(() => {
+    allProductsPaginationRef.current = {
+      baseParams: null,
+      hasMore: false,
+      isLoading: false,
+      page: 0,
+      requestKey: '',
+    };
+    setGroupedProductsReady(true);
+  }, []);
+
+  const loadAllProductsPage = useCallback(async page => {
+    const pagination = allProductsPaginationRef.current;
+    const requestKey = pagination.requestKey;
+
+    if (!pagination.baseParams || !requestKey || pagination.isLoading) {
+      return false;
+    }
+
+    if (page > 1 && !pagination.hasMore) {
+      return false;
+    }
+
+    pagination.isLoading = true;
+
+    try {
+      const data = await actionsRef.current.getItems({
+        ...pagination.baseParams,
+        itemsPerPage: ALL_PRODUCTS_PAGE_SIZE,
+        page,
+      });
+
+      if (productsRequestKeyRef.current !== requestKey) {
+        return false;
+      }
+
+      const nextPageProducts = Array.isArray(data) ? data : [];
+      const currentProducts = page === 1 ? [] : categoryProductsRef.current;
+      const currentProductIds = new Set(
+        currentProducts.map(product => String(product?.id || product?.['@id'] || '')),
+      );
+      const mergedProducts = [
+        ...currentProducts,
+        ...nextPageProducts.filter(product => {
+          const productId = String(product?.id || product?.['@id'] || '');
+          return productId && !currentProductIds.has(productId);
+        }),
+      ];
+
+      updateCategoryProducts(mergedProducts);
+      setVisibleCount(count => Math.max(count, mergedProducts.length));
+
+      const totalItems = Number(productsStore.getters?.totalItems || 0);
+      const hasMore = totalItems > 0
+        ? mergedProducts.length < totalItems
+        : nextPageProducts.length >= ALL_PRODUCTS_PAGE_SIZE;
+      pagination.page = page;
+      pagination.hasMore = hasMore;
+
+      return hasMore;
+    } catch {
+      // The central store error flow handles request failures.
+      return false;
+    } finally {
+      pagination.isLoading = false;
+    }
+  }, [updateCategoryProducts]);
+
+  const loadAllProductsUntilComplete = useCallback(async requestKey => {
+    let page = 1;
+    let hasMore = await loadAllProductsPage(page);
+
+    while (
+      hasMore &&
+      productsRequestKeyRef.current === requestKey &&
+      allProductsPaginationRef.current.requestKey === requestKey
+    ) {
+      page += 1;
+      hasMore = await loadAllProductsPage(page);
+    }
+
+    if (
+      productsRequestKeyRef.current === requestKey &&
+      allProductsPaginationRef.current.requestKey === requestKey
+    ) {
+      setGroupedProductsReady(true);
+    }
+  }, [loadAllProductsPage]);
+
   useEffect(() => {
     if (!category) {
       productsRequestKeyRef.current = '';
+      resetAllProductsPagination();
+      setGroupedProductsReady(true);
       updateCategoryProducts([]);
       return;
     }
@@ -545,6 +804,8 @@ const ProductsPage = ({ navigation, route }) => {
     };
 
     if (normalizedSearchQuery) {
+      resetAllProductsPagination();
+      setGroupedProductsReady(true);
       const requestKey = JSON.stringify(['search', baseParams, normalizedSearchQuery]);
       if (productsRequestKeyRef.current === requestKey) return;
       productsRequestKeyRef.current = requestKey;
@@ -563,20 +824,33 @@ const ProductsPage = ({ navigation, route }) => {
     }
 
     if (isAllProducts) {
-      const requestKey = JSON.stringify(['all', baseParams]);
+      const requestKey = JSON.stringify([
+        'all',
+        shouldGroupByType ? 'grouped' : 'paged',
+        baseParams,
+      ]);
       if (productsRequestKeyRef.current === requestKey) return;
       productsRequestKeyRef.current = requestKey;
-      actionsRef.current
-        .getItems({
-          ...baseParams,
-        })
-        .then(data => {
-          if (productsRequestKeyRef.current !== requestKey) return;
-          updateCategoryProducts(data || []);
-        })
-        .catch(() => { });
+      allProductsPaginationRef.current = {
+        baseParams,
+        hasMore: true,
+        isLoading: false,
+        page: 0,
+        requestKey,
+      };
+      updateCategoryProducts([]);
+      if (shouldGroupByType) {
+        setGroupedProductsReady(false);
+        loadAllProductsUntilComplete(requestKey);
+      } else {
+        setGroupedProductsReady(true);
+        loadAllProductsPage(1);
+      }
       return;
     }
+
+    resetAllProductsPagination();
+    setGroupedProductsReady(true);
 
     if (
       categories &&
@@ -613,7 +887,11 @@ const ProductsPage = ({ navigation, route }) => {
     contextTypes,
     currentCompany?.id,
     isAllProducts,
+    loadAllProductsUntilComplete,
+    loadAllProductsPage,
     normalizedSearchQuery,
+    resetAllProductsPagination,
+    shouldGroupByType,
     typeFilter,
     updateCategoryProducts,
   ]);
@@ -710,6 +988,18 @@ const ProductsPage = ({ navigation, route }) => {
   const maxContentWidth = 860;
   const containerWidth = Math.min(width, maxContentWidth);
   const isCompactMobile = width < 360;
+  const shouldWaitForGroupedProducts = shouldGroupByType && !groupedProductsReady;
+  const shouldShowInitialSkeleton =
+    (storeLoading && categoryProducts.length === 0) ||
+    shouldWaitForGroupedProducts;
+  const shouldShowEmptyState =
+    !shouldWaitForGroupedProducts &&
+    !storeLoading &&
+    visibleProducts.length === 0 &&
+    !error;
+  const shouldShowProductList =
+    !shouldWaitForGroupedProducts &&
+    visibleProducts.length > 0;
   const listContentStyle = {
     paddingTop: isCompactMobile ? 12 : 16,
     paddingHorizontal: isCompactMobile ? 12 : 16,
@@ -747,11 +1037,188 @@ const ProductsPage = ({ navigation, route }) => {
       </View>
     );
   };
+  const renderDesktopHeader = () => {
+    if (!isDesktopList) {
+      return null;
+    }
+
+    return (
+      <View
+        style={[
+          styles.tableHeader,
+          {
+            backgroundColor: brandColors['bg-headers-light'] || brandColors.background,
+            borderColor: brandColors.border,
+          },
+        ]}
+      >
+        <Text style={[styles.tableHeaderImage, { color: brandColors.textSecondary }]}>Imagem</Text>
+        <Text style={[styles.tableHeaderId, { color: brandColors.textSecondary }]}>ID</Text>
+        <Text style={[styles.tableHeaderProduct, { color: brandColors.textSecondary }]}>Produto</Text>
+        <View style={styles.tableHeaderSync}>
+          <Text style={[styles.tableHeaderSyncTitle, { color: brandColors.textSecondary }]}>
+            Canais sincronizados
+          </Text>
+          <View style={styles.tableHeaderSyncLegend}>
+            {SYNC_STATUS_LEGEND.map(item => (
+              <View key={item.key} style={styles.tableHeaderSyncLegendItem}>
+                <View
+                  style={[
+                    styles.tableHeaderSyncLegendDot,
+                    {
+                      backgroundColor: item.color,
+                      borderColor: `${item.color}55`,
+                    },
+                  ]}
+                />
+                <Text style={[styles.tableHeaderSyncLegendText, { color: brandColors.textSecondary }]}>
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+        <Text style={[styles.tableHeaderCategory, { color: brandColors.textSecondary }]}>Categoria</Text>
+        <Text style={[styles.tableHeaderType, { color: brandColors.textSecondary }]}>Tipo</Text>
+        <Text style={[styles.tableHeaderQueue, { color: brandColors.textSecondary }]}>Fila</Text>
+        <Text style={[styles.tableHeaderPrice, { color: brandColors.textSecondary }]}>Preço</Text>
+        <Text style={[styles.tableHeaderAction, { color: brandColors.textSecondary }]}>Ação</Text>
+      </View>
+    );
+  };
+  const scrollToTypeGroup = typeKey => {
+    const index = typeJumpTargets[typeKey];
+    if (typeof index !== 'number') {
+      return;
+    }
+
+    const lastTypeGroupKey = typeGroups[typeGroups.length - 1]?.key;
+    if (typeKey === lastTypeGroupKey) {
+      productListRef.current?.scrollToEnd?.({ animated: true });
+      return;
+    }
+
+    productListRef.current?.scrollToIndex?.({
+      animated: true,
+      index,
+      viewOffset: 8,
+    });
+  };
+  const renderTypeJumpButton = group => {
+    const typeConf = PRODUCT_TYPE_CONFIG[group.key] || {};
+
+    return (
+      <TouchableOpacity
+        key={group.key}
+        style={[
+          styles.typeJumpButton,
+          {
+            backgroundColor: typeConf.bg || brandColors.background,
+            borderColor: typeConf.color ? `${typeConf.color}33` : brandColors.border,
+          },
+        ]}
+        activeOpacity={0.8}
+        onPress={() => scrollToTypeGroup(group.key)}
+      >
+        <Text style={[styles.typeJumpText, { color: typeConf.color || brandColors.text }]}>
+          {group.label}
+        </Text>
+        <Text style={[styles.typeJumpCount, { color: typeConf.color || brandColors.textSecondary }]}>
+          {group.products.length}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+  const renderTypeJumpBar = () => {
+    if (!shouldShowTypeJumpBar || typeGroups.length <= 1) {
+      return null;
+    }
+
+    return (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.typeJumpContent}
+        style={styles.typeJumpScroll}
+      >
+        {typeGroups.map(renderTypeJumpButton)}
+      </ScrollView>
+    );
+  };
+  const renderListHeader = () => (
+    <View>
+      {renderSupplyHeader()}
+      {renderDesktopHeader()}
+    </View>
+  );
+  const renderStickyTypeJumpBar = () => {
+    if (!shouldShowProductList) {
+      return null;
+    }
+
+    const typeJumpBar = renderTypeJumpBar();
+    if (!typeJumpBar) {
+      return null;
+    }
+
+    return (
+      <View
+        style={[
+          styles.stickyTypeJumpBar,
+          {
+            backgroundColor: brandColors.background,
+            borderColor: brandColors.border,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.stickyTypeJumpInner,
+            {
+              width: containerWidth,
+              paddingHorizontal: isCompactMobile ? 12 : 16,
+            },
+          ]}
+        >
+          {typeJumpBar}
+        </View>
+      </View>
+    );
+  };
+  const renderTypeHeader = item => (
+    <View
+      style={[
+        isDesktopList ? styles.tableTypeSectionHeader : styles.typeSectionHeader,
+        {
+          backgroundColor: isDesktopList
+            ? brandColors['bg-headers-light'] || brandColors['bg-even-light'] || brandColors.background
+            : brandColors.background,
+          borderColor: brandColors.border,
+        },
+      ]}
+    >
+      <Text
+        style={[
+          isDesktopList ? styles.tableTypeSectionTitle : styles.typeSectionTitle,
+          { color: brandColors.text },
+        ]}
+      >
+        {isDesktopList
+          ? `${item.label} · ${item.count} ${item.count === 1 ? labels.singular : labels.plural}`
+          : item.label}
+      </Text>
+      {!isDesktopList && (
+        <Text style={[styles.typeSectionCount, { color: brandColors.textSecondary }]}>
+          {item.count}
+        </Text>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       {!storeLoading && <StateStore store="products" />}
-      {storeLoading && (
+      {shouldShowInitialSkeleton && (
         <ScrollView style={styles.scroll}>
           <View style={inlineStyle_413_16({
             containerWidth: containerWidth,
@@ -762,7 +1229,7 @@ const ProductsPage = ({ navigation, route }) => {
           </View>
         </ScrollView>
       )}
-      {!storeLoading && visibleProducts.length === 0 && !error && (
+      {shouldShowEmptyState && (
         <View style={context === 'supplies' ? styles.emptyWithHeader : styles.emptyContainer}>
           {context === 'supplies' && (
             <View style={styles.emptyHeaderWrap}>
@@ -792,33 +1259,58 @@ const ProductsPage = ({ navigation, route }) => {
           </View>
         </View>
       )}
-      {!storeLoading && visibleProducts.length > 0 && (
+      {renderStickyTypeJumpBar()}
+      {shouldShowProductList && (
         <FlatList
-          data={productsData}
-          keyExtractor={item => String(item.id)}
+          ref={productListRef}
+          data={listData}
+          keyExtractor={item => String(shouldGroupByType ? item.key : item.id)}
           contentContainerStyle={listContentStyle}
-          ListHeaderComponent={renderSupplyHeader}
+          ListHeaderComponent={renderListHeader}
+          onScrollToIndexFailed={info => {
+            setTimeout(() => {
+              productListRef.current?.scrollToIndex?.({
+                animated: true,
+                index: info.index,
+                viewOffset: 8,
+              });
+            }, 120);
+          }}
           onEndReached={() => {
+            if (isAllProducts) {
+              const pagination = allProductsPaginationRef.current;
+              loadAllProductsPage(pagination.page + 1);
+              return;
+            }
+
             if (visibleCount < visibleProducts.length)
               setVisibleCount(v => v + 50);
           }}
           renderItem={({ item }) => {
+            if (shouldGroupByType && item.type === 'header') {
+              return renderTypeHeader(item);
+            }
+
+            const product = shouldGroupByType ? item.product : item;
             // No PDV/single-item, o card nao pode roubar o toque do botao interno.
             const CardWrapper = isManager ? TouchableOpacity : View;
             const wrapperProps = isManager
-              ? { onPress: () => handleProductPress(item) }
+              ? { onPress: () => handleProductPress(product) }
               : {};
 
             return (
               <CardWrapper {...wrapperProps}>
                 <ProductItem
-                  product={item}
+                  product={product}
                   category={category}
+                  productCategories={productCategoriesByProductId[normalizeProductId(product)] || []}
                   catalogContext={context}
+                  displayMode={isDesktopList ? 'table' : 'card'}
                   interactionMode={interactionMode}
+                  palette={brandColors}
                   singleItemMode={isSingleItemMode}
                   orderId={currentOrderId}
-                  marketplaceStatuses={isManager ? getProductStatuses(item) : []}
+                  marketplaceStatuses={isManager ? getProductStatuses(product) : []}
                   onMarketplaceSync={handleMarketplaceSync}
                   marketplaceSyncingKey={marketplaceSyncingKey}
                 />
