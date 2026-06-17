@@ -773,7 +773,7 @@ const CustomizeScreen = () => {
 
     productsActionsRef.current
       .getItems({
-        id: productIds, 1),
+        id: productIds,
       })
       .then(items => {
         if (!isActive) {
