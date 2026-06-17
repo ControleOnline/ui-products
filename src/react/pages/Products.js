@@ -502,7 +502,7 @@ const ProductsPage = ({ navigation, route }) => {
 
     productCategoryActionsRef.current
       .getItems({
-        product: productIds.map(productId => `/products/${productId}`), productIds.length * 5),
+        product: productIds.map(productId => `/products/${productId}`),
       })
       .then(data => {
         if (productCategoryRequestKeyRef.current !== requestKey) {
