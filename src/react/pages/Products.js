@@ -502,8 +502,7 @@ const ProductsPage = ({ navigation, route }) => {
 
     productCategoryActionsRef.current
       .getItems({
-        product: productIds.map(productId => `/products/${productId}`),
-        itemsPerPage: Math.max(50, productIds.length * 5),
+        product: productIds.map(productId => `/products/${productId}`), productIds.length * 5),
       })
       .then(data => {
         if (productCategoryRequestKeyRef.current !== requestKey) {
@@ -722,7 +721,6 @@ const ProductsPage = ({ navigation, route }) => {
     try {
       const data = await actionsRef.current.getItems({
         ...pagination.baseParams,
-        itemsPerPage: ALL_PRODUCTS_PAGE_SIZE,
         page,
       });
 
@@ -812,7 +810,6 @@ const ProductsPage = ({ navigation, route }) => {
       actionsRef.current
         .getItems({
           ...baseParams,
-          itemsPerPage: 100,
           product: normalizedSearchQuery,
         })
         .then(data => {
@@ -868,7 +865,6 @@ const ProductsPage = ({ navigation, route }) => {
         actionsRef.current
           .getItems({
             ...baseParams,
-            itemsPerPage: 50,
             'productCategory.category':
               category?.['@id'] || `/categories/${categoryId}`,
           })

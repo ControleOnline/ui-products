@@ -229,7 +229,6 @@ const CategoriesPage = ({ route }) => {
       const response = await modelActions.getItems({
         context: 'menu',
         people: currentCompanyId,
-        itemsPerPage: 100,
       })
 
       const availableModels = (Array.isArray(response) ? response : [])
@@ -486,7 +485,6 @@ const CategoriesPage = ({ route }) => {
         const results = await searchCompanyProducts({
           companyId: currentCompany.id,
           query: normalizedProductSearchText,
-          itemsPerPage: 8,
         })
 
         if (isMounted) {

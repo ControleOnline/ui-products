@@ -773,8 +773,7 @@ const CustomizeScreen = () => {
 
     productsActionsRef.current
       .getItems({
-        id: productIds,
-        itemsPerPage: Math.max(productIds.length, 1),
+        id: productIds, 1),
       })
       .then(items => {
         if (!isActive) {
@@ -889,7 +888,6 @@ const CustomizeScreen = () => {
 
     const refreshedOrderProducts = await orderProductsActions.getItems({
       'order.id': Number(activeOrderId),
-      itemsPerPage: 200,
     });
 
     if (typeof ordersActions.syncOrderProducts === 'function') {

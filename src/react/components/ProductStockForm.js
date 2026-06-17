@@ -127,7 +127,6 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
         productInvStore.actions.getItems({ product: `/products/${ProductId}` }).catch(() => []),
         inventoriesStore.actions.getItems({
           people: `/people/${currentCompany.id}`,
-          itemsPerPage: 200,
         }).catch(() => []),
       ]);
       const map = {};

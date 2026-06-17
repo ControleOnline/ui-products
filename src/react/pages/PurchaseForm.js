@@ -98,7 +98,6 @@ const SupplierSelector = ({ brandColors, value, onSelect, showApplyToAll, onAppl
       const params = {
         'link.company':  `/people/${companyId}`,
         'link.linkType': 'provider',
-        itemsPerPage:    PAGE_SIZE,
         page:            p,
       };
       if (q.trim()) params.name = q.trim();
@@ -360,7 +359,7 @@ const ProductSearch = ({ inventories: _inventories, brandColors, onAdd }) => {
       const data = await productsStore.actions.getItems({
         product: text, company: companyId,
         people: `/people/${companyId}`, active: 1,
-        'order[product]': 'ASC', itemsPerPage: PAGE_SIZE,
+        'order[product]': 'ASC',
       }).catch(() => []);
       if (reqId !== searchRef.current) return;
 
@@ -492,7 +491,6 @@ const PurchaseForm = () => {
     if (!currentCompany?.id) return;
     inventoriesStore.actions.getItems({
       people: `/people/${currentCompany.id}`,
-      itemsPerPage: PAGE_SIZE,
     }).then(data => setInventories(data || [])).catch(() => {});
   }, [currentCompany?.id]));
 

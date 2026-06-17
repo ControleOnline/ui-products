@@ -546,7 +546,6 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
     if (!productGroupIri) { setCurrentItems([]); return []; }
     const response = await productGroupProductStore.actions.getItems({
       productGroup: productGroupIri,
-      itemsPerPage: 500,
     });
     const items = extractItems(response).filter(isSharedModifierItem);
     setCurrentItems(items);
@@ -648,7 +647,6 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
         active: 1,
         company: currentCompany.id,
         'order[product]': 'ASC',
-        itemsPerPage: 50,
         page,
         ...(q ? { product: q } : {}),
       });

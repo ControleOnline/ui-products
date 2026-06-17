@@ -519,7 +519,6 @@ const ProductGroups = ({ ProductId }) => {
     return actions
       .getItems({
         product: ProductId,
-        itemsPerPage: 200,
         'order[groupOrder]': 'ASC',
         'order[productGroup]': 'ASC',
       })
@@ -565,7 +564,6 @@ const ProductGroups = ({ ProductId }) => {
     const links = extractItems(await groupParentActions.getItems({
       productGroup,
       parentProduct,
-      itemsPerPage: 20,
     }));
     for (const link of links) {
       const id = normalizeEntityId(link);
@@ -584,7 +582,6 @@ const ProductGroups = ({ ProductId }) => {
     try {
       const response = await actions.getItems({
         company: `/people/${currentCompany.id}`,
-        itemsPerPage: 300,
         'order[productGroup]': 'ASC',
       });
       const associatedIds = new Set(groups.map(group => normalizeEntityId(group)).filter(Boolean));
@@ -764,7 +761,6 @@ const ProductGroups = ({ ProductId }) => {
       const links = productGroup
         ? extractItems(await groupParentActions.getItems({
             productGroup,
-            itemsPerPage: 100,
           }))
         : [];
       const hasOtherActiveLinks = links.some(link => {

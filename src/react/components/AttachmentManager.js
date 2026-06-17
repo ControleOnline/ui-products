@@ -166,7 +166,6 @@ const AttachmentManager = ({
           const params = {
             context: fileContext,
             fileType: 'image',
-            itemsPerPage: pageSize,
             page,
             'order[fileName]': 'ASC',
           };

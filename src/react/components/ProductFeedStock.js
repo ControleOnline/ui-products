@@ -531,7 +531,6 @@ const ProductFeedStock = ({
          */
         type: ['feedstock'],
         'order[product]': 'ASC',
-        itemsPerPage: 50,
         page,
         ...(q ? { product: q } : {}),
       });
@@ -663,7 +662,6 @@ const ProductFeedStock = ({
       try {
         const res = await productUnitStore.actions.getItems({
           people: `/people/${currentCompany.id}`,
-          itemsPerPage: 200,
         });
         const list = Array.isArray(res) ? res : (res?.['hydra:member'] || res?.member || []);
         setUnitOptions(list.map(u => ({ id: u.id, label: u.productUnit || u.unit || String(u.id) })));

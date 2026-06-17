@@ -206,7 +206,6 @@ const ProductSupplierRelationModal = ({
       try {
         const params = {
           'link.linkType': 'provider',
-          itemsPerPage: PAGE_SIZE,
           page: targetPage,
         };
 

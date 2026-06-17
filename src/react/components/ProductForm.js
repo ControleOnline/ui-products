@@ -398,7 +398,7 @@ const ProductForm = ({
         const cleanProductId = extractId(data?.id || ProductId);
         if (cleanProductId) {
           const relationList = await productCategoryActions
-            .getItems({ product: `/products/${cleanProductId}`, itemsPerPage: 300 })
+            .getItems({ product: `/products/${cleanProductId}`})
             .catch(() => []);
           const relationCategoryIds = extractCategoryIds({ productCategories: collectionFrom(relationList) });
           if (relationCategoryIds.length > 0) existingCategoryIds = relationCategoryIds;
@@ -466,17 +466,17 @@ const ProductForm = ({
 
     if (productUnitStore?.actions && !listsRequested.units) {
       setListsRequested(prev => ({ ...prev, units: true }));
-      productUnitStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => { });
+      productUnitStore.actions.getItems({ people: peopleIRI}).catch(() => { });
     }
 
     if (queuesStore?.actions && !listsRequested.queues) {
       setListsRequested(prev => ({ ...prev, queues: true }));
-      queuesStore.actions.getItems({ company: peopleIRI, itemsPerPage: 200 }).catch(() => { });
+      queuesStore.actions.getItems({ company: peopleIRI}).catch(() => { });
     }
 
     if (inventoriesStore?.actions && !listsRequested.inventories) {
       setListsRequested(prev => ({ ...prev, inventories: true }));
-      inventoriesStore.actions.getItems({ people: peopleIRI, itemsPerPage: 200 }).catch(() => { });
+      inventoriesStore.actions.getItems({ people: peopleIRI}).catch(() => { });
     }
   }, [currentCompany?.id, listsRequested]);
 
@@ -493,7 +493,6 @@ const ProductForm = ({
       context,
       company: companyId,
       'order[name]': 'ASC',
-      itemsPerPage: 200,
     }).catch(() => {
       setCategoriesRequestKey('');
     });
@@ -534,7 +533,6 @@ const ProductForm = ({
     const response = await productActions.getItems({
       company: companyId,
       type: ['feedstock'],
-      itemsPerPage: 500,
     }).catch(() => []);
 
     return resolveDuplicateProductCandidate({
@@ -590,7 +588,7 @@ const ProductForm = ({
     const productIri = `/products/${productId}`;
     const desiredCategoryIds = uniqueCategoryIds(selectedCategoryIds);
     const existingList = await productCategoryActions
-      .getItems({ product: productIri, itemsPerPage: 300 })
+      .getItems({ product: productIri})
       .catch(() => []);
     const allRelations = collectionFrom(existingList);
     const desiredSet = new Set(desiredCategoryIds);
