@@ -18,6 +18,10 @@ import {
   mergeProductDraftIntoExisting,
   resolveDuplicateProductCandidate,
 } from '@controleonline/ui-products/src/react/domain/productDuplicates';
+import {
+  normalizeProductRelationId,
+  resolveProductRelationOptionId,
+} from '@controleonline/ui-products/src/react/domain/productRelations';
 
 import {
   inlineStyle_71_8,
@@ -33,17 +37,6 @@ import {
 } from './ProductForm.styles';
 
 import { inlineStyle_92_14 } from './ProductForm.styles';
-
-const normalizeRelationId = value => {
-  if (!value && value !== 0) return '';
-  if (typeof value === 'number') return value;
-  if (typeof value === 'string') {
-    const m = String(value).match(/(\d+)$/);
-    return m ? m[1] : value;
-  }
-  if (typeof value === 'object') return value.id || value['@id'] || '';
-  return value;
-};
 
 const extractId = value => {
   if (value === null || value === undefined || value === '') return '';
@@ -134,11 +127,11 @@ const normalizeProductForForm = data => {
   if (!data) return data;
   return {
     ...data,
-    productUnit: normalizeRelationId(data.productUnit),
-    queue: normalizeRelationId(data.queue),
-    company: normalizeRelationId(data.company),
-    defaultOutInventory: normalizeRelationId(data.defaultOutInventory),
-    defaultInInventory: normalizeRelationId(data.defaultInInventory),
+    productUnit: normalizeProductRelationId(data.productUnit),
+    queue: normalizeProductRelationId(data.queue),
+    company: normalizeProductRelationId(data.company),
+    defaultOutInventory: normalizeProductRelationId(data.defaultOutInventory),
+    defaultInInventory: normalizeProductRelationId(data.defaultInInventory),
   };
 };
 
@@ -479,6 +472,20 @@ const ProductForm = ({
       inventoriesStore.actions.getItems({ people: peopleIRI}).catch(() => { });
     }
   }, [currentCompany?.id, listsRequested]);
+
+  useEffect(() => {
+    const queueOptions = queuesGetters.items || [];
+    if (!product?.queue || queueOptions.length === 0) return;
+
+    const resolvedQueueId = resolveProductRelationOptionId(
+      product.queue,
+      queueOptions,
+      ['queue', 'name'],
+    );
+
+    if (String(resolvedQueueId) === String(product.queue)) return;
+    setProduct(prev => ({ ...prev, queue: resolvedQueueId }));
+  }, [product?.queue, queuesGetters.items]);
 
   useEffect(() => {
     const companyId = currentCompany?.id;
