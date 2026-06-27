@@ -32,7 +32,7 @@ import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import {
-  isPosKioskMode,
+  isPosTotemMode,
   isPosSingleItemMode,
 } from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import {
@@ -372,7 +372,7 @@ const ProductsPage = ({ navigation, route }) => {
       shouldShowOperationalBottomNavigation({
         appType: env.APP_TYPE,
         interactionMode,
-        isKioskMode: isPosKioskMode(runtimeDeviceConfig?.configs),
+        isTotemMode: isPosTotemMode(runtimeDeviceConfig?.configs),
       }),
     [interactionMode, runtimeDeviceConfig?.configs],
   );
