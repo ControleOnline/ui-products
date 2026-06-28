@@ -24,12 +24,14 @@ import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports'
 import {searchCompanyProducts} from '@controleonline/ui-common/src/react/utils/commercialDocumentOrders'
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators'
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
+import Formatter from '@controleonline/ui-common/src/utils/formatter'
+import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity'
+import {resolveProductCoverUrl} from '@controleonline/ui-products/src/react/domain/productMedia'
 
 import {
   readCachedCategories,
   writeCachedCategories,
 } from '@controleonline/ui-products/src/react/utils/categoryCache'
-import usePosOrderMaterialization from '@controleonline/ui-orders/src/react/hooks/usePosOrderMaterialization'
 
 import Icon from 'react-native-vector-icons/FontAwesome'
 import { skeletonStyles, styles } from './Categories.styles'
@@ -81,6 +83,11 @@ const normalizeCatalogContext = value =>
   String(value || 'products').trim().toLowerCase() === 'supplies'
     ? 'supplies'
     : 'products'
+
+const withHexAlpha = (value, alpha, fallback = 'rgba(15,23,42,0.06)') => {
+  const color = String(value || '').trim()
+  return /^#[0-9a-f]{6}$/i.test(color) ? `${color}${alpha}` : fallback
+}
 
 const buildCatalogLabels = context => {
   if (context === 'supplies') {
@@ -210,11 +217,6 @@ const CategoriesPage = ({ route }) => {
     route?.params?.id,
     route?.params?.resumeExistingOrder,
   ])
-  const {materializeOrderWithProducts, openOrderDetails} = usePosOrderMaterialization({
-    interactionParams: route?.params,
-    navigation,
-  })
-
   const loadMenuModels = useCallback(async () => {
     if (!currentCompany?.id) {
       setMenuModels([])
@@ -422,33 +424,25 @@ const CategoriesPage = ({ route }) => {
     },
     [context, interactionMode, navigation, operationalRouteParams],
   )
-  const handleAutocompleteProductSelect = useCallback(
-    async product => {
-      try {
-        const productId = normalizeEntityId(product)
+  const handleCustomizeProduct = useCallback(
+    product => {
+      const productId = normalizeEntityId(product)
 
-        if (!productId) {
-          throw new Error('Nao foi possivel identificar o produto selecionado.')
-        }
-
-        const updatedOrder = await materializeOrderWithProducts({
-          products: [{product: productId, quantity: 1}],
-        })
-
-        if (!updatedOrder) {
-          throw new Error('Nao foi possivel preparar o pedido para conferencia.')
-        }
-
-        setProductSearchText('')
-        setProductSearchResults([])
-        openOrderDetails(updatedOrder)
-      } catch (error) {
-        showError?.(error?.message || 'Nao foi possivel adicionar o produto selecionado.')
+      if (!productId) {
+        showError?.('Nao foi possivel identificar o produto selecionado.')
+        return
       }
-    },
-    [materializeOrderWithProducts, openOrderDetails, showError],
-  )
 
+      setProductSearchText('')
+      setProductSearchResults([])
+      navigation.navigate('CustomizeScreen', {
+        ...operationalRouteParams,
+        productId,
+        interactionMode,
+      })
+    },
+    [interactionMode, navigation, operationalRouteParams, showError],
+  )
   const openMenuModelPicker = useCallback(async () => {
     if (!currentCompany?.id) {
       Alert.alert('Empresa nao selecionada', 'Selecione uma empresa para escolher o modelo do cardapio.')
@@ -645,9 +639,11 @@ const CategoriesPage = ({ route }) => {
   const columns = getColumns()
   const maxContentWidth = 1600
   const containerWidth = Math.min(width, maxContentWidth)
+  const isMobileCatalog = width < 640
   const isCompactMobile = width < 360
   const gap = isCompactMobile ? 8 : 12
-  const cardWidth = (containerWidth - (columns + 1) * gap) / columns
+  const gridContentWidth = containerWidth - gap
+  const cardWidth = (gridContentWidth - (columns - 1) * gap) / columns
   const scrollBottomPadding = isManagerApp
     ? 84
     : interactionMode === 'pdv'
@@ -710,45 +706,74 @@ const CategoriesPage = ({ route }) => {
             </View>
             {normalizedProductSearchText.length >= 2 && (
               <View style={styles.searchSuggestionList}>
-                {productSearchResults.map(product => (
-                  <TouchableOpacity
-                    key={product?.id || product?.['@id']}
-                    style={[
-                      styles.searchSuggestionItem,
-                      isCompactMobile && styles.searchSuggestionItemCompact,
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => handleAutocompleteProductSelect(product)}
-                  >
-                    <View style={styles.searchSuggestionCopy}>
-                      <Text
-                        style={[
-                          styles.searchSuggestionTitle,
-                          isCompactMobile && styles.searchSuggestionTitleCompact,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {product?.product || 'Produto sem nome'}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.searchSuggestionMeta,
-                          isCompactMobile && styles.searchSuggestionMetaCompact,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {[product?.sku ? `SKU ${product.sku}` : '', product?.description || '']
-                          .filter(Boolean)
-                          .join(' • ')}
-                      </Text>
+                {productSearchResults.map(product => {
+                  const coverUrl = resolveProductCoverUrl(product)
+                  const isCustomProduct =
+                    String(product?.type || '').trim() === 'custom'
+
+                  return (
+                    <View
+                      key={product?.id || product?.['@id']}
+                      style={[
+                        styles.searchSuggestionItem,
+                        isCompactMobile && styles.searchSuggestionItemCompact,
+                      ]}
+                    >
+                      <View style={styles.searchSuggestionThumb}>
+                        {coverUrl ? (
+                          <Image
+                            source={{uri: coverUrl}}
+                            style={styles.searchSuggestionImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <MaterialCommunityIcons
+                            name="image-outline"
+                            size={22}
+                            color="#94A3B8"
+                          />
+                        )}
+                      </View>
+                      <View style={styles.searchSuggestionCopy}>
+                        <Text
+                          style={[
+                            styles.searchSuggestionTitle,
+                            isCompactMobile &&
+                              styles.searchSuggestionTitleCompact,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {product?.product || 'Produto sem nome'}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.searchSuggestionPrice,
+                            isCompactMobile &&
+                              styles.searchSuggestionPriceCompact,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {Formatter.formatMoney(product?.price || 0)}
+                        </Text>
+                      </View>
+                      {isCustomProduct ? (
+                        <TouchableOpacity
+                          activeOpacity={0.86}
+                          onPress={() => handleCustomizeProduct(product)}
+                          style={styles.searchSuggestionCustomizeButton}
+                        >
+                          <Text style={styles.searchSuggestionCustomizeText}>
+                            CUSTOMIZAR
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.searchSuggestionQuantity}>
+                          <ProductQuantity product={product} />
+                        </View>
+                      )}
                     </View>
-                    <MaterialCommunityIcons
-                      name="arrow-right"
-                      size={18}
-                      color="#94A3B8"
-                    />
-                  </TouchableOpacity>
-                ))}
+                  )
+                })}
                 {!productSearchLoading && productSearchResults.length === 0 && (
                   <TouchableOpacity
                     style={[
@@ -1067,17 +1092,40 @@ const CategoriesPage = ({ route }) => {
                       style={[
                         styles.noCategoryCard,
                         isCompactMobile && styles.noCategoryCardCompact,
+                        isMobileCatalog && styles.noCategoryCardMobile,
                         { aspectRatio: 3 / 4 },
+                        isMobileCatalog && {
+                          borderColor: withHexAlpha(brandColors.primary, '80', brandColors.primary),
+                          backgroundColor: withHexAlpha(brandColors.primary, '0A', '#FFFFFF'),
+                        },
                       ]}
                     >
-                      <MaterialCommunityIcons name="tag-off-outline" size={32} color="#94A3B8" />
+                      <View
+                        style={[
+                          styles.noCategoryIconWrap,
+                          isMobileCatalog && {
+                            backgroundColor: withHexAlpha(brandColors.primary, '18'),
+                          },
+                        ]}
+                      >
+                        <MaterialCommunityIcons
+                          name="view-grid-plus-outline"
+                          size={isMobileCatalog ? 34 : 32}
+                          color={isMobileCatalog ? brandColors.primary : '#94A3B8'}
+                        />
+                      </View>
                       <Text
                         style={[
                           styles.noCategoryName,
                           isCompactMobile && styles.noCategoryNameCompact,
+                          isMobileCatalog && styles.noCategoryNameMobile,
+                          isMobileCatalog && { color: brandColors.text || '#0F172A' },
                         ]}
+                        numberOfLines={2}
                       >
-                        {labels.allLabel}
+                        {isMobileCatalog && context === 'products'
+                          ? 'Todos os produtos'
+                          : labels.allLabel}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1096,6 +1144,7 @@ const CategoriesPage = ({ route }) => {
                         style={[
                           styles.cardImage,
                           isCompactMobile && styles.cardImageCompact,
+                          isMobileCatalog && styles.cardImageMobile,
                           { backgroundColor: category.color },
                         ]}
                       >
@@ -1111,12 +1160,14 @@ const CategoriesPage = ({ route }) => {
                           style={[
                             styles.cardOverlay,
                             isCompactMobile && styles.cardOverlayCompact,
+                            isMobileCatalog && styles.cardOverlayMobile,
                           ]}
                         >
                           <Text
                             style={[
                               styles.cardOverlayName,
                               isCompactMobile && styles.cardOverlayNameCompact,
+                              isMobileCatalog && styles.cardOverlayNameMobile,
                             ]}
                             numberOfLines={2}
                           >

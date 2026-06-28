@@ -89,17 +89,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    minHeight: 64,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   searchSuggestionItemCompact: {
-    paddingHorizontal: 12,
-    paddingVertical: 11,
+    gap: 8,
+    minHeight: 58,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  searchSuggestionThumb: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  searchSuggestionImage: {
+    width: '100%',
+    height: '100%',
   },
   searchSuggestionCopy: {
     flex: 1,
+    minWidth: 0,
   },
   searchSuggestionTitle: {
     fontSize: 14,
@@ -116,6 +136,33 @@ const styles = StyleSheet.create({
   },
   searchSuggestionMetaCompact: {
     fontSize: 11,
+  },
+  searchSuggestionPrice: {
+    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#16A34A',
+  },
+  searchSuggestionPriceCompact: {
+    fontSize: 13,
+  },
+  searchSuggestionQuantity: {
+    flexShrink: 0,
+    marginRight: -8,
+  },
+  searchSuggestionCustomizeButton: {
+    flexShrink: 0,
+    minHeight: 34,
+    borderRadius: 10,
+    backgroundColor: '#022736',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  searchSuggestionCustomizeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
 
   countLabel: {
@@ -328,6 +375,14 @@ const styles = StyleSheet.create({
   cardImageCompact: {
     borderRadius: 16,
   },
+  cardImageMobile: {
+    borderRadius: 8,
+    ...Platform.select({
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 12 },
+      android: { elevation: 5 },
+      web: { boxShadow: '0 8px 20px rgba(15,23,42,0.16)' },
+    }),
+  },
 
   cardCoverImage: {
     position: 'absolute',
@@ -365,6 +420,22 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
   },
+  cardOverlayMobile: {
+    minHeight: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    paddingTop: 10,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    backgroundColor: 'rgba(15,23,42,0.50)',
+    ...Platform.select({
+      web: {
+        backgroundImage: 'linear-gradient(to top, rgba(15,23,42,0.90) 0%, rgba(15,23,42,0.78) 62%, rgba(15,23,42,0.16) 100%)',
+      },
+    }),
+  },
   cardOverlayName: {
     color: '#fff',
     fontWeight: '700',
@@ -382,6 +453,13 @@ const styles = StyleSheet.create({
   cardOverlayNameCompact: {
     fontSize: 12,
     lineHeight: 16,
+  },
+  cardOverlayNameMobile: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 
   editOverlay: {
@@ -408,8 +486,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
   },
+  noCategoryCardMobile: {
+    borderRadius: 8,
+    borderStyle: 'solid',
+    borderWidth: 1.5,
+    paddingHorizontal: 14,
+    ...Platform.select({
+      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 12 },
+      android: { elevation: 3 },
+      web: { boxShadow: '0 8px 18px rgba(15,23,42,0.10)' },
+    }),
+  },
   noCategoryCardCompact: {
     borderRadius: 16,
+  },
+  noCategoryIconWrap: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   noCategoryName: {
     fontSize: 13,
@@ -417,6 +513,11 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 18,
+  },
+  noCategoryNameMobile: {
+    fontSize: 16,
+    lineHeight: 20,
+    fontWeight: '800',
   },
   noCategoryNameCompact: {
     fontSize: 12,
