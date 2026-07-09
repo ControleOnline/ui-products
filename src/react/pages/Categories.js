@@ -149,8 +149,8 @@ const CategoriesPage = ({ route }) => {
   const { width } = useWindowDimensions()
   const interactionMode =
     route?.params?.interactionMode ||
-    (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv')
-  const isManagerApp = env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
+    (app_type === 'MANAGER' ? 'manager' : 'pdv')
+  const isManagerApp = app_type === 'MANAGER' && interactionMode !== 'pdv'
 
   const categoriesStore = useStore('categories')
   const { items, isLoading: storeLoading } = categoriesStore.getters

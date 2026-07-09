@@ -282,7 +282,7 @@ const ProductsPage = ({ navigation, route }) => {
   const context = normalizeCatalogContext(routeParams.context);
   const interactionMode =
     routeParams.interactionMode ||
-    (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
+    (app_type === 'MANAGER' ? 'manager' : 'pdv');
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -366,11 +366,11 @@ const ProductsPage = ({ navigation, route }) => {
   ).replace(/\D+/g, '');
 
   const isManager =
-    env.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv';
+    app_type === 'MANAGER' && interactionMode !== 'pdv';
   const shouldShowBottomNavigation = useMemo(
     () =>
       shouldShowOperationalBottomNavigation({
-        appType: env.APP_TYPE,
+        appType: app_type,
         interactionMode,
         isTotemMode: isPosTotemMode(runtimeDeviceConfig?.configs),
       }),

@@ -345,7 +345,7 @@ const CustomizeScreen = () => {
     deviceId: storagedDevice?.id,
     defaultStatusId: defaultCompany?.configs?.['pos-default-status'],
   });
-  const activeChannel = String(order?.app || env.APP_TYPE || 'default').toLowerCase();
+  const activeChannel = String(order?.app || app_type || 'default').toLowerCase();
   const productGroupActionsRef = useRef(productGroupActions);
   const productsActionsRef = useRef(productsActions);
   const orderProductsActionsRef = useRef(orderProductsActions);

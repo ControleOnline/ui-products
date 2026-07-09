@@ -10,7 +10,7 @@ import PurchaseSuggestions from '@controleonline/ui-products/src/react/pages/Pur
 import PurchaseForm from '@controleonline/ui-products/src/react/pages/PurchaseForm';
 import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
-const isPosApp = String(env.APP_TYPE || '').toUpperCase() === 'POS';
+const isPosApp = String(app_type || '').toUpperCase() === 'POS';
 const normalizeNumericParam = value => String(value || '').replace(/\D+/g, '') || undefined;
 const normalizeCatalogContext = value =>
   String(value || 'products').trim().toLowerCase() === 'supplies'
@@ -37,7 +37,7 @@ const getProductDetailsTitle = route => {
 };
 const resolveInteractionMode = route =>
   route.params?.interactionMode ||
-  (env.APP_TYPE === 'MANAGER' ? 'manager' : 'pdv');
+  (app_type === 'MANAGER' ? 'manager' : 'pdv');
 const buildCategoryFallbackParams = route => ({
   store: 'category',
   context: normalizeCatalogContext(route.params?.context),

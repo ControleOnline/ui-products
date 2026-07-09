@@ -65,7 +65,7 @@ const ProductItem = ({
   const coverUrl = resolveProductCoverUrl(product);
   const hasImage = !!coverUrl
   const isManager =
-    APP_ENV.APP_TYPE === 'MANAGER' && interactionMode !== 'pdv'
+    app_type === 'MANAGER' && interactionMode !== 'pdv'
   const typeConf = PRODUCT_TYPE_CONFIG[product.type] || null
   const queueLabel = product?.queue?.queue || product?.queue?.name || ''
   const isSupplyCatalog = catalogContext === 'supplies'
@@ -141,12 +141,12 @@ const ProductItem = ({
         </TouchableOpacity>
       );
     }
-    if (singleItemMode || APP_ENV.APP_TYPE === 'TOTEM') {
+    if (singleItemMode || app_type === 'TOTEM') {
       return (
         <ProductTotem
           product={product}
           category={category}
-          singleItemMode={singleItemMode || APP_ENV.APP_TYPE === 'TOTEM'}
+          singleItemMode={singleItemMode || app_type === 'TOTEM'}
           orderId={orderId}
         />
       );
