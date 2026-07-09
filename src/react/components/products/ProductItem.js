@@ -8,7 +8,7 @@ import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/Pr
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
-import { APP_ENV } from '@controleonline/../../config/env.js';
+import {app_type} from '@appType';
 import { colors } from '@controleonline/../../src/styles/colors';
 import styles from './ProductItem.styles';
 
