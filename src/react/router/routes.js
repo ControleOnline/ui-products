@@ -1,4 +1,5 @@
 import { env } from '@env';
+import {app_type} from '@appType';
 import Products from '@controleonline/ui-products/src/react/pages/Products';
 import Categories from '@controleonline/ui-products/src/react/pages/Categories';
 import CustomizeScreen from '@controleonline/ui-products/src/react/pages/CustomizeScreen';
