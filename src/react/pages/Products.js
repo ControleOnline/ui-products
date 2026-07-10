@@ -24,7 +24,6 @@ import ProductItem, {
   getProductTypeLabel,
 } from '@controleonline/ui-products/src/react/components/products/ProductItem';
 import { useFocusEffect } from '@react-navigation/native';
-import { env } from '@env';
 import {app_type} from '@appType';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';

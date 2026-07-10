@@ -18,7 +18,6 @@ import {
 
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import {useStore} from '@store';
-import {env} from '@env';
 import {app_type} from '@appType';
 import usePosCartSession from '@controleonline/ui-orders/src/react/hooks/usePosCartSession';
 import {isPosSingleItemMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
