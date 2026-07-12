@@ -10,7 +10,7 @@ const extractId = value => {
   return match ? parseInt(match[1], 10) : null;
 };
 
-export const uploadFileToApi = async ({file, context = 'products', peopleId}) => {
+export const uploadFileToApi = async ({file, context = 'products', peopleId, entityId}) => {
   const session = JSON.parse(localStorage.getItem('session') || '{}');
   const token = session?.api_key || session?.token;
   if (!token) throw new Error('Sessao invalida para upload.');
@@ -33,6 +33,7 @@ export const uploadFileToApi = async ({file, context = 'products', peopleId}) =>
 
   formData.append('context', context);
   if (peopleId) formData.append('people', String(extractId(peopleId)));
+  if (entityId) formData.append('id', String(extractId(entityId)));
 
   const response = await fetch(`${apiEntryPoint}/files/upload`, {
     method: 'POST',
