@@ -1406,8 +1406,14 @@ const CustomizeScreen = () => {
         // No single-item, a troca precisa substituir o pai e manter os filhos
         // do customizado no mesmo envio para nao reaparecerem itens extras.
         await ordersActions.replaceProducts(targetOrderId, orderProductData);
-      } else {
+      } else if (activeOrderProductId) {
         await orderProductsActions.save(orderProductData);
+      } else {
+        /*
+         * @agents New customized lines use the order aggregate endpoint so the
+         * backend can consolidate an equivalent product and component tree.
+         */
+        await ordersActions.addProducts(targetOrderId, [orderProductData]);
       }
 
       try {
