@@ -52,7 +52,7 @@ export default {
           },
           {
             value: 'average',
-            label: 'MÃ©dia',
+            label: 'Média',
           },
           {
             value: 'biggest',

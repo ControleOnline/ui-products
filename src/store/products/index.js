@@ -113,9 +113,9 @@ export default {
           {value: 'custom', label: 'Produto Customizado'},
           {value: 'manufactured', label: 'Produto Manufaturado'},
           {value: 'product', label: 'Produto'},
-          {value: 'service', label: 'ServiÃ§o'},
+          {value: 'service', label: 'Serviço'},
           {value: 'component', label: 'Componente'},
-          {value: 'feedstock', label: 'MatÃ©ria Prima'},
+          {value: 'feedstock', label: 'Matéria Prima'},
           {value: 'package', label: 'Embalagem'},
         ],
         label: 'type',
@@ -161,10 +161,10 @@ export default {
         label: 'featured',
         list: [
           {value: true, label: 'Sim'},
-          {value: false, label: 'NÃ£o'},
+          {value: false, label: 'Não'},
         ],
         format: function (value) {
-          return value ? 'Sim' : 'NÃ£o';
+          return value ? 'Sim' : 'Não';
         },
         saveFormat: function (value) {
           return !!value;
