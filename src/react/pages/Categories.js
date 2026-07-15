@@ -3,7 +3,7 @@ import { Text, View, Image, ScrollView, TouchableOpacity, Platform, Modal, useWi
 import { useStore } from '@store'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import css from '@controleonline/ui-orders/src/react/css/orders'
-import StateStore from '@controleonline/ui-layout/src/react/components/StateStore'
+import StateStore from '@controleonline/ui-common/src/react/components/StateStore'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import {app_type} from '@appType'
 import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'

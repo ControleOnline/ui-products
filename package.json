@@ -21,5 +21,14 @@
   "homepage": "https://www.controleonline.com/devs/plugins",
   "browserslist": [
     "last 1 version, not dead, ie >= 11"
-  ]
+  ],
+  "dependencies": {
+    "@controleonline/ui-common": "*",
+    "@controleonline/ui-crm": "*",
+    "@controleonline/ui-default": "*",
+    "@controleonline/ui-layout": "*",
+    "@controleonline/ui-manager": "*",
+    "@controleonline/ui-orders": "*",
+    "@controleonline/ui-people": "*"
+  }
 }

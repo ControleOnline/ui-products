@@ -3,7 +3,7 @@ import { View, ScrollView, TextInput, Text, TouchableOpacity, Switch } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
-import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
+import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { useNavigation } from '@react-navigation/native';
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';

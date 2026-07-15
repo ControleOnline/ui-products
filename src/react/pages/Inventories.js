@@ -2,7 +2,7 @@ import React, { useCallback, useState, useMemo, useRef } from 'react';
 import { Text, View, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import StateStore from '@controleonline/ui-layout/src/react/components/StateStore';
+import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
