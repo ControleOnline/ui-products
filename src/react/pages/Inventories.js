@@ -4,7 +4,7 @@ import { useStore } from '@store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';

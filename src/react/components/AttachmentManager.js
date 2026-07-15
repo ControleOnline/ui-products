@@ -12,7 +12,7 @@ import {
 import * as DocumentPicker from 'expo-document-picker';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {useStore} from '@store';
-import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal';
+import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import {resolveFileImageUrl} from '@controleonline/ui-common/src/react/utils/fileUrl';
 import {uploadFileToApi, toFileIri} from '@controleonline/ui-products/src/react/services/fileUpload';
 

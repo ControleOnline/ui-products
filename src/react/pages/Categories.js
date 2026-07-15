@@ -10,7 +10,7 @@ import CategoryForm from '@controleonline/ui-common/src/react/components/Categor
 import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl'
 import {useMessage} from '@controleonline/ui-common/src/react/components/MessageService'
 import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager'
-import AnimatedModal from '@controleonline/ui-crm/src/react/components/AnimatedModal'
+import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal'
 import {
   downloadMenuCatalog as downloadCompanyMenuCatalog,
 } from '@controleonline/ui-common/src/react/utils/menuCatalogDownload'
