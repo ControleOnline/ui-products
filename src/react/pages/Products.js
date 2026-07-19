@@ -20,8 +20,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import ProductItem, {
-  PRODUCT_TYPE_CONFIG,
   getProductTypeLabel,
+  resolveProductTypeTheme,
 } from '@controleonline/ui-products/src/react/components/products/ProductItem';
 import { useFocusEffect } from '@react-navigation/native';
 import {app_type} from '@appType';
@@ -1107,7 +1107,7 @@ const ProductsPage = ({ navigation, route }) => {
     });
   };
   const renderTypeJumpButton = group => {
-    const typeConf = PRODUCT_TYPE_CONFIG[group.key] || {};
+    const typeConf = resolveProductTypeTheme(group.key, brandColors) || {};
 
     return (
       <TouchableOpacity
@@ -1115,17 +1115,17 @@ const ProductsPage = ({ navigation, route }) => {
         style={[
           styles.typeJumpButton,
           {
-            backgroundColor: typeConf.bg || brandColors.background,
-            borderColor: typeConf.color ? `${typeConf.color}33` : brandColors.border,
+            backgroundColor: typeConf.backgroundColor,
+            borderColor: typeConf.textColor,
           },
         ]}
         activeOpacity={0.8}
         onPress={() => scrollToTypeGroup(group.key)}
       >
-        <Text style={[styles.typeJumpText, { color: typeConf.color || brandColors.text }]}>
+        <Text style={[styles.typeJumpText, { color: typeConf.textColor }]}>
           {group.label}
         </Text>
-        <Text style={[styles.typeJumpCount, { color: typeConf.color || brandColors.textSecondary }]}>
+        <Text style={[styles.typeJumpCount, { color: typeConf.textColor }]}>
           {group.products.length}
         </Text>
       </TouchableOpacity>
@@ -1189,9 +1189,9 @@ const ProductsPage = ({ navigation, route }) => {
   };
   const renderTypeHeader = item => {
     const typeKey = String(item.key || '').replace(`${MOBILE_TYPE_HEADER_PREFIX}-`, '');
-    const typeConf = PRODUCT_TYPE_CONFIG[typeKey] || {};
-    const desktopTypeColor = typeConf.color || brandColors.primary;
-    const desktopTypeBackground = typeConf.bg || brandColors['bg-headers-light'] || brandColors.background;
+    const typeConf = resolveProductTypeTheme(typeKey, brandColors) || {};
+    const desktopTypeColor = typeConf.textColor;
+    const desktopTypeBackground = typeConf.backgroundColor;
 
     return (
       <View
@@ -1202,7 +1202,7 @@ const ProductsPage = ({ navigation, route }) => {
               ? desktopTypeBackground
               : brandColors.background,
             borderColor: isDesktopList
-              ? `${desktopTypeColor}33`
+              ? desktopTypeColor
               : brandColors.border,
           },
         ]}

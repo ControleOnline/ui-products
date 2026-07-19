@@ -9,22 +9,67 @@ import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/com
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
 import {app_type} from '@appType';
-import { colors } from '@controleonline/../../src/styles/colors';
 import styles from './ProductItem.styles';
 
 export const PRODUCT_TYPE_CONFIG = {
-  product:     { label: 'Produto',       color: '#3B82F6', bg: '#EFF6FF' },
-  service:     { label: 'Serviço',       color: '#8B5CF6', bg: '#F5F3FF' },
-  component:   { label: 'Componente',    color: '#F97316', bg: '#FFF7ED' },
-  feedstock:   { label: 'Matéria Prima', color: '#16A34A', bg: '#F0FDF4' },
-  package:     { label: 'Embalagem',     color: '#0891B2', bg: '#ECFEFF' },
-  custom:      { label: 'Custom',        color: '#DB2777', bg: '#FDF2F8' },
-  manufactured:{ label: 'Fabricado',     color: '#D97706', bg: '#FFFBEB' },
-  recipe:      { label: 'Preparo',       color: '#6B7280', bg: '#F3F4F6' },
+  product: {
+    label: 'Produto',
+    backgroundToken: 'chipSelectedBackground',
+    textToken: 'chipSelectedText',
+  },
+  service: {
+    label: 'Serviço',
+    backgroundToken: 'buttonBackgroundSecondary',
+    textToken: 'buttonTextSecondary',
+  },
+  component: {
+    label: 'Componente',
+    backgroundToken: 'chipBackground',
+    textToken: 'textWarning',
+  },
+  feedstock: {
+    label: 'Matéria Prima',
+    backgroundToken: 'chipBackground',
+    textToken: 'textSuccess',
+  },
+  package: {
+    label: 'Embalagem',
+    backgroundToken: 'chipSelectedBackground',
+    textToken: 'chipSelectedText',
+  },
+  custom: {
+    label: 'Custom',
+    backgroundToken: 'buttonBackgroundSecondary',
+    textToken: 'buttonTextSecondary',
+  },
+  manufactured: {
+    label: 'Fabricado',
+    backgroundToken: 'chipBackground',
+    textToken: 'textWarning',
+  },
+  recipe: {
+    label: 'Preparo',
+    backgroundToken: 'chipBackground',
+    textToken: 'textMuted',
+  },
 };
 
 export const getProductTypeLabel = type =>
   PRODUCT_TYPE_CONFIG[type]?.label || String(type || '').trim() || '';
+
+export const resolveProductTypeTheme = (type, palette = {}) => {
+  const typeConfig = PRODUCT_TYPE_CONFIG[type] || null;
+
+  if (!typeConfig) {
+    return null;
+  }
+
+  return {
+    ...typeConfig,
+    backgroundColor: palette[typeConfig.backgroundToken],
+    textColor: palette[typeConfig.textToken],
+  };
+};
 
 const collectionFrom = value => {
   if (!value) return [];
@@ -66,7 +111,6 @@ const ProductItem = ({
   const hasImage = !!coverUrl
   const isManager =
     app_type === 'MANAGER' && interactionMode !== 'pdv'
-  const typeConf = PRODUCT_TYPE_CONFIG[product.type] || null
   const queueLabel = product?.queue?.queue || product?.queue?.name || ''
   const isSupplyCatalog = catalogContext === 'supplies'
   const isTableMode = displayMode === 'table'
@@ -81,12 +125,32 @@ const ProductItem = ({
       ? 'Preço opção'
       : 'Preço cad.'
     : ''
-  const resolvedPalette = {
-    background: palette.background || colors.background,
-    border: palette.border || colors.border,
-    primary: palette.primary || colors.primary,
-    textSecondary: palette.textSecondary || colors.textSecondary,
-  };
+  const resolvedPalette = useMemo(
+    () => ({
+      buttonBackground: palette.buttonBackground,
+      buttonBackgroundSecondary: palette.buttonBackgroundSecondary,
+      buttonText: palette.buttonText,
+      buttonTextSecondary: palette.buttonTextSecondary,
+      cardBackground: palette.cardBackground,
+      cardBorder: palette.cardBorder,
+      cardText: palette.cardText,
+      chipBackground: palette.chipBackground,
+      chipBorder: palette.chipBorder,
+      chipSelectedBackground: palette.chipSelectedBackground,
+      chipSelectedText: palette.chipSelectedText,
+      chipText: palette.chipText,
+      iconDisabled: palette.iconDisabled,
+      textMuted: palette.textMuted,
+      textSecondary: palette.textSecondary,
+      textSuccess: palette.textSuccess,
+      textWarning: palette.textWarning,
+    }),
+    [palette],
+  );
+  const typeConf = useMemo(
+    () => resolveProductTypeTheme(product.type, resolvedPalette),
+    [product.type, resolvedPalette],
+  );
   const resolvedCategories = useMemo(() => {
     const source = productCategories.length > 0
       ? productCategories
@@ -116,7 +180,11 @@ const ProductItem = ({
           {!!product.sku && (
             <Text style={styles.skuLabel} numberOfLines={1}>SKU {product.sku}</Text>
           )}
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#CBD5E1" />
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={20}
+            color={resolvedPalette.iconDisabled}
+          />
         </View>
       );
     }
@@ -134,10 +202,12 @@ const ProductItem = ({
           style={[
             styles.customizeButton,
             isTableMode && styles.tableCustomizeButton,
-            isTableMode && { backgroundColor: resolvedPalette.primary },
+            { backgroundColor: resolvedPalette.buttonBackground },
           ]}
         >
-          <Text style={styles.customizeButtonText}>CUSTOMIZAR</Text>
+          <Text style={[styles.customizeButtonText, { color: resolvedPalette.buttonText }]}>
+            CUSTOMIZAR
+          </Text>
         </TouchableOpacity>
       );
     }
@@ -146,6 +216,7 @@ const ProductItem = ({
         <ProductTotem
           product={product}
           category={category}
+          palette={resolvedPalette}
           singleItemMode={singleItemMode || app_type === 'TOTEM'}
           orderId={orderId}
         />
@@ -168,8 +239,8 @@ const ProductItem = ({
           isTableMode && styles.tableCategoryChip,
           isPlaceholder && styles.categoryChipPlaceholder,
           {
-            backgroundColor: resolvedPalette.background,
-            borderColor: resolvedPalette.border,
+            backgroundColor: resolvedPalette.chipBackground,
+            borderColor: resolvedPalette.chipBorder,
           },
         ]}
       >
@@ -178,8 +249,8 @@ const ProductItem = ({
             styles.categorySwatch,
             isPlaceholder && styles.categorySwatchPlaceholder,
             {
-              backgroundColor: primaryCategory?.color || resolvedPalette.background,
-              borderColor: resolvedPalette.border,
+              backgroundColor: primaryCategory?.color || resolvedPalette.chipBackground,
+              borderColor: resolvedPalette.chipBorder,
             },
           ]}
         />
@@ -187,14 +258,14 @@ const ProductItem = ({
           style={[
             styles.categoryChipText,
             isPlaceholder && styles.placeholderText,
-            { color: resolvedPalette.textSecondary },
+            { color: resolvedPalette.chipText },
           ]}
           numberOfLines={1}
         >
           {primaryCategory?.name || 'Sem categoria'}
         </Text>
         {extraCategoryCount > 0 && (
-          <Text style={[styles.categoryCountText, { color: resolvedPalette.textSecondary }]}>
+          <Text style={[styles.categoryCountText, { color: resolvedPalette.chipText }]}>
             +{extraCategoryCount}
           </Text>
         )}
@@ -204,7 +275,14 @@ const ProductItem = ({
 
   if (isTableMode) {
     return (
-      <View style={[styles.tableRow, { borderColor: resolvedPalette.border }]}>
+      <View
+        style={[
+          styles.tableRow,
+          {
+            backgroundColor: resolvedPalette.cardBackground,
+            borderColor: resolvedPalette.cardBorder,
+          },
+        ]}>
         <View style={styles.tableImageCell}>
           {hasImage && (
             <Image
@@ -214,8 +292,17 @@ const ProductItem = ({
             />
           )}
           {!hasImage && (
-            <View style={[styles.tableImage, styles.tableImageEmpty]}>
-              <MaterialCommunityIcons name="image-outline" size={18} color={resolvedPalette.textSecondary} />
+            <View
+              style={[
+                styles.tableImage,
+                styles.tableImageEmpty,
+                {backgroundColor: resolvedPalette.chipBackground},
+              ]}>
+              <MaterialCommunityIcons
+                name="image-outline"
+                size={18}
+                color={resolvedPalette.iconDisabled}
+              />
             </View>
           )}
         </View>
@@ -249,8 +336,15 @@ const ProductItem = ({
         </View>
         <View style={styles.tableTypeCell}>
           {typeConf ? (
-            <View style={[styles.typeChip, styles.tableTypeChip, { backgroundColor: typeConf.bg }]}>
-              <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
+            <View
+              style={[
+                styles.typeChip,
+                styles.tableTypeChip,
+                {backgroundColor: typeConf.backgroundColor},
+              ]}>
+              <Text style={[styles.typeChipText, {color: typeConf.textColor}]}>
+                {typeConf.label}
+              </Text>
             </View>
           ) : (
             <Text style={styles.tableMutedText} numberOfLines={1}>-</Text>
@@ -272,9 +366,16 @@ const ProductItem = ({
   }
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, {backgroundColor: resolvedPalette.cardBackground}]}>
       {hasImage && (
-        <View style={[styles.imageWrap, { borderColor: resolvedPalette.border }]}>
+        <View
+          style={[
+            styles.imageWrap,
+            {
+              backgroundColor: resolvedPalette.cardBackground,
+              borderColor: resolvedPalette.cardBorder,
+            },
+          ]}>
           <Image
             source={{ uri: coverUrl }}
             style={styles.coverImage}
@@ -283,8 +384,20 @@ const ProductItem = ({
         </View>
       )}
       {!hasImage && (
-        <View style={[styles.imageWrap, styles.imageWrapEmpty, { borderColor: resolvedPalette.border }]}>
-          <MaterialCommunityIcons name="image-outline" size={26} color={resolvedPalette.textSecondary} />
+        <View
+          style={[
+            styles.imageWrap,
+            styles.imageWrapEmpty,
+            {
+              backgroundColor: resolvedPalette.cardBackground,
+              borderColor: resolvedPalette.cardBorder,
+            },
+          ]}>
+          <MaterialCommunityIcons
+            name="image-outline"
+            size={26}
+            color={resolvedPalette.iconDisabled}
+          />
         </View>
       )}
 
@@ -294,7 +407,7 @@ const ProductItem = ({
             <View style={styles.cardIdentity}>
               <ProductReferenceLink product={product} />
               <View style={styles.nameRow}>
-                <Text style={styles.name} numberOfLines={2}>
+                <Text style={[styles.name, {color: resolvedPalette.cardText}]} numberOfLines={2}>
                   {product.product}
                 </Text>
               </View>
@@ -321,19 +434,32 @@ const ProductItem = ({
             <View style={styles.metaGridCell}>
               {renderCategoryChip({ showPlaceholder: true })}
             </View>
-            <View style={styles.metaGridCell}>
-              {typeConf && (
-                <View style={[styles.typeChip, styles.cardTypeChip, { backgroundColor: typeConf.bg }]}>
-                  <Text style={[styles.typeChipText, { color: typeConf.color }]}>{typeConf.label}</Text>
-                </View>
-              )}
-            </View>
+              <View style={styles.metaGridCell}>
+                {typeConf && (
+                  <View
+                    style={[
+                      styles.typeChip,
+                      styles.cardTypeChip,
+                      {backgroundColor: typeConf.backgroundColor},
+                    ]}>
+                    <Text style={[styles.typeChipText, {color: typeConf.textColor}]}>
+                      {typeConf.label}
+                    </Text>
+                  </View>
+                )}
+              </View>
           </View>
           {isSupplyCatalog && !!unitLabel && (
             <View style={styles.metaChipsRow}>
-              <View style={styles.unitChip}>
-                <MaterialCommunityIcons name="scale" size={10} color="#64748B" />
-                <Text style={styles.unitChipText}>{String(unitLabel).toUpperCase()}</Text>
+              <View style={[styles.unitChip, {backgroundColor: resolvedPalette.chipBackground}]}>
+                <MaterialCommunityIcons
+                  name="scale"
+                  size={10}
+                  color={resolvedPalette.textMuted}
+                />
+                <Text style={[styles.unitChipText, {color: resolvedPalette.textMuted}]}>
+                  {String(unitLabel).toUpperCase()}
+                </Text>
               </View>
             </View>
           )}
@@ -364,14 +490,21 @@ const ProductItem = ({
         <View style={styles.priceRow}>
           <View>
             {!!priceLabel && (
-              <Text style={styles.priceLabel}>{priceLabel}</Text>
+              <Text style={[styles.priceLabel, {color: resolvedPalette.textMuted}]}>
+                {priceLabel}
+              </Text>
             )}
             {product.quantity > 0 && (
-              <Text style={styles.priceTotal}>
+              <Text style={[styles.priceTotal, {color: resolvedPalette.textMuted}]}>
                 {Formatter.formatMoney(product.quantity * product.price)}
               </Text>
             )}
-            <Text style={[styles.price, isSupplyCatalog && styles.supplyPrice]}>
+            <Text
+              style={[
+                styles.price,
+                {color: resolvedPalette.textSuccess},
+                isSupplyCatalog && [styles.supplyPrice, {color: resolvedPalette.textSecondary}],
+              ]}>
               {product.quantity > 0 ? `${product.quantity} × ` : ''}
               {Formatter.formatMoney(product.price)}
             </Text>
