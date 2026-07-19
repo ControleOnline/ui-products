@@ -1049,16 +1049,16 @@ const ProductsPage = ({ navigation, route }) => {
         style={[
           styles.tableHeader,
           {
-            backgroundColor: brandColors['bg-headers-light'] || brandColors.background,
-            borderColor: brandColors.border,
+            backgroundColor: brandColors.tableHeaderBackground,
+            borderColor: brandColors.tableHeaderBorder,
           },
         ]}
       >
-        <Text style={[styles.tableHeaderImage, { color: brandColors.textSecondary }]}>Imagem</Text>
-        <Text style={[styles.tableHeaderId, { color: brandColors.textSecondary }]}>ID</Text>
-        <Text style={[styles.tableHeaderProduct, { color: brandColors.textSecondary }]}>Produto</Text>
+        <Text style={[styles.tableHeaderImage, { color: brandColors.tableHeaderText }]}>Imagem</Text>
+        <Text style={[styles.tableHeaderId, { color: brandColors.tableHeaderText }]}>ID</Text>
+        <Text style={[styles.tableHeaderProduct, { color: brandColors.tableHeaderText }]}>Produto</Text>
         <View style={styles.tableHeaderSync}>
-          <Text style={[styles.tableHeaderSyncTitle, { color: brandColors.textSecondary }]}>
+          <Text style={[styles.tableHeaderSyncTitle, { color: brandColors.tableHeaderText }]}>
             Canais sincronizados
           </Text>
           <View style={styles.tableHeaderSyncLegend}>
@@ -1073,18 +1073,18 @@ const ProductsPage = ({ navigation, route }) => {
                     },
                   ]}
                 />
-                <Text style={[styles.tableHeaderSyncLegendText, { color: brandColors.textSecondary }]}>
+                <Text style={[styles.tableHeaderSyncLegendText, { color: brandColors.tableHeaderText }]}>
                   {item.label}
                 </Text>
               </View>
             ))}
           </View>
         </View>
-        <Text style={[styles.tableHeaderCategory, { color: brandColors.textSecondary }]}>Categoria</Text>
-        <Text style={[styles.tableHeaderType, { color: brandColors.textSecondary }]}>Tipo</Text>
-        <Text style={[styles.tableHeaderQueue, { color: brandColors.textSecondary }]}>Fila</Text>
-        <Text style={[styles.tableHeaderPrice, { color: brandColors.textSecondary }]}>Preço</Text>
-        <Text style={[styles.tableHeaderAction, { color: brandColors.textSecondary }]}>Ação</Text>
+        <Text style={[styles.tableHeaderCategory, { color: brandColors.tableHeaderText }]}>Categoria</Text>
+        <Text style={[styles.tableHeaderType, { color: brandColors.tableHeaderText }]}>Tipo</Text>
+        <Text style={[styles.tableHeaderQueue, { color: brandColors.tableHeaderText }]}>Fila</Text>
+        <Text style={[styles.tableHeaderPrice, { color: brandColors.tableHeaderText }]}>Preço</Text>
+        <Text style={[styles.tableHeaderAction, { color: brandColors.tableHeaderText }]}>Ação</Text>
       </View>
     );
   };

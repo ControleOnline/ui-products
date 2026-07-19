@@ -88,7 +88,7 @@ const normalizeCategory = value => {
   return {
     id: String(categoryId),
     name: categoryName,
-    color: category?.color || '',
+    color: category?.color,
   };
 };
 
@@ -249,7 +249,7 @@ const ProductItem = ({
             styles.categorySwatch,
             isPlaceholder && styles.categorySwatchPlaceholder,
             {
-              backgroundColor: primaryCategory?.color || resolvedPalette.chipBackground,
+              backgroundColor: primaryCategory?.color,
               borderColor: resolvedPalette.chipBorder,
             },
           ]}
