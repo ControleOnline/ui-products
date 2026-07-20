@@ -19,6 +19,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
+import { api } from '@controleonline/ui-common/src/api';
 import ProductItem, {
   getProductTypeLabel,
   resolveProductTypeTheme,
@@ -302,6 +303,8 @@ const ProductsPage = ({ navigation, route }) => {
 
   const peopleStore = useStore('people');
   const { currentCompany } = peopleStore.getters;
+  const deviceStore = useStore('device');
+  const { item: currentDevice } = deviceStore.getters;
   const deviceConfigStore = useStore('device_config');
   const runtimeDeviceConfig = deviceConfigStore.getters?.item;
 
@@ -385,6 +388,26 @@ const ProductsPage = ({ navigation, route }) => {
     syncEntity,
     syncingKey: marketplaceSyncingKey,
   } = useMarketplaceCatalogSync(isManager ? currentCompany?.id : null);
+  const fetchProductCatalogItems = useCallback(
+    async (params = {}) => {
+      if (isManager || context !== 'products') {
+        return actionsRef.current.getItems(params);
+      }
+
+      const response = await api.fetch('product-showcases/catalog', {
+        params: {
+          ...params,
+          integration_key: 'pos',
+          device: currentDevice?.device || currentDevice?.id || '',
+          category: params['productCategory.category'],
+          search: params.product,
+        },
+      });
+
+      return Array.isArray(response?.member) ? response.member : [];
+    },
+    [context, currentDevice?.device, currentDevice?.id, isManager],
+  );
   const categoryRouteValue = routeParams.categoryId || routeParams.category;
   const normalizedSearchQuery = useMemo(
     () => String(routeParams.searchQuery || '').trim(),
@@ -719,7 +742,7 @@ const ProductsPage = ({ navigation, route }) => {
     pagination.isLoading = true;
 
     try {
-      const data = await actionsRef.current.getItems({
+      const data = await fetchProductCatalogItems({
         ...pagination.baseParams,
         page,
       });
@@ -758,7 +781,7 @@ const ProductsPage = ({ navigation, route }) => {
     } finally {
       pagination.isLoading = false;
     }
-  }, [updateCategoryProducts]);
+  }, [fetchProductCatalogItems, updateCategoryProducts]);
 
   const loadAllProductsUntilComplete = useCallback(async requestKey => {
     let page = 1;
@@ -807,11 +830,10 @@ const ProductsPage = ({ navigation, route }) => {
       const requestKey = JSON.stringify(['search', baseParams, normalizedSearchQuery]);
       if (productsRequestKeyRef.current === requestKey) return;
       productsRequestKeyRef.current = requestKey;
-      actionsRef.current
-        .getItems({
-          ...baseParams,
-          product: normalizedSearchQuery,
-        })
+      fetchProductCatalogItems({
+        ...baseParams,
+        product: normalizedSearchQuery,
+      })
         .then(data => {
           if (productsRequestKeyRef.current !== requestKey) return;
           updateCategoryProducts(data || []);
@@ -862,12 +884,11 @@ const ProductsPage = ({ navigation, route }) => {
         const requestKey = JSON.stringify(['category', baseParams, categoryId]);
         if (productsRequestKeyRef.current === requestKey) return;
         productsRequestKeyRef.current = requestKey;
-        actionsRef.current
-          .getItems({
-            ...baseParams,
-            'productCategory.category':
-              category?.['@id'] || `/categories/${categoryId}`,
-          })
+        fetchProductCatalogItems({
+          ...baseParams,
+          'productCategory.category':
+            category?.['@id'] || `/categories/${categoryId}`,
+        })
           .then(data => {
             if (productsRequestKeyRef.current !== requestKey) return;
             if (data && Object.keys(data).length > 0)
@@ -882,6 +903,7 @@ const ProductsPage = ({ navigation, route }) => {
     categories,
     contextTypes,
     currentCompany?.id,
+    fetchProductCatalogItems,
     isAllProducts,
     loadAllProductsUntilComplete,
     loadAllProductsPage,
