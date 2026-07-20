@@ -10,7 +10,6 @@ import styles from './ProductShowcasesPage.styles';
 
 const ProductShowcasesPage = () => {
   const peopleStore = useStore('people');
-  const showcaseItemsStore = useStore('product_showcase_items');
   const themeStore = useStore('theme');
   const {currentCompany} = peopleStore.getters || {};
   const {colors: themeColors} = themeStore.getters || {};
@@ -44,7 +43,6 @@ const ProductShowcasesPage = () => {
       <View style={styles.content}>
         <DefaultExternalFilters
           accentColor={palette.primary}
-          columns={showcaseItemsStore.getters?.columns || []}
           filters={filters}
           onChangeFilters={setFilters}
           storeName="product_showcase_items"
