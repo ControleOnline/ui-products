@@ -56,7 +56,6 @@ export default {
         sortField: 'product.product',
         align: 'left',
         label: 'product',
-        externalFilter: true,
         searchParam: 'search',
         list: 'products/getItems',
         listRequestParams({currentCompanyId}) {
@@ -75,7 +74,6 @@ export default {
         sortField: 'showcase.name',
         align: 'left',
         label: 'showcase',
-        externalFilter: true,
         list: 'product_showcases/getItems',
         listRequestParams({requestParams}) {
           return requestParams?.['showcase.company']
@@ -107,7 +105,6 @@ export default {
         sortField: 'outInventory.inventory',
         align: 'left',
         label: 'outInventory',
-        externalFilter: true,
         list: 'inventories/getItems',
         listRequestParams({currentCompanyId}) {
           return currentCompanyId ? {people: currentCompanyId} : {};
@@ -125,7 +122,6 @@ export default {
         name: 'externalCode',
         align: 'left',
         label: 'externalCode',
-        externalFilter: true,
         format(value) {
           return value || '';
         },
@@ -156,7 +152,6 @@ export default {
         name: 'active',
         align: 'left',
         label: 'active',
-        externalFilter: true,
         list: [
           {value: true, label: 'active'},
           {value: false, label: 'inactive'},
