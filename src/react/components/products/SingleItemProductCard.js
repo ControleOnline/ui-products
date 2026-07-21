@@ -13,14 +13,13 @@ const SingleItemProductCard = ({product, palette = {}, orderId = ''}) => {
   const isNarrow = width <= 340;
   const colors = useMemo(
     () => ({
-      background: palette.cardBackground || palette.surface || palette.background,
-      border: palette.cardBorder || palette.border,
-      selectedBorder: palette.checkboxBorder || palette.primary,
-      selectedBackground:
-        palette.checkboxSelectedBackground || palette.buttonBackground,
-      selectedMark: palette.checkboxSelectedMark || palette.buttonText,
-      shadow: palette.cardShadow || palette.text,
-      text: palette.cardText || palette.text,
+      background: palette.cardBackground,
+      border: palette.cardBorder,
+      selectedBorder: palette.checkboxBorder,
+      selectedBackground: palette.checkboxSelectedBackground,
+      selectedMark: palette.checkboxSelectedMark,
+      shadow: palette.cardShadow,
+      text: palette.cardText,
     }),
     [palette],
   );
