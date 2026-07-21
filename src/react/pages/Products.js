@@ -395,11 +395,15 @@ const ProductsPage = ({ navigation, route }) => {
       if (isManager || context !== 'products') {
         return actionsRef.current.getItems(params);
       }
+      if (!currentCompany?.id) {
+        return [];
+      }
 
       const response = await api.fetch('product-showcases/catalog', {
         params: {
           ...params,
           integration_key: 'pos',
+          company: currentCompany.id,
           device: currentDevice?.device || currentDevice?.id || '',
           category: params['productCategory.category'],
           search: params.product,
@@ -408,7 +412,7 @@ const ProductsPage = ({ navigation, route }) => {
 
       return Array.isArray(response?.member) ? response.member : [];
     },
-    [context, currentDevice?.device, currentDevice?.id, isManager],
+    [context, currentCompany?.id, currentDevice?.device, currentDevice?.id, isManager],
   );
   const categoryRouteValue = routeParams.categoryId || routeParams.category;
   const normalizedSearchQuery = useMemo(
