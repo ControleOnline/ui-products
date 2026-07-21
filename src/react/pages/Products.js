@@ -22,11 +22,13 @@ import StateStore from '@controleonline/ui-common/src/react/components/StateStor
 import { api } from '@controleonline/ui-common/src/api';
 import ProductItem, {
   getProductTypeLabel,
+  getProductTypePluralLabel,
   resolveProductTypeTheme,
 } from '@controleonline/ui-products/src/react/components/products/ProductItem';
 import { useFocusEffect } from '@react-navigation/native';
 import {app_type} from '@appType';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import {resolveProductCoverUrl} from '@controleonline/ui-products/src/react/domain/productMedia';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
@@ -681,6 +683,20 @@ const ProductsPage = ({ navigation, route }) => {
       })),
     ]);
   }, [productsData, shouldGroupByType, typeGroups]);
+  const hasSingleItemGroup = isSingleItemMode && typeGroups.length === 1;
+  const hasSingleItemMedia = useMemo(
+    () => isSingleItemMode && productsData.some(product => !!resolveProductCoverUrl(product)),
+    [isSingleItemMode, productsData],
+  );
+  const singleItemColumnCount = isSingleItemMode
+    ? width <= 340
+      ? 1
+      : width < DESKTOP_LIST_MIN_WIDTH
+        ? hasSingleItemMedia
+          ? 2
+          : 1
+        : 4
+    : 1;
   const typeJumpTargets = useMemo(() => {
     const targets = {};
     groupedProductsData.forEach((item, index) => {
@@ -691,8 +707,13 @@ const ProductsPage = ({ navigation, route }) => {
     return targets;
   }, [groupedProductsData]);
   const listData = useMemo(
-    () => (shouldGroupByType ? groupedProductsData : productsData),
-    [groupedProductsData, productsData, shouldGroupByType],
+    () =>
+      hasSingleItemGroup
+        ? typeGroups[0].products
+        : shouldGroupByType
+          ? groupedProductsData
+          : productsData,
+    [groupedProductsData, hasSingleItemGroup, productsData, shouldGroupByType, typeGroups],
   );
 
   const changeCategoryProduct = (p, changeStorage = false) => {
@@ -1003,7 +1024,7 @@ const ProductsPage = ({ navigation, route }) => {
     [syncEntity],
   );
 
-  const maxContentWidth = isDesktopList ? 1600 : 860;
+  const maxContentWidth = isSingleItemMode ? 1160 : isDesktopList ? 1600 : 860;
   const containerWidth = Math.min(width, maxContentWidth);
   const isCompactMobile = width < 360;
   const shouldWaitForGroupedProducts = shouldGroupByType && !groupedProductsReady;
@@ -1062,7 +1083,7 @@ const ProductsPage = ({ navigation, route }) => {
     );
   };
   const renderDesktopHeader = () => {
-    if (!isDesktopList) {
+    if (!isDesktopList || isSingleItemMode) {
       return null;
     }
 
@@ -1169,12 +1190,35 @@ const ProductsPage = ({ navigation, route }) => {
       </ScrollView>
     );
   };
-  const renderListHeader = () => (
-    <View>
-      {renderSupplyHeader()}
-      {renderDesktopHeader()}
-    </View>
-  );
+  const renderListHeader = () => {
+    const singleItemType = hasSingleItemGroup ? typeGroups[0]?.key : '';
+    const singleItemTitle = singleItemType
+      ? getProductTypePluralLabel(singleItemType)
+      : 'Itens disponíveis';
+
+    return (
+      <View>
+        {isSingleItemMode && (
+          <View style={styles.singleItemHeading}>
+            <Text style={[styles.singleItemHeadingTitle, {color: brandColors.text}]}>
+              {singleItemTitle}
+            </Text>
+            <Text
+              style={[
+                styles.singleItemHeadingCount,
+                {color: brandColors.textSecondary},
+              ]}
+            >
+              {visibleProducts.length}{' '}
+              {visibleProducts.length === 1 ? 'disponível' : 'disponíveis'}
+            </Text>
+          </View>
+        )}
+        {renderSupplyHeader()}
+        {renderDesktopHeader()}
+      </View>
+    );
+  };
   const renderStickyTypeJumpBar = () => {
     if (!shouldShowProductList) {
       return null;
@@ -1237,7 +1281,9 @@ const ProductsPage = ({ navigation, route }) => {
         >
           {isDesktopList
             ? `${item.label} · ${item.count} ${item.count === 1 ? 'item' : 'itens'}`
-            : item.label}
+            : isSingleItemMode
+              ? getProductTypePluralLabel(typeKey)
+              : item.label}
         </Text>
         {!isDesktopList && (
           <Text style={[styles.typeSectionCount, { color: brandColors.textSecondary }]}>
@@ -1295,12 +1341,21 @@ const ProductsPage = ({ navigation, route }) => {
       {renderStickyTypeJumpBar()}
       {shouldShowProductList && (
         <FlatList
+          key={`products-${isSingleItemMode ? singleItemColumnCount : 1}`}
           ref={productListRef}
           data={listData}
-          keyExtractor={item => String(shouldGroupByType ? item.key : item.id)}
+          keyExtractor={item =>
+            String(shouldGroupByType && !hasSingleItemGroup ? item.key : item.id)
+          }
           contentContainerStyle={listContentStyle}
+          columnWrapperStyle={
+            hasSingleItemGroup && singleItemColumnCount > 1
+              ? styles.singleItemGridRow
+              : undefined
+          }
           ListHeaderComponent={renderListHeader}
-          stickyHeaderIndices={isDesktopList ? [0] : undefined}
+          numColumns={hasSingleItemGroup ? singleItemColumnCount : 1}
+          stickyHeaderIndices={isDesktopList && !isSingleItemMode ? [0] : undefined}
           onScrollToIndexFailed={info => {
             setTimeout(() => {
               productListRef.current?.scrollToIndex?.({
@@ -1321,16 +1376,18 @@ const ProductsPage = ({ navigation, route }) => {
               setVisibleCount(v => v + 50);
           }}
           renderItem={({ item }) => {
-            if (shouldGroupByType && item.type === 'header') {
+            if (shouldGroupByType && !hasSingleItemGroup && item.type === 'header') {
               return renderTypeHeader(item);
             }
 
-            const product = shouldGroupByType ? item.product : item;
+            const product = shouldGroupByType && !hasSingleItemGroup ? item.product : item;
             // No PDV/single-item, o card nao pode roubar o toque do botao interno.
             const CardWrapper = isManager ? TouchableOpacity : View;
             const wrapperProps = isManager
-              ? { onPress: () => handleProductPress(product) }
-              : {};
+              ? {onPress: () => handleProductPress(product)}
+              : isSingleItemMode
+                ? {style: styles.singleItemGridCell}
+                : {};
 
             return (
               <CardWrapper {...wrapperProps}>
@@ -1339,7 +1396,7 @@ const ProductsPage = ({ navigation, route }) => {
                   category={category}
                   productCategories={productCategoriesByProductId[normalizeProductId(product)] || []}
                   catalogContext={context}
-                  displayMode={isDesktopList ? 'table' : 'card'}
+                  displayMode={isDesktopList && !isSingleItemMode ? 'table' : 'card'}
                   interactionMode={interactionMode}
                   palette={brandColors}
                   singleItemMode={isSingleItemMode}

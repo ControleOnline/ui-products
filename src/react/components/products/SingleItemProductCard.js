@@ -1,0 +1,130 @@
+import React, {memo, useMemo} from 'react';
+import {Text, View, useWindowDimensions} from 'react-native';
+import Formatter from '@controleonline/ui-common/src/utils/formatter';
+import DefaultFile from '@controleonline/ui-default/src/react/components/files/DefaultFile';
+import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
+import {resolveProductCoverUrl} from '@controleonline/ui-products/src/react/domain/productMedia';
+import styles from './SingleItemProductCard.styles';
+
+const SingleItemProductCard = ({product, palette = {}, orderId = ''}) => {
+  const {width} = useWindowDimensions();
+  const coverUrl = resolveProductCoverUrl(product);
+  const hasMedia = !!coverUrl;
+  const isNarrow = width <= 340;
+  const colors = useMemo(
+    () => ({
+      background: palette.cardBackground || palette.surface || palette.background,
+      border: palette.cardBorder || palette.border,
+      selectedBorder: palette.checkboxBorder || palette.primary,
+      selectedBackground:
+        palette.checkboxSelectedBackground || palette.buttonBackground,
+      selectedMark: palette.checkboxSelectedMark || palette.buttonText,
+      shadow: palette.cardShadow || palette.text,
+      text: palette.cardText || palette.text,
+    }),
+    [palette],
+  );
+  const productName = String(product?.product || '').trim();
+
+  return (
+    <ProductTotem
+      accessibilityLabel={productName}
+      orderId={orderId}
+      palette={palette}
+      product={product}
+      singleItemMode
+      containerStyle={styles.touchable}
+    >
+      {({isSelected}) => (
+        <View
+          style={[
+            styles.card,
+            hasMedia ? styles.cardWithMedia : styles.cardCompact,
+            hasMedia && isNarrow && styles.cardWithMediaNarrow,
+            !hasMedia && isNarrow && styles.cardCompactNarrow,
+            {
+              backgroundColor: colors.background,
+              borderColor: isSelected ? colors.selectedBorder : colors.border,
+              shadowColor: colors.shadow,
+            },
+            isSelected && styles.cardSelected,
+          ]}
+        >
+          {hasMedia && (
+            <View
+              style={[
+                styles.media,
+                isNarrow && styles.mediaNarrow,
+                {backgroundColor: colors.background},
+              ]}
+            >
+              <DefaultFile
+                accessibilityLabel={`Imagem de ${productName}`}
+                resizeMode="cover"
+                source={coverUrl}
+                style={styles.mediaImage}
+              />
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.content,
+              hasMedia ? styles.contentWithMedia : styles.compactContent,
+            ]}
+          >
+            <View style={styles.identity}>
+              <Text
+                numberOfLines={2}
+                style={[
+                  styles.name,
+                  hasMedia && !isNarrow && styles.nameWithMedia,
+                  {color: colors.text},
+                ]}
+              >
+                {productName}
+              </Text>
+              {!hasMedia && (
+                <Text style={[styles.price, {color: colors.text}]}>
+                  {Formatter.formatMoney(product?.price)}
+                </Text>
+              )}
+            </View>
+
+            <View style={hasMedia ? styles.actionRow : undefined}>
+              {hasMedia && (
+                <Text style={[styles.price, {color: colors.text}]}>
+                  {Formatter.formatMoney(product?.price)}
+                </Text>
+              )}
+              <View
+                style={[
+                  styles.radio,
+                  {
+                    backgroundColor: isSelected
+                      ? colors.selectedBackground
+                      : colors.background,
+                    borderColor: isSelected
+                      ? colors.selectedBackground
+                      : colors.text,
+                  },
+                ]}
+              >
+                {isSelected && (
+                  <View
+                    style={[
+                      styles.radioMark,
+                      {backgroundColor: colors.selectedMark},
+                    ]}
+                  />
+                )}
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+    </ProductTotem>
+  );
+};
+
+export default memo(SingleItemProductCard);

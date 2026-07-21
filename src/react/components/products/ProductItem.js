@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity';
 import ProductTotem from '@controleonline/ui-orders/src/react/components/cart/ProductTotem';
+import SingleItemProductCard from '@controleonline/ui-products/src/react/components/products/SingleItemProductCard';
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
@@ -14,41 +15,49 @@ import styles from './ProductItem.styles';
 export const PRODUCT_TYPE_CONFIG = {
   product: {
     label: 'Produto',
+    pluralLabel: 'Produtos',
     backgroundToken: 'chipSelectedBackground',
     textToken: 'chipSelectedText',
   },
   service: {
     label: 'Serviço',
+    pluralLabel: 'Serviços',
     backgroundToken: 'buttonBackgroundSecondary',
     textToken: 'buttonTextSecondary',
   },
   component: {
     label: 'Componente',
+    pluralLabel: 'Componentes',
     backgroundToken: 'chipBackground',
     textToken: 'textWarning',
   },
   feedstock: {
     label: 'Matéria Prima',
+    pluralLabel: 'Matérias-primas',
     backgroundToken: 'chipBackground',
     textToken: 'textSuccess',
   },
   package: {
     label: 'Embalagem',
+    pluralLabel: 'Embalagens',
     backgroundToken: 'chipSelectedBackground',
     textToken: 'chipSelectedText',
   },
   custom: {
     label: 'Custom',
+    pluralLabel: 'Customizados',
     backgroundToken: 'buttonBackgroundSecondary',
     textToken: 'buttonTextSecondary',
   },
   manufactured: {
     label: 'Fabricado',
+    pluralLabel: 'Fabricados',
     backgroundToken: 'chipBackground',
     textToken: 'textWarning',
   },
   recipe: {
     label: 'Preparo',
+    pluralLabel: 'Preparos',
     backgroundToken: 'chipBackground',
     textToken: 'textMuted',
   },
@@ -56,6 +65,9 @@ export const PRODUCT_TYPE_CONFIG = {
 
 export const getProductTypeLabel = type =>
   PRODUCT_TYPE_CONFIG[type]?.label || String(type || '').trim() || '';
+
+export const getProductTypePluralLabel = type =>
+  PRODUCT_TYPE_CONFIG[type]?.pluralLabel || getProductTypeLabel(type);
 
 export const resolveProductTypeTheme = (type, palette = {}) => {
   const typeConfig = PRODUCT_TYPE_CONFIG[type] || null;
@@ -168,6 +180,16 @@ const ProductItem = ({
   }, [product?.productCategory, productCategories]);
   const primaryCategory = resolvedCategories[0] || null;
   const extraCategoryCount = Math.max(0, resolvedCategories.length - 1);
+
+  if (singleItemMode && !isManager && product.type !== 'custom') {
+    return (
+      <SingleItemProductCard
+        orderId={orderId}
+        palette={palette}
+        product={product}
+      />
+    );
+  }
 
   const renderAction = () => {
     if (isManager) {

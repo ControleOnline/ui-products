@@ -368,6 +368,34 @@ const styles = StyleSheet.create({
   stickyTypeJumpInner: {
     maxWidth: 860,
   },
+  singleItemHeading: {
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 1,
+    paddingBottom: 10,
+  },
+  singleItemHeadingTitle: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: -0.35,
+  },
+  singleItemHeadingCount: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  singleItemGridRow: {
+    gap: 10,
+  },
+  singleItemGridCell: {
+    flex: 1,
+    minWidth: 0,
+    marginBottom: 10,
+  },
 });
 
 export { skeletonStyles, styles }
