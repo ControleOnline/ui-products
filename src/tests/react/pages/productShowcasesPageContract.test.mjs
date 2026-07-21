@@ -13,6 +13,7 @@ test('ProductShowcasesPage uses the default table contract', () => {
   assert.ok(externalFiltersIndex >= 0);
   assert.ok(defaultTableIndex > externalFiltersIndex);
   assert.match(pageSource, /<DefaultTable[\s\S]*storeName="product_showcase_items"/);
+  assert.doesNotMatch(pageSource, /visibleColumnsPreferenceKey/);
   assert.doesNotMatch(pageSource, /showExternalFilters/);
   assert.doesNotMatch(pageSource, /api\.fetch/);
   assert.doesNotMatch(pageSource, /FlatList/);

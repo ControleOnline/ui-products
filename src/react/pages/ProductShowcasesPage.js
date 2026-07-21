@@ -55,7 +55,6 @@ const ProductShowcasesPage = () => {
           searchProps={{searchKey: 'search'}}
           showTotalItemsInCompactToolbar
           storeName="product_showcase_items"
-          visibleColumnsPreferenceKey="product_showcase_items"
         />
       </View>
     </SafeAreaView>
