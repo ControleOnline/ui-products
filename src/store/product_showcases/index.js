@@ -71,6 +71,27 @@ export default {
       {
         sortable: true,
         editable: true,
+        name: 'peopleDomain',
+        sortField: 'peopleDomain.domain',
+        align: 'left',
+        label: 'Domínio do shop',
+        list: 'people_domains/getItems',
+        listRequestParams({currentCompanyId}) {
+          return {
+            ...(currentCompanyId ? {people: `/people/${currentCompanyId}`} : {}),
+            domainType: 'SHOP',
+          };
+        },
+        format(value) {
+          return value?.domain || '';
+        },
+        saveFormat(value) {
+          return value ? `/people_domains/${value.value || value}` : null;
+        },
+      },
+      {
+        sortable: true,
+        editable: true,
         name: 'active',
         align: 'left',
         label: 'active',
