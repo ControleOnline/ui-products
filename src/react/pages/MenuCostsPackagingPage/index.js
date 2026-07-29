@@ -1,7 +1,7 @@
+/* eslint-disable no-unused-vars */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   Text,
   TextInput,
@@ -16,32 +16,15 @@ import { useStore } from '@store';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import styles, { MENU_COLORS } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/index.styles';
+import { MAIN_TABS } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/tabs';
 import {
-  MAIN_TABS,
-} from '@controleonline/ui-products/src/react/pages/MenuCostsPage/tabs';
+  resolveMenuCostsTabRoute,
+} from '@controleonline/ui-products/src/react/pages/MenuCostsPage/navigation';
 import {
-  RESOURCE_META,
-  activeCostOptionsForRef,
-  activeCostSummary,
-  categoryName,
-  comparableCostLabel,
-  decimal,
-  evidenceLabel,
-  filterBySearch,
-  formatDate,
-  getById,
-  money,
-  resourceParentUsageRows,
-  safeArray,
-} from '@controleonline/ui-products/src/react/domain/menuCostsShared';
-import { fetchLatestPurchasesByProductIds } from '@controleonline/ui-products/src/react/domain/productCosting';
+  buildLivePackagingDb,
+} from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsPackaging';
 import { MENU_COSTS_PAGE_SIZE } from '@controleonline/ui-products/src/react/domain/menuCostsPagination';
-import { resolveMenuCostsTabRoute } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/navigation';
-import {
-  resolveCategoryCoverUrl,
-  resolveProductCoverUrl,
-} from '@controleonline/ui-products/src/react/domain/productMedia';
-import { buildLiveIngredientsDb } from '@controleonline/ui-products/src/react/domain/menuCostsIngredients';
+import { fetchLatestPurchasesByProductIds, formatCurrency } from '@controleonline/ui-products/src/react/domain/productCosting';
 
 const EMPTY_DB = {
   categories: [],
@@ -56,6 +39,106 @@ const EMPTY_DB = {
   settings: {},
 };
 
+const safeArray = value => (Array.isArray(value) ? value : []);
+
+const normalizeText = value =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+const formatDate = value => {
+  if (!value) return 'Sem data';
+  const text = String(value);
+  if (text.includes('-')) {
+    const [year, month, day] = text.split('T')[0].split('-');
+    if (year && month && day) {
+      return `${day}/${month}/${year}`;
+    }
+  }
+  return text;
+};
+
+const money = value => formatCurrency(Number(value || 0));
+
+const decimal = (value, digits = 2) =>
+  Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: digits,
+  });
+
+const evidenceLabel = value => ({
+  documented: 'Comprovado',
+  review: 'Revisar',
+  estimated: 'Estimado',
+  manual: 'Manual',
+}[value] || 'Revisar');
+
+const categoryName = (db, categoryId) =>
+  safeArray(db?.categories).find(item => String(item.id) === String(categoryId))?.name || 'Sem categoria';
+
+const filterBySearch = (items, query, selectors) => {
+  const normalizedQuery = normalizeText(query);
+  if (!normalizedQuery) {
+    return safeArray(items);
+  }
+
+  return safeArray(items).filter(item => {
+    const haystack = selectors
+      .map(selector => normalizeText(String(selector(item) || '')))
+      .join(' ');
+    return haystack.includes(normalizedQuery);
+  });
+};
+
+const buildParentRows = (db, item) => {
+  if (safeArray(item?.parentRows).length) {
+    return safeArray(item.parentRows)
+      .map(row => ({
+        ...row,
+        category: row.category || categoryName(db, row.categoryId),
+      }))
+      .sort((left, right) => String(left.productName || '').localeCompare(String(right.productName || ''), 'pt-BR'));
+  }
+
+  const unitCost = Number(item?.purchaseQty || 1) > 0
+    ? Number(item?.purchaseCost || 0) / Number(item?.purchaseQty || 1)
+    : Number(item?.purchaseCost || 0);
+
+  return safeArray(db?.products)
+    .filter(product => product?.active !== false)
+    .flatMap(product =>
+      safeArray(product?.components)
+        .filter(component => String(component?.refType) === 'packaging' && String(component?.refId) === String(item?.id))
+        .map(component => ({
+          productId: product.id,
+          productName: product.name || product.product || `#${product.id}`,
+          productCode: product.code || product.sku || String(product.id),
+          category: categoryName(db, product.categoryId),
+          qty: Number(component.qty || 0),
+          unit: component.unit || item?.baseUnit || 'un',
+          cost: Number(component.qty || 0) * unitCost,
+        })),
+    )
+      .sort((left, right) => String(left.productName || '').localeCompare(String(right.productName || ''), 'pt-BR'));
+};
+
+const getToneStyle = tone => {
+  if (tone === 'good') return styles.toneGood;
+  if (tone === 'warn') return styles.toneWarn;
+  if (tone === 'bad') return styles.toneBad;
+  return styles.toneNeutral;
+};
+
+const Badge = ({ children, tone = 'neutral' }) => (
+  <View style={[styles.badge, getToneStyle(tone)]}>
+    <Text style={styles.badgeText}>{children}</Text>
+  </View>
+);
+
 const IconButton = ({ icon, label, onPress, active, disabled = false }) => (
   <TouchableOpacity
     style={[
@@ -67,16 +150,8 @@ const IconButton = ({ icon, label, onPress, active, disabled = false }) => (
     onPress={disabled ? undefined : onPress}
     disabled={disabled}
   >
-    <Icon
-      name={icon}
-      size={16}
-      color={active ? MENU_COLORS.brandText : MENU_COLORS.muted}
-    />
-    {label ? (
-      <Text style={[styles.iconButtonText, active && styles.iconButtonTextActive]}>
-        {label}
-      </Text>
-    ) : null}
+    <Icon name={icon} size={16} color={active ? MENU_COLORS.brandText : MENU_COLORS.muted} />
+    {label ? <Text style={[styles.iconButtonText, active && styles.iconButtonTextActive]}>{label}</Text> : null}
   </TouchableOpacity>
 );
 
@@ -93,27 +168,17 @@ const SearchBox = ({ value, onChangeText, placeholder }) => (
   </View>
 );
 
-const Badge = ({ label, tone = 'neutral' }) => {
-  const toneStyle =
-    tone === 'good'
-      ? styles.toneGood
-      : tone === 'warn'
-        ? styles.toneWarn
-        : tone === 'bad'
-          ? styles.toneBad
-          : styles.toneNeutral;
-
-  return (
-    <View style={[styles.badge, toneStyle]}>
-      <Text style={styles.badgeText}>{label}</Text>
-    </View>
-  );
-};
+const EmptyState = ({ text = 'Nenhum registro encontrado.' }) => (
+  <View style={styles.emptyState}>
+    <Icon name="inbox" size={24} color={MENU_COLORS.muted} />
+    <Text style={styles.emptyStateText}>{text}</Text>
+  </View>
+);
 
 const InfoGrid = ({ rows }) => (
   <View style={styles.infoGrid}>
     {safeArray(rows).map(row => (
-      <View key={`${row.label}-${row.value}`} style={styles.infoCell}>
+      <View key={row.label} style={styles.infoCell}>
         <Text style={styles.infoLabel}>{row.label}</Text>
         <Text style={styles.infoValue} numberOfLines={2}>
           {row.value}
@@ -128,48 +193,25 @@ const InfoGrid = ({ rows }) => (
   </View>
 );
 
-const EmptyState = ({ text = 'Nenhum registro encontrado.' }) => (
-  <View style={styles.emptyState}>
-    <Icon name="inbox" size={24} color={MENU_COLORS.muted} />
-    <Text style={styles.emptyStateText}>{text}</Text>
-  </View>
-);
-
-const buildImageSource = url => (url ? { uri: url } : null);
-
-const imageForIngredient = (db, ingredient) =>
-  buildImageSource(
-    resolveProductCoverUrl(ingredient) ||
-    resolveCategoryCoverUrl(getById(db, 'categories', ingredient?.categoryId)),
-  );
-
-const VisualThumb = ({ source, label, size = 'md' }) => (
-  <View
-    style={[
-      styles.visualThumb,
-      size === 'lg' && styles.visualThumbLarge,
-      size === 'sm' && styles.visualThumbSmall,
-    ]}
-  >
-    {source ? (
-      <Image source={source} style={styles.visualImage} resizeMode="cover" />
-    ) : (
-      <Text style={styles.visualInitial}>{String(label || 'GY').slice(0, 2).toUpperCase()}</Text>
-    )}
-  </View>
-);
-
-const RowCard = ({ title, subtitle, meta, selected, onPress, right, badges, imageSource }) => (
+const RowCard = ({ item, selected, onPress, right, badges, meta, subtitle }) => (
   <TouchableOpacity
     style={[styles.rowCard, selected && styles.rowCardActive]}
     activeOpacity={onPress ? 0.84 : 1}
     onPress={onPress}
     disabled={!onPress}
   >
-    {imageSource ? <VisualThumb source={imageSource} label={title} size="sm" /> : null}
+    <View style={[styles.visualThumb, styles.visualThumbSmall]}>
+      <Text style={styles.visualInitial}>{String(item?.name || 'PK').slice(0, 2).toUpperCase()}</Text>
+    </View>
     <View style={styles.rowContent}>
-      <Text style={styles.rowTitle} numberOfLines={2}>{title}</Text>
-      {subtitle ? <Text style={styles.rowSubtitle} numberOfLines={2}>{subtitle}</Text> : null}
+      <Text style={styles.rowTitle} numberOfLines={2}>
+        {item.name}
+      </Text>
+      {subtitle ? (
+        <Text style={styles.rowSubtitle} numberOfLines={2}>
+          {subtitle}
+        </Text>
+      ) : null}
       {badges?.length ? (
         <View style={styles.badgeLine}>
           {badges.map(badge => (
@@ -177,7 +219,11 @@ const RowCard = ({ title, subtitle, meta, selected, onPress, right, badges, imag
           ))}
         </View>
       ) : null}
-      {meta ? <Text style={styles.rowMeta} numberOfLines={2}>{meta}</Text> : null}
+      {meta ? (
+        <Text style={styles.rowMeta} numberOfLines={2}>
+          {meta}
+        </Text>
+      ) : null}
     </View>
     {right ? <View style={styles.rowRight}>{right}</View> : null}
   </TouchableOpacity>
@@ -200,77 +246,11 @@ const DetailShell = ({ title, subtitle, badges, children }) => (
   </View>
 );
 
-const ActiveCostPanel = ({ db, item }) => {
-  const summary = activeCostSummary(db, 'ingredient', item);
-  const options = activeCostOptionsForRef('ingredient');
-  const modeLabel = options.find(option => option.value === summary.mode)?.label || summary.modeLabel;
+const resolveSectionTitle = () => 'Embalagens cadastradas no ERP';
 
-  return (
-    <View style={styles.activeCostPanel}>
-      <View style={styles.activeCostHeader}>
-        <View>
-          <Text style={styles.panelTitle}>Custo ativo</Text>
-          <Text style={styles.panelSubtitle}>
-            Leitura atual do ERP, sem gravação nesta tela.
-          </Text>
-        </View>
-        <Badge tone={summary.mode === 'review' ? 'warn' : 'good'}>{modeLabel}</Badge>
-      </View>
-      <InfoGrid
-        rows={[
-          {
-            label: 'Custo canônico ativo',
-            value: `${money(summary.activePrimaryCost)} / ${summary.primaryUnit}`,
-            helper: summary.source,
-          },
-          {
-            label: 'Leitura de cálculo',
-            value: `${money(summary.activeBaseCost)} / ${summary.baseUnit}`,
-            helper: 'Base usada no custo por unidade',
-          },
-          {
-            label: 'Cadastro atual',
-            value: `${money(summary.registeredPrimaryCost)} / ${summary.primaryUnit}`,
-            helper: 'Valor cadastrado no ERP',
-          },
-          {
-            label: 'Compras vinculadas',
-            value: String(summary.purchaseCount),
-            helper: summary.latest
-              ? `${formatDate(summary.latest.date)} · ${summary.latest.supplierName}`
-              : 'Sem compra vinculada',
-          },
-        ]}
-      />
-    </View>
-  );
-};
+const resolveInitialSelection = db => safeArray(db?.packaging)[0]?.id || null;
 
-const PurchaseRows = ({ rows }) => {
-  if (!safeArray(rows).length) {
-    return <EmptyState text="Sem compras vinculadas para este ingrediente." />;
-  }
-
-  return (
-    <View style={styles.panelNested}>
-      <Text style={styles.panelTitle}>Histórico de compra</Text>
-      {rows.map(row => (
-        <RowCard
-          key={row.id}
-          title={row.description || row.resourceName || 'Item comprado'}
-          subtitle={`${formatDate(row.date)} · ${row.supplierName || 'Fornecedor'}`}
-          meta={`${decimal(row.quantity, 3)} ${row.unit || 'un'} · unit ${money(row.unitPrice)}`}
-          right={<Text style={styles.rowMoney}>{money(row.totalPrice || row.totalAmount)}</Text>}
-          badges={[{ label: `${safeArray(row.inputs).length} evid.`, tone: safeArray(row.inputs).length ? 'good' : 'warn' }]}
-        />
-      ))}
-    </View>
-  );
-};
-
-const resolveSectionTitle = () => 'Ingredientes cadastrados no ERP';
-
-export default function MenuCostsIngredientsPage({ navigation }) {
+export default function MenuCostsPackagingPage({ navigation }) {
   const messageApi = useMessage() || {};
   const { showError } = messageApi;
   const peopleStore = useStore('people');
@@ -308,7 +288,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
     setLoadError('');
 
     try {
-      const nextDb = await buildLiveIngredientsDb({
+      const nextDb = await buildLivePackagingDb({
         companyId,
         companyIri,
         productsActions: productsStore.actions,
@@ -323,16 +303,16 @@ export default function MenuCostsIngredientsPage({ navigation }) {
 
       setDb(nextDb);
       setSelectedId(currentSelected =>
-        currentSelected && safeArray(nextDb.ingredients).some(item => String(item.id) === String(currentSelected))
+        currentSelected && safeArray(nextDb.packaging).some(item => String(item.id) === String(currentSelected))
           ? currentSelected
-          : safeArray(nextDb.ingredients)[0]?.id || null,
+          : resolveInitialSelection(nextDb),
       );
     } catch (error) {
       const message =
         error?.response?.data?.['hydra:description'] ||
         error?.response?.data?.detail ||
         error?.message ||
-        'Falha ao carregar os ingredientes do ERP.';
+        'Falha ao carregar as embalagens do ERP.';
       setDb(EMPTY_DB);
       setSelectedId(null);
       setLoadError(message);
@@ -360,22 +340,35 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   );
 
   useEffect(() => {
-    if (!safeArray(db.ingredients).length) return;
-    if (!selectedId || !safeArray(db.ingredients).some(item => String(item.id) === String(selectedId))) {
-      setSelectedId(safeArray(db.ingredients)[0]?.id || null);
+    if (!safeArray(db.packaging).length) return;
+    if (!selectedId || !safeArray(db.packaging).some(item => String(item.id) === String(selectedId))) {
+      setSelectedId(resolveInitialSelection(db));
     }
   }, [db, selectedId]);
 
+  const handleTabPress = useCallback(
+    tab => {
+      const { routeName, params } = resolveMenuCostsTabRoute(tab);
+
+      if (routeName === 'MenuCostsPackagingPage') {
+        return;
+      }
+
+      navigation?.navigate?.(routeName, params || {});
+    },
+    [navigation],
+  );
+
   const rows = useMemo(
     () =>
-      filterBySearch(safeArray(db.ingredients), query, [
+      filterBySearch(db.packaging, query, [
         item => item.name,
         item => item.code,
         item => item.description,
         item => item.notes,
         item => item.supplier,
-        item => categoryName(db, item.categoryId),
         item => item.sourceReference,
+        item => categoryName(db, item.categoryId),
       ]).sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'pt-BR')),
     [db, query],
   );
@@ -386,13 +379,13 @@ export default function MenuCostsIngredientsPage({ navigation }) {
   );
 
   useEffect(() => {
-    const ingredientId = String(selected?.id || '').trim();
-    if (!ingredientId || !currentCompany?.id) {
+    const packagingId = String(selected?.id || '').trim();
+    if (!packagingId || !currentCompany?.id) {
       setSelectedPurchaseRows([]);
       return undefined;
     }
 
-    const cachedRows = purchaseCacheRef.current.get(ingredientId);
+    const cachedRows = purchaseCacheRef.current.get(packagingId);
     if (cachedRows) {
       setSelectedPurchaseRows(cachedRows);
       return undefined;
@@ -405,7 +398,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
       try {
         const latestPurchasesByProductId = await fetchLatestPurchasesByProductIds({
           companyId: currentCompany.id,
-          productIds: [ingredientId],
+          productIds: [packagingId],
           limitPerProduct: 3,
           maxPages: 1,
         });
@@ -414,9 +407,11 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           return;
         }
 
-        const rowsForIngredient = safeArray(latestPurchasesByProductId?.[ingredientId]);
-        purchaseCacheRef.current.set(ingredientId, rowsForIngredient);
-        setSelectedPurchaseRows(rowsForIngredient);
+        const rowsForPackaging = Array.isArray(latestPurchasesByProductId?.[packagingId])
+          ? latestPurchasesByProductId[packagingId]
+          : [];
+        purchaseCacheRef.current.set(packagingId, rowsForPackaging);
+        setSelectedPurchaseRows(rowsForPackaging);
       } catch {
         if (requestId === purchaseRequestIdRef.current) {
           setSelectedPurchaseRows([]);
@@ -451,42 +446,25 @@ export default function MenuCostsIngredientsPage({ navigation }) {
     }
   }, [hasMoreRows, isLoadingDb, loadMoreRows]);
 
-  const handleTabPress = useCallback(
-    tab => {
-      const { routeName, params } = resolveMenuCostsTabRoute(tab);
-
-      if (routeName === 'MenuCostsIngredientsPage') {
-        return;
-      }
-
-      navigation?.navigate?.(routeName, params || {});
-    },
-    [navigation],
+  const parentRows = useMemo(
+    () => (selected ? buildParentRows(db, selected) : []),
+    [db, selected],
   );
-
-  const duplicateCount = rows.reduce(
-    (sum, item) => sum + Math.max(0, Number(item.duplicateCount || 1) - 1),
-    0,
-  );
-  const reviewCount = rows.filter(item => ['review', 'estimated', 'manual'].includes(item.evidenceType || item.sourceType)).length;
-  const documentedCount = rows.filter(item => (item.evidenceType || item.sourceType) === 'documented').length;
 
   const selectedWarnings = selected
     ? [
         selected.duplicateCount > 1
           ? `Este item consolida ${selected.duplicateCount} registros com o mesmo código ou nome.`
           : '',
-        (selected.evidenceType || selected.sourceType) === 'review'
-          ? 'Ainda não existe compra vinculada recente para este item.'
-          : '',
         !selected.purchaseCost ? 'Sem custo de compra carregado.' : '',
+        selected.evidenceType === 'review' ? 'Ainda não existe compra vinculada recente para este item.' : '',
       ].filter(Boolean)
     : [];
 
   const content = isLoadingDb ? (
     <View style={styles.emptyState}>
       <ActivityIndicator size="small" color={MENU_COLORS.brand} />
-      <Text style={styles.emptyStateText}>Carregando ingredientes do ERP...</Text>
+      <Text style={styles.emptyStateText}>Carregando embalagens do ERP...</Text>
     </View>
   ) : loadError ? (
     <View style={styles.emptyState}>
@@ -494,35 +472,33 @@ export default function MenuCostsIngredientsPage({ navigation }) {
       <Text style={styles.emptyStateText}>{loadError}</Text>
     </View>
   ) : rows.length === 0 ? (
-    <EmptyState text="Nenhum ingrediente encontrado no ERP." />
+    <EmptyState text="Nenhuma embalagem encontrada no ERP." />
   ) : (
     <View style={styles.splitLayout}>
       <View style={styles.listPanel}>
         <View style={styles.activeCostHeader}>
           <View>
-            <Text style={styles.panelTitle}>
-              {RESOURCE_META.ingredients?.plural || 'Ingredientes'}
-            </Text>
+            <Text style={styles.panelTitle}>Embalagens</Text>
             <Text style={styles.panelSubtitle}>
-              Itens comprados ou controlados como insumo de estoque e custo.
+              Descartáveis, potes, sacolas e embalagens que entram na ficha ou repasse.
             </Text>
           </View>
           <Badge>{rows.length} item(ns)</Badge>
         </View>
         <View style={styles.badgeLine}>
-          <Badge tone="good">{documentedCount} comprovado(s)</Badge>
-          <Badge tone={reviewCount ? 'warn' : 'good'}>{reviewCount} para revisar</Badge>
-          <Badge tone={duplicateCount ? 'warn' : 'good'}>{duplicateCount} duplicidade(s)</Badge>
+          <Badge tone="good">{rows.filter(item => (item.evidenceType || item.sourceType) === 'documented').length} comprovado(s)</Badge>
+          <Badge tone={rows.filter(item => item.duplicateCount > 1).length ? 'warn' : 'good'}>
+            {rows.filter(item => item.duplicateCount > 1).length} duplicidade(s)
+          </Badge>
         </View>
         {visibleRows.map(item => (
           <RowCard
             key={item.id}
-            title={item.name}
+            item={item}
             subtitle={item.description || item.notes || item.supplier || categoryName(db, item.categoryId)}
-            imageSource={imageForIngredient(db, item)}
             selected={selected?.id === item.id}
             onPress={() => setSelectedId(item.id)}
-            right={<Text style={styles.rowMoney}>{comparableCostLabel('ingredient', item)}</Text>}
+            right={<Text style={styles.rowMoney}>{money(Number(item.purchaseCost || 0) / Number(item.purchaseQty || 1))}</Text>}
             badges={[
               { label: evidenceLabel(item.evidenceType || item.sourceType), tone: (item.evidenceType || item.sourceType) === 'documented' ? 'good' : 'warn' },
               item.duplicateCount > 1
@@ -535,7 +511,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
         {hasMoreRows ? (
           <View style={styles.emptyState}>
             <ActivityIndicator size="small" color={MENU_COLORS.brand} />
-            <Text style={styles.emptyStateText}>Carregando mais ingredientes...</Text>
+            <Text style={styles.emptyStateText}>Carregando mais embalagens...</Text>
           </View>
         ) : null}
       </View>
@@ -545,7 +521,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           title={selected.name}
           subtitle={selected.description || selected.notes || selected.supplier || ''}
           badges={[
-            { label: RESOURCE_META.ingredients?.singular || 'Ingrediente', tone: 'neutral' },
+            { label: 'Embalagem', tone: 'neutral' },
             { label: categoryName(db, selected.categoryId), tone: 'neutral' },
             { label: evidenceLabel(selected.evidenceType || selected.sourceType), tone: (selected.evidenceType || selected.sourceType) === 'documented' ? 'good' : 'warn' },
             selected.duplicateCount > 1
@@ -554,28 +530,28 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           ]}
         >
           <View style={styles.productHero}>
-            <VisualThumb source={imageForIngredient(db, selected)} label={selected.name} size="lg" />
+            <View style={[styles.visualThumb, styles.visualThumbLarge]}>
+              <Text style={styles.visualInitial}>{String(selected.name || 'PK').slice(0, 2).toUpperCase()}</Text>
+            </View>
             <View style={styles.productHeroText}>
               <Text style={styles.productHeroTitle}>{categoryName(db, selected.categoryId)}</Text>
               <Text style={styles.productHeroSubtitle}>
-                {selected.supplier || selected.sourceReference || 'ERP feedstock'}
+                {selected.supplier || selected.sourceReference || 'ERP package'}
               </Text>
             </View>
           </View>
-
-          <ActiveCostPanel db={db} item={selected} />
 
           <InfoGrid
             rows={[
               {
                 label: 'Custo de compra',
-                value: `${money(selected.purchaseCost)} / ${decimal(selected.purchaseQty)} ${selected.baseUnit || 'un'}`,
+                value: `${money(selected.purchaseCost)} / ${decimal(selected.purchaseQty)} un`,
                 helper: selected.supplier || 'Sem fornecedor informado',
               },
               {
                 label: 'Custo unitário',
-                value: comparableCostLabel('ingredient', selected),
-                helper: `ERP ${selected.erpUnit || 'UN'}`,
+                value: money(Number(selected.purchaseCost || 0) / Number(selected.purchaseQty || 1)),
+                helper: selected.erpUnit || 'UN',
               },
               {
                 label: 'Código ERP',
@@ -589,8 +565,8 @@ export default function MenuCostsIngredientsPage({ navigation }) {
               },
               {
                 label: 'Pais vinculados',
-                value: String(resourceParentUsageRows(db, 'ingredient', selected.id).length),
-                helper: 'Produtos de venda que usam este insumo',
+                value: String(parentRows.length),
+                helper: 'Produtos de venda que usam esta embalagem',
               },
               {
                 label: 'Status',
@@ -612,13 +588,13 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           <View style={styles.panelNested}>
             <Text style={styles.panelTitle}>Produtos-pai vinculados</Text>
             <Text style={styles.panelSubtitle}>
-              O ingrediente abaixo aparece diretamente na engenharia de produtos.
+              A embalagem abaixo aparece diretamente na engenharia de produtos.
             </Text>
-            {resourceParentUsageRows(db, 'ingredient', selected.id).length ? resourceParentUsageRows(db, 'ingredient', selected.id).map(parentRow => (
+            {parentRows.length ? parentRows.map(parentRow => (
               <RowCard
                 key={parentRow.productId}
-                title={parentRow.productName}
-                subtitle={parentRow.category}
+                item={{ name: parentRow.productName }}
+                subtitle={categoryName(db, parentRow.categoryId) || parentRow.category}
                 meta={`${decimal(parentRow.qty, 3)} ${parentRow.unit || 'un'} · ${money(parentRow.cost)}`}
                 right={<Text style={styles.rowMoney}>{parentRow.productCode}</Text>}
                 badges={[{ label: 'Pai', tone: 'neutral' }]}
@@ -626,10 +602,22 @@ export default function MenuCostsIngredientsPage({ navigation }) {
             )) : <EmptyState text="Nenhum produto pai encontrado." />}
           </View>
 
-          <PurchaseRows rows={selectedPurchaseRows} />
+          <View style={styles.panelNested}>
+            <Text style={styles.panelTitle}>Histórico de compra</Text>
+            {selectedPurchaseRows.length ? selectedPurchaseRows.map(row => (
+              <RowCard
+                key={row.id}
+                item={{ name: row.description || 'Compra vinculada' }}
+                subtitle={`${formatDate(row.date)} · ${row.supplierName || 'Fornecedor'}`}
+                meta={`${decimal(row.quantity, 3)} un · unit ${money(row.unitPrice)}`}
+                right={<Text style={styles.rowMoney}>{money(row.totalPrice)}</Text>}
+                badges={[{ label: `${safeArray(row.inputs).length} evid.`, tone: safeArray(row.inputs).length ? 'good' : 'warn' }]}
+              />
+            )) : <EmptyState text="Sem compras vinculadas para esta embalagem." />}
+          </View>
         </DetailShell>
       ) : (
-        <EmptyState text="Selecione um ingrediente para ver custos, pais e compras." />
+        <EmptyState text="Selecione uma embalagem para ver custos, pais e compras." />
       )}
     </View>
   );
@@ -654,9 +642,9 @@ export default function MenuCostsIngredientsPage({ navigation }) {
                     key={tab.key}
                     icon={tab.icon}
                     label={tab.label}
-                    active={tab.key === 'ingredients'}
+                    active={tab.key === 'packaging'}
                     onPress={() => handleTabPress(tab.key)}
-                    disabled={tab.key === 'ingredients'}
+                    disabled={tab.key === 'packaging'}
                   />
                 ))}
               </View>
@@ -666,13 +654,13 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           <View style={styles.content}>
             <View style={styles.sectionTop}>
               <View>
-                <Text style={styles.sectionEyebrow}>Ingredientes</Text>
+                <Text style={styles.sectionEyebrow}>Embalagens</Text>
                 <Text style={styles.sectionTitle}>{resolveSectionTitle()}</Text>
               </View>
               <SearchBox
                 value={query}
                 onChangeText={setQuery}
-                placeholder="Buscar ingrediente, fornecedor ou código"
+                placeholder="Buscar embalagem, fornecedor ou código"
               />
             </View>
 
@@ -687,7 +675,7 @@ export default function MenuCostsIngredientsPage({ navigation }) {
           </View>
         </View>
       </View>
-      <StateStore stores={['people', 'products', 'product_group_product', 'orders', 'categories']} />
+      <StateStore stores={['people', 'products', 'product_group_product', 'product_unit', 'orders', 'categories']} />
     </SafeAreaView>
   );
 }
