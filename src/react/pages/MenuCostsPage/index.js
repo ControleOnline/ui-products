@@ -127,7 +127,6 @@ import { createMenuCostsDraftRepository } from '@controleonline/ui-products/src/
 import {
   buildMenuCostsTechnicalWorkspace,
 } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsTechnicalWorkspace';
-import { ensureLegacySampleDraftImport } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsLegacyDraftImport';
 import {
   buildMenuCostsCompositionPieces,
   buildMenuCostsPackagingPieces,
@@ -140,7 +139,6 @@ import {
   collectMenuCostsComponentRecordIds,
   fetchMenuCostsComponentRecords,
 } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsComponentRecords';
-import legacyMenuCostsSampleDb from './legacy-menu-costs-sample.json';
 
 const STORAGE_KEY = 'controleonline:menu-costs-page:engineering-live:v1';
 const PRODUCT_CATEGORY_ORDER_STORAGE_KEY = 'controleonline:menu-costs-page:product-category-order:v1';
@@ -924,16 +922,7 @@ export default function MenuCostsPage({ navigation, route }) {
       };
     }
 
-    const draftPromise = safeArray(db?.products).length
-      ? ensureLegacySampleDraftImport({
-        company: currentCompany,
-        erpDb: db,
-        legacyDb: legacyMenuCostsSampleDb,
-        draftRepository,
-      })
-      : draftRepository.load(companyId);
-
-    draftPromise
+    draftRepository.load(companyId)
       .then(draftWorkspace => {
         if (alive) {
           setTechnicalWorkspace(buildMenuCostsTechnicalWorkspace({
