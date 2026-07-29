@@ -172,7 +172,7 @@ describe('menuCostsLiveDb', () => {
       packaging: [],
       products: [{
         id: 30,
-        name: 'Alpha Gyros',
+        name: 'Alpha Produto Exemplo',
         type: 'product',
         active: true,
         components: [{
@@ -202,7 +202,7 @@ describe('menuCostsLiveDb', () => {
       packaging: [{ id: 20, name: 'Embalagem', type: 'package', active: true }],
       products: [{
         id: 30,
-        name: 'Alpha Gyros',
+        name: 'Alpha Produto Exemplo',
         type: 'product',
         active: true,
         components: [{
@@ -235,7 +235,7 @@ describe('menuCostsLiveDb', () => {
           if (type.includes('manufactured') || type.includes('component') || type.includes('recipe')) return [];
           return [{
             id: 30,
-            product: 'Alpha Gyros',
+            product: 'Alpha Produto Exemplo',
             sku: 'ALPHA',
             type: 'product',
             active: true,
@@ -390,7 +390,7 @@ describe('menuCostsLiveDb', () => {
           if (type.includes('manufactured') || type.includes('component') || type.includes('recipe')) return [];
           return [{
             id: 30,
-            product: 'Alpha Gyros',
+            product: 'Alpha Produto Exemplo',
             sku: 'ALPHA',
             type: 'product',
             active: true,
@@ -402,7 +402,7 @@ describe('menuCostsLiveDb', () => {
         getItems: jest.fn(async () => [{
           id: 7,
           '@id': '/product_groups/7',
-          productGroup: 'Turbine seu Gyros',
+          productGroup: 'Turbine seu Produto Exemplo',
           required: true,
           minimum: 1,
           maximum: 2,
@@ -436,7 +436,7 @@ describe('menuCostsLiveDb', () => {
 
     assert.equal(product.components.length, 0);
     assert.equal(product.addons.length, 1);
-    assert.equal(addon.group, 'Turbine seu Gyros');
+    assert.equal(addon.group, 'Turbine seu Produto Exemplo');
     assert.equal(addon.required, true);
     assert.equal(addon.minimum, 1);
     assert.equal(addon.maximum, 2);

@@ -127,7 +127,7 @@ import { createMenuCostsDraftRepository } from '@controleonline/ui-products/src/
 import {
   buildMenuCostsTechnicalWorkspace,
 } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsTechnicalWorkspace';
-import { ensureGyrosLegacyDraftImport } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsLegacyDraftImport';
+import { ensureLegacySampleDraftImport } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsLegacyDraftImport';
 import {
   buildMenuCostsCompositionPieces,
   buildMenuCostsPackagingPieces,
@@ -140,7 +140,7 @@ import {
   collectMenuCostsComponentRecordIds,
   fetchMenuCostsComponentRecords,
 } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsComponentRecords';
-import legacyGyrosEngineeringDb from './gyros-custos-cardapio.json';
+import legacyMenuCostsSampleDb from './legacy-menu-costs-sample.json';
 
 const STORAGE_KEY = 'controleonline:menu-costs-page:engineering-live:v1';
 const PRODUCT_CATEGORY_ORDER_STORAGE_KEY = 'controleonline:menu-costs-page:product-category-order:v1';
@@ -925,10 +925,10 @@ export default function MenuCostsPage({ navigation, route }) {
     }
 
     const draftPromise = safeArray(db?.products).length
-      ? ensureGyrosLegacyDraftImport({
+      ? ensureLegacySampleDraftImport({
         company: currentCompany,
         erpDb: db,
-        legacyDb: legacyGyrosEngineeringDb,
+        legacyDb: legacyMenuCostsSampleDb,
         draftRepository,
       })
       : draftRepository.load(companyId);
@@ -1293,7 +1293,7 @@ export default function MenuCostsPage({ navigation, route }) {
   const exportJson = useCallback(() => {
     downloadTextFile(
       JSON.stringify(buildExportPayload(db), null, 2),
-      'gyros-custos-cardapio-erp.json',
+      'sample-product-custos-cardapio-erp.json',
       'application/json'
     );
   }, [db, downloadTextFile]);
@@ -1301,7 +1301,7 @@ export default function MenuCostsPage({ navigation, route }) {
   const exportErpJson = useCallback(() => {
     downloadTextFile(
       JSON.stringify(buildErpExportPayload(db), null, 2),
-      'gyros-engenharia-export-erp.json',
+      'sample-product-engenharia-export-erp.json',
       'application/json'
     );
   }, [db, downloadTextFile]);
@@ -1309,7 +1309,7 @@ export default function MenuCostsPage({ navigation, route }) {
   const exportErpCsv = useCallback(() => {
     downloadTextFile(
       buildErpCatalogCsv(db),
-      'gyros-catalogo-erp.csv',
+      'sample-product-catalogo-erp.csv',
       'text/csv;charset=utf-8'
     );
   }, [db, downloadTextFile]);

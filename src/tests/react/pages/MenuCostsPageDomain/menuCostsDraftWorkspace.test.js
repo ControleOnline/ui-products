@@ -46,7 +46,7 @@ test('stores an operational role locally without changing the ERP entity type', 
 
 test('keeps composition, packaging and resale in separate contracts', () => {
   const workspace = normalizeMenuCostsDraftWorkspace({
-    products: [validEntity('product-1', 'sale_product', 'Alpha Gyros')],
+    products: [validEntity('product-1', 'sale_product', 'Alpha Produto Exemplo')],
     ingredients: [validEntity('ingredient-1', 'ingredient', 'Fraldinha')],
     packaging: [validEntity('package-1', 'packaging', 'Papel barreira')],
     resale: [validEntity('resale-1', 'resale', 'Refrigerante lata')],

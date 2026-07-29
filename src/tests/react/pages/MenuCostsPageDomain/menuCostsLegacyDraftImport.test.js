@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 const {
-  buildGyrosLegacyDraftImport,
-  ensureGyrosLegacyDraftImport,
-  isGyrosLegacyCompany,
+  buildLegacySampleDraftImport,
+  ensureLegacySampleDraftImport,
+  isLegacySampleCompany,
 } = require('@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsLegacyDraftImport');
 
 const legacyDb = {
@@ -22,7 +22,7 @@ const legacyDb = {
   packaging: [{ id: 'pkg_wrap', name: 'Papel barreira' }],
   products: [{
     id: 'prd_alpha',
-    name: 'Alpha Gyros de Fraldinha',
+    name: 'Alpha Sample Product de Fraldinha',
     code: 'GYR-LAN-ALPHA',
     active: true,
     components: [
@@ -38,17 +38,17 @@ const erpDb = {
   ingredients: [{ id: 10, name: 'Pão Francês com Parmesão' }],
   recipes: [],
   packaging: [],
-  products: [{ id: 1104, name: 'Alpha Gyros (Fraldinha)', sku: 'ALPHA' }],
+  products: [{ id: 1104, name: 'Alpha Sample Product (Fraldinha)', sku: 'ALPHA' }],
 };
 
-test('recognizes only the Gyros company for the temporary migration', () => {
-  assert.equal(isGyrosLegacyCompany({ name: 'GYROS' }), true);
-  assert.equal(isGyrosLegacyCompany({ alias: 'Gyros Greek Barbecue' }), true);
-  assert.equal(isGyrosLegacyCompany({ name: 'Outra Pizzaria' }), false);
+test('recognizes only the sample company for the temporary migration', () => {
+  assert.equal(isLegacySampleCompany({ name: 'SAMPLE' }), true);
+  assert.equal(isLegacySampleCompany({ alias: 'Sample Product Greek Barbecue' }), true);
+  assert.equal(isLegacySampleCompany({ name: 'Outra Pizzaria' }), false);
 });
 
 test('imports legacy technical composition without importing commercial groups', () => {
-  const workspace = buildGyrosLegacyDraftImport({ companyId: 3, erpDb, legacyDb });
+  const workspace = buildLegacySampleDraftImport({ companyId: 3, erpDb, legacyDb });
 
   assert.equal(workspace.products.length, 1);
   assert.equal(workspace.products[0].erpReference.id, '1104');
@@ -77,14 +77,14 @@ test('runs once and preserves existing local records', async () => {
     },
   };
 
-  await ensureGyrosLegacyDraftImport({
-    company: { id: 3, name: 'Gyros' },
+  await ensureLegacySampleDraftImport({
+    company: { id: 3, name: 'Sample Product' },
     erpDb,
     legacyDb,
     draftRepository: repository,
   });
-  await ensureGyrosLegacyDraftImport({
-    company: { id: 3, name: 'Gyros' },
+  await ensureLegacySampleDraftImport({
+    company: { id: 3, name: 'Sample Product' },
     erpDb,
     legacyDb,
     draftRepository: repository,

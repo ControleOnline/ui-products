@@ -15,11 +15,11 @@ const {
   resaleItems,
   validateImportedDb,
 } = require('../../../react/pages/MenuCostsPage/viewModel');
-const seedData = require('../../../react/pages/MenuCostsPage/gyros-custos-cardapio.json');
+const seedData = require('../../../react/pages/MenuCostsPage/legacy-menu-costs-sample.json');
 
 const cloneSeedData = () => JSON.parse(JSON.stringify(seedData));
 
-test('menu costs seed keeps Gyros engineering entities separated', () => {
+test('menu costs seed keeps Sample Product engineering entities separated', () => {
   const db = cloneSeedData();
 
   assert.ok(db.ingredients.length > 0);
@@ -33,7 +33,7 @@ test('product costing resolves a sale product without mutating the seed', () => 
   const db = cloneSeedData();
   const alpha = computeProduct(db, 'prd_alpha');
 
-  assert.equal(alpha.product.name, 'Alpha Gyros de Fraldinha');
+  assert.equal(alpha.product.name, 'Alpha Sample Product de Fraldinha');
   assert.ok(alpha.directCost > 0);
   assert.ok(alpha.salePrice > alpha.directCost);
   assert.ok(alpha.nodes.length > 0);
@@ -79,7 +79,7 @@ test('erp exports preserve products, components and addon rows', () => {
   assert.ok(payload.components.length > payload.products.length);
   assert.ok(payload.addons.length > 0);
   assert.match(csv, /codigo;produto;categoria/);
-  assert.match(csv, /Alpha Gyros de Fraldinha/);
+  assert.match(csv, /Alpha Sample Product de Fraldinha/);
   assert.equal(validateImportedDb(db), db);
 });
 
@@ -145,7 +145,7 @@ test('supply sync rows resolve parents and remote supply products', () => {
     {
       id: 9010,
       sku: 'GYR-LAN-ALPHA',
-      product: 'Alpha Gyros de Fraldinha',
+      product: 'Alpha Sample Product de Fraldinha',
       type: 'product',
       price: 1,
     },

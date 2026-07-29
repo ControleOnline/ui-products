@@ -4,11 +4,11 @@ import {
   normalizeMenuCostsDraftWorkspace,
 } from '@controleonline/ui-products/src/react/pages/MenuCostsPage/domain/menuCostsDraftWorkspace';
 
-export const GYROS_LEGACY_IMPORT_VERSION = 3;
+export const LEGACY_SAMPLE_IMPORT_VERSION = 3;
 
-// Correcao operacional temporaria da Gyros. O tipo oficial do produto no ERP
+// Correcao operacional temporaria para dados de exemplo. O tipo oficial do produto no ERP
 // permanece intacto; estes papeis existem apenas no workspace local da engenharia.
-const GYROS_TECHNICAL_ROLE_OVERRIDES = Object.freeze({
+const LEGACY_SAMPLE_TECHNICAL_ROLE_OVERRIDES = Object.freeze({
   1882: 'ingredient',
   1883: 'preparation',
   1887: 'ingredient',
@@ -47,14 +47,14 @@ const mergeById = (current, imported) => uniqueById([
   ...safeArray(imported).filter(candidate => !safeArray(current).some(item => String(item.id) === String(candidate.id))),
 ]);
 
-export const isGyrosLegacyCompany = company => {
+export const isLegacySampleCompany = company => {
   const identity = normalizeText([
     company?.name,
     company?.alias,
     company?.businessName,
     company?.tradeName,
   ].filter(Boolean).join(' '));
-  return identity.includes('gyros');
+  return identity.includes('sample-product');
 };
 
 const productTokens = value => normalizeText(value).split(' ').filter(Boolean);
@@ -144,7 +144,7 @@ const resolveLegacyTarget = (lookup, component) => {
   return entity ? { type, entity } : null;
 };
 
-export const buildGyrosLegacyDraftImport = ({ companyId, erpDb = {}, legacyDb = {} } = {}) => {
+export const buildLegacySampleDraftImport = ({ companyId, erpDb = {}, legacyDb = {} } = {}) => {
   const lookup = createLegacyLookup(legacyDb);
   const products = [];
   const ingredients = [];
@@ -153,7 +153,7 @@ export const buildGyrosLegacyDraftImport = ({ companyId, erpDb = {}, legacyDb = 
   const compositionLinks = [];
   const preparationComponents = [];
   const packagingLinks = [];
-  const technicalRoles = Object.entries(GYROS_TECHNICAL_ROLE_OVERRIDES).map(([targetId, role]) => ({
+  const technicalRoles = Object.entries(LEGACY_SAMPLE_TECHNICAL_ROLE_OVERRIDES).map(([targetId, role]) => ({
     id: `technical-role:${targetId}`,
     targetId,
     role,
@@ -257,7 +257,7 @@ export const buildGyrosLegacyDraftImport = ({ companyId, erpDb = {}, legacyDb = 
   }, companyId);
 };
 
-export const ensureGyrosLegacyDraftImport = async ({
+export const ensureLegacySampleDraftImport = async ({
   company,
   erpDb,
   legacyDb,
@@ -265,10 +265,10 @@ export const ensureGyrosLegacyDraftImport = async ({
 } = {}) => {
   const companyId = entityId(company);
   const current = await draftRepository.load(companyId);
-  if (!isGyrosLegacyCompany(company)) return current;
-  if (Number(current?.imports?.legacyPwa?.version || 0) >= GYROS_LEGACY_IMPORT_VERSION) return current;
+  if (!isLegacySampleCompany(company)) return current;
+  if (Number(current?.imports?.legacyPwa?.version || 0) >= LEGACY_SAMPLE_IMPORT_VERSION) return current;
 
-  const imported = buildGyrosLegacyDraftImport({ companyId, erpDb, legacyDb });
+  const imported = buildLegacySampleDraftImport({ companyId, erpDb, legacyDb });
   return draftRepository.save(companyId, {
     ...current,
     products: mergeById(current.products, imported.products),
@@ -282,7 +282,7 @@ export const ensureGyrosLegacyDraftImport = async ({
     imports: {
       ...(current.imports || {}),
       legacyPwa: {
-        version: GYROS_LEGACY_IMPORT_VERSION,
+        version: LEGACY_SAMPLE_IMPORT_VERSION,
         source: MENU_COSTS_DRAFT_SOURCES.LEGACY_PWA,
       },
     },

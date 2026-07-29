@@ -21,13 +21,13 @@ test('stores technical drafts under a company-specific key', async () => {
   const repository = createMenuCostsDraftRepository(storage);
 
   await repository.save(3, {
-    products: [{ id: 'product-1', type: 'sale_product', name: 'Alpha Gyros' }],
+    products: [{ id: 'product-1', type: 'sale_product', name: 'Alpha Produto Exemplo' }],
   });
   await repository.save(9, {
     products: [{ id: 'product-2', type: 'sale_product', name: 'Outro produto' }],
   });
 
-  assert.equal((await repository.load(3)).products[0].name, 'Alpha Gyros');
+  assert.equal((await repository.load(3)).products[0].name, 'Alpha Produto Exemplo');
   assert.equal((await repository.load(9)).products[0].name, 'Outro produto');
   assert.notEqual(buildMenuCostsDraftStorageKey(3), buildMenuCostsDraftStorageKey(9));
 });

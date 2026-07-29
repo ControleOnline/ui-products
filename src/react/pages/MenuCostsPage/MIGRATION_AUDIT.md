@@ -1,10 +1,10 @@
-# Auditoria de migracao - MenuCostsPage Gyros
+# Auditoria de migracao - MenuCostsPage Sample Product
 
 Data: 2026-05-31
 
 ## Escopo
 
-Esta auditoria orienta a migracao do PWA Gyros de Engenharia de Produtos e Processos para a rota `/menu-costs-page`.
+Esta auditoria orienta a migracao do PWA Sample Product de Engenharia de Produtos e Processos para a rota `/menu-costs-page`.
 
 Regra de isolamento:
 
@@ -14,7 +14,7 @@ Regra de isolamento:
 
 ## Estado atual da migracao
 
-A pagina React atual ja porta a estrutura inicial do PWA para o ERP, com dados locais vindos de `gyros-custos-cardapio.json`.
+A pagina React atual ja porta a estrutura inicial do PWA para o ERP, com dados locais vindos de `legacy-menu-costs-sample.json`.
 
 Coberto na primeira versao:
 
@@ -84,15 +84,15 @@ Base local atual:
 Grupos de adicionais encontrados no PWA:
 
 - Escolha seu queijo.
-- Turbine seu Gyros.
+- Turbine seu Sample Product.
 - Adicionais.
 - Deseja remover algo.
 - Molhos extra a parte.
-- Escolha seu Gyros.
+- Escolha seu Sample Product.
 - Escolha sua Bebida 350ml.
 - Tempero da batata.
 - Finalize seu combo.
-- Gyros 1, Gyros 2, Gyros 3, Gyros 4.
+- Sample Product 1, Sample Product 2, Sample Product 3, Sample Product 4.
 - Tempero das batatas do combo.
 - Escolha o tempero da sua Batata.
 - Escolha a proteina.

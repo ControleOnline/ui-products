@@ -78,7 +78,7 @@ test('search keeps ancestors openable while pruning unrelated branches', () => {
 
 test('suggests mentioned preparations without duplicating confirmed links', () => {
   const suggestions = buildPreparationLinkSuggestions({
-    product: { name: 'Gyros', description: 'Carne, vinagrete da casa e maionese chimichurri' },
+    product: { name: 'Produto Exemplo', description: 'Carne, vinagrete da casa e maionese chimichurri' },
     recipes: [
       { id: 1, name: 'Vinagrete da casa' },
       { id: 2, name: 'Maionese chimichurri' },

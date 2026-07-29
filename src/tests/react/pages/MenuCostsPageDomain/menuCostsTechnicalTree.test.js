@@ -54,7 +54,7 @@ const preparationNode = {
 test('consolidates fixed composition, nested preparation and commercial groups', () => {
   const audit = buildProductTechnicalTreeAudit({
     computed: {
-      product: { id: 100, name: 'Alpha Gyros' },
+      product: { id: 100, name: 'Alpha Produto Exemplo' },
       nodes: [ingredientNode, preparationNode],
       addons: [{
         id: 700,
@@ -112,7 +112,7 @@ test('marks missing references, invalid quantities and incomplete preparations f
 test('keeps commercial-description matches as suggestions outside confirmed cost', () => {
   const audit = buildProductTechnicalTreeAudit({
     computed: {
-      product: { id: 100, name: 'Alpha Gyros' },
+      product: { id: 100, name: 'Alpha Produto Exemplo' },
       nodes: [ingredientNode],
       addons: [],
     },

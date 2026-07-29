@@ -30,8 +30,8 @@ const textHeaders = () => ({
 
 const createCompany = () => ({
   id: 3,
-  name: 'Gyros',
-  alias: 'GYROS',
+  name: 'Produto Exemplo',
+  alias: 'EXEMPLO',
   panel_enabled: true,
   enabled: true,
   commercial_enabled: true,
@@ -76,7 +76,7 @@ const createMenuProducts = () => [
   {
     id: 1104,
     '@id': '/products/1104',
-    product: 'Alpha Gyros (Fraldinha)',
+    product: 'Alpha Produto Exemplo (Fraldinha)',
     description: 'Pao Frances, Carne, Vinagrete',
     sku: 'ALPHA',
     type: 'product',
@@ -397,7 +397,7 @@ test.describe('menu costs dashboard smoke', () => {
 
     await page.getByText('Expandir todas').click();
 
-    await expect(page.getByText('Alpha Gyros (Fraldinha)').first()).toBeVisible();
+    await expect(page.getByText('Alpha Produto Exemplo (Fraldinha)').first()).toBeVisible();
     await expect(page.getByTestId('menu-category-card-11')).toContainText('Escolha de bebida');
     await expect(page.getByTestId('menu-category-card-11')).not.toContainText('Chá gelado de limão');
     await expect(page.getByTestId('menu-category-card-12')).toContainText('Chá gelado de limão');
@@ -422,7 +422,7 @@ test.describe('menu costs dashboard smoke', () => {
     await expect(page.getByText('Escolha as Bebidas')).toBeVisible();
     await expect(page.getByText('Chá gelado de limão').last()).toBeVisible();
 
-    await page.getByText('Alpha Gyros (Fraldinha)').first().click();
+    await page.getByText('Alpha Produto Exemplo (Fraldinha)').first().click();
     await page.getByText('Composição', { exact: true }).click();
     await expect(page.getByText('Ficha técnica local para revisão')).not.toBeVisible();
     await expect(page.getByText('Rascunho local').first()).toBeVisible();

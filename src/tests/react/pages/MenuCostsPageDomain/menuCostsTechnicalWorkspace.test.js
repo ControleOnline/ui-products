@@ -18,7 +18,7 @@ const erpDb = {
   packaging: [{ id: 30, name: 'Papel barreira' }],
   products: [{
     id: 100,
-    name: 'Alpha Gyros',
+    name: 'Alpha Produto Exemplo',
     components: [
       { relationId: 501, refType: 'ingredient', refId: 10, qty: 150, unit: 'g' },
       { relationId: 502, refType: 'recipe', refId: 20, qty: 60, unit: 'ml' },
