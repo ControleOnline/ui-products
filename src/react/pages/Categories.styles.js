@@ -13,6 +13,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  tableContent: {
+    flex: 1,
+    minHeight: 0,
+  },
   scroll: {
     flex: 1,
   },
