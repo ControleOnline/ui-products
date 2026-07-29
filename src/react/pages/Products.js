@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { api } from '@controleonline/ui-common/src/api';
+import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
 import ProductItem, {
   getProductTypeLabel,
   getProductTypePluralLabel,
@@ -830,6 +831,10 @@ const ProductsPage = ({ navigation, route }) => {
   }, [loadAllProductsPage]);
 
   useEffect(() => {
+    if (isManager) {
+      return;
+    }
+
     if (!category) {
       productsRequestKeyRef.current = '';
       resetAllProductsPagination();
@@ -929,6 +934,7 @@ const ProductsPage = ({ navigation, route }) => {
     contextTypes,
     currentCompany?.id,
     fetchProductCatalogItems,
+    isManager,
     isAllProducts,
     loadAllProductsUntilComplete,
     loadAllProductsPage,
@@ -1026,6 +1032,81 @@ const ProductsPage = ({ navigation, route }) => {
       }
     },
     [syncEntity],
+  );
+
+  const managerTableRequestParams = useMemo(() => {
+    if (!isManager || !currentCompany?.id) {
+      return {};
+    }
+
+    const effectiveTypeFilter = context === 'supplies'
+      ? (typeFilter || 'feedstock')
+      : typeFilter;
+    const params = {
+      active: 1,
+      'order[product]': 'ASC',
+      'order[description]': 'ASC',
+      company: currentCompany.id,
+      type: effectiveTypeFilter ? [effectiveTypeFilter] : contextTypes,
+    };
+    const effectiveCategoryId = categoryId || resolveRouteCategoryId(categoryRouteValue);
+
+    if (!isAllProducts && effectiveCategoryId) {
+      params['productCategory.category'] = `/categories/${effectiveCategoryId}`;
+    }
+
+    if (normalizedSearchQuery) {
+      params.product = normalizedSearchQuery;
+    }
+
+    return params;
+  }, [
+    categoryId,
+    categoryRouteValue,
+    context,
+    contextTypes,
+    currentCompany?.id,
+    isAllProducts,
+    isManager,
+    normalizedSearchQuery,
+    typeFilter,
+  ]);
+
+  const renderManagerProductCard = useCallback(
+    ({item}) => (
+      <TouchableOpacity
+        activeOpacity={0.84}
+        onPress={() => handleProductPress(item)}
+      >
+        <ProductItem
+          product={item}
+          category={category}
+          productCategories={productCategoriesByProductId[normalizeProductId(item)] || []}
+          catalogContext={context}
+          displayMode={isDesktopList ? 'table' : 'card'}
+          interactionMode={interactionMode}
+          palette={brandColors}
+          singleItemMode={false}
+          orderId={currentOrderId}
+          marketplaceStatuses={getProductStatuses(item)}
+          onMarketplaceSync={handleMarketplaceSync}
+          marketplaceSyncingKey={marketplaceSyncingKey}
+        />
+      </TouchableOpacity>
+    ),
+    [
+      brandColors,
+      category,
+      context,
+      currentOrderId,
+      getProductStatuses,
+      handleMarketplaceSync,
+      handleProductPress,
+      interactionMode,
+      isDesktopList,
+      marketplaceSyncingKey,
+      productCategoriesByProductId,
+    ],
   );
 
   const maxContentWidth = isSingleItemMode ? 1160 : isDesktopList ? 1600 : 860;
@@ -1297,6 +1378,90 @@ const ProductsPage = ({ navigation, route }) => {
       </View>
     );
   };
+
+  if (isManager) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {!storeLoading && <StateStore store="products" />}
+        <View
+          style={[
+            styles.managerTableContent,
+            {
+              paddingBottom: isCompactMobile ? 96 : 104,
+            },
+          ]}
+        >
+          {context === 'supplies' && renderSupplyHeader()}
+          <DefaultTable
+            accentColor={brandColors.primary}
+            add
+            addButtonPlacement="bottom"
+            addLabel={context === 'supplies'
+              ? getSupplyActionLabel(visibleTypeFilter)
+              : labels.addLabel}
+            compactBreakpoint={DESKTOP_LIST_MIN_WIDTH}
+            initialViewMode="cards"
+            onAdd={handleAddProduct}
+            onDataLoaded={updateCategoryProducts}
+            renderCard={renderManagerProductCard}
+            requestParams={managerTableRequestParams}
+            showRowActions={false}
+            showTotalItemsInCompactToolbar
+            storeName="products"
+            visibleColumnsPreferenceKey={`products:${context}:manager`}
+          />
+        </View>
+        {context === 'supplies' && (
+          <AnimatedModal
+            visible={supplyTypeModalVisible}
+            onRequestClose={() => setSupplyTypeModalVisible(false)}
+            style={styles.supplyTypeModalWrap}
+          >
+            <View style={styles.supplyTypeModal}>
+              <View style={styles.supplyTypeModalHeader}>
+                <Text style={styles.supplyTypeModalTitle}>Visualização de insumos</Text>
+                <TouchableOpacity
+                  style={styles.supplyTypeModalClose}
+                  onPress={() => setSupplyTypeModalVisible(false)}
+                  activeOpacity={0.75}
+                >
+                  <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+              {SUPPLY_TYPE_OPTIONS.map(option => {
+                const active = option.value === selectedSupplyType.value;
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.supplyTypeOption, active && styles.supplyTypeOptionActive]}
+                    onPress={() => handleSelectSupplyType(option.value)}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.supplyTypeOptionIcon, active && { backgroundColor: `${brandColors.primary}18` }]}>
+                      <MaterialCommunityIcons
+                        name={option.icon}
+                        size={18}
+                        color={active ? brandColors.primary : '#64748B'}
+                      />
+                    </View>
+                    <View style={styles.supplyTypeOptionText}>
+                      <Text style={[styles.supplyTypeOptionTitle, active && { color: brandColors.primary }]}>
+                        {option.label}
+                      </Text>
+                      <Text style={styles.supplyTypeOptionDescription}>{option.description}</Text>
+                    </View>
+                    {active && (
+                      <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </AnimatedModal>
+        )}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

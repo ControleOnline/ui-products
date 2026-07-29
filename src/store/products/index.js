@@ -39,6 +39,7 @@ export default {
       {
         sortable: true,
         name: 'sku',
+        searchable: true,
         externalFilter: false,
         align: 'left',
         label: 'sku',
@@ -53,6 +54,7 @@ export default {
       {
         sortable: true,
         name: 'product',
+        searchable: true,
         externalFilter: false,
         align: 'left',
         label: 'product',
@@ -63,6 +65,7 @@ export default {
       {
         sortable: true,
         name: 'description',
+        searchable: true,
         externalFilter: false,
         align: 'left',
         label: 'description',

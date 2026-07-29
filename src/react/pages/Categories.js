@@ -1,137 +1,54 @@
-import React, { useCallback, useState, useMemo, useRef } from 'react'
-import { Text, View, Image, ScrollView, TouchableOpacity, Platform, Modal, useWindowDimensions, ActivityIndicator, Alert, TextInput } from 'react-native'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
+import { Alert, SafeAreaView, useWindowDimensions, View } from 'react-native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { useStore } from '@store'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { app_type } from '@appType'
 import css from '@controleonline/ui-orders/src/react/css/orders'
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
-import {app_type} from '@appType'
-import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'
-import { resolveFileImageUrl } from '@controleonline/ui-common/src/react/utils/fileUrl'
-import {useMessage} from '@controleonline/ui-common/src/react/components/MessageService'
-import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager'
-import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal'
+import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable'
+import { colors } from '@controleonline/../../src/styles/colors'
+import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import {
   downloadMenuCatalog as downloadCompanyMenuCatalog,
 } from '@controleonline/ui-common/src/react/utils/menuCatalogDownload'
 import {
   downloadNormalizedCatalog as downloadCompanyNormalizedCatalog,
 } from '@controleonline/ui-common/src/react/utils/normalizedCatalogDownload'
-import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
-import { colors } from '@controleonline/../../src/styles/colors'
-import ImportsPage from '@controleonline/ui-common/src/react/pages/Imports'
-import {searchCompanyProducts} from '@controleonline/ui-common/src/react/utils/commercialDocumentOrders'
-import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators'
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
-import Formatter from '@controleonline/ui-common/src/utils/formatter'
-import ProductQuantity from '@controleonline/ui-orders/src/react/components/cart/ProductQuantity'
-import {resolveProductCoverUrl} from '@controleonline/ui-products/src/react/domain/productMedia'
+import { writeCachedCategories } from '@controleonline/ui-products/src/react/utils/categoryCache'
+import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels'
 
+import { styles } from './Categories.styles'
+import CategoryCard from './CategoriesPage/CategoryCard'
+import CategoryEditorModal from './CategoriesPage/CategoryEditorModal'
+import CategoryImportModal from './CategoriesPage/CategoryImportModal'
+import MenuModelPickerModal from './CategoriesPage/MenuModelPickerModal'
+import { buildCatalogLabels } from './CategoriesPage/catalogLabels'
+import { buildCategoryToolbarActions } from './CategoriesPage/categoryToolbarActions'
 import {
-  readCachedCategories,
-  writeCachedCategories,
-} from '@controleonline/ui-products/src/react/utils/categoryCache'
+  normalizeCatalogContext,
+  normalizeEntityId,
+  slugifyFileName,
+} from './CategoriesPage/categoryPageUtils'
 
-import Icon from 'react-native-vector-icons/FontAwesome'
-import { skeletonStyles, styles } from './Categories.styles'
+const DESKTOP_GRID_MIN_WIDTH = 960
 
-import {
-  inlineStyle_104_8,
-  inlineStyle_424_14,
-  inlineStyle_617_22,
-  inlineStyle_631_42,
-  inlineStyle_692_8,
-} from './Categories.styles';
-import {ALL_PRODUCTS_SENTINEL} from '@controleonline/ui-products/src/react/constants/categorySentinels';
-
-const buildCoverUrl = (files, coverRelationId) => {
-  const arr = files || []
-  let first = null
-  if (coverRelationId) {
-    first = arr.find(item => String(item?.id) === String(coverRelationId) && item?.file?.id)
-  }
-  if (!first) first = arr.find(item => item?.file?.id)
-  if (!first) return null
-  return resolveFileImageUrl(first.file)
-}
-
-const slugifyFileName = value => {
-  const normalized = String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-
-  return normalized || 'catalogo'
-}
-
-const normalizeEntityId = value => {
-  if (!value && value !== 0) {
-    return ''
-  }
-
-  const raw = typeof value === 'object'
-    ? value?.['@id'] || value?.id || value?.value || ''
-    : value
-
-  return String(raw || '').replace(/\D+/g, '').trim()
-}
-
-const normalizeCatalogContext = value =>
-  String(value || 'products').trim().toLowerCase() === 'supplies'
-    ? 'supplies'
-    : 'products'
-
-const withHexAlpha = (value, alpha, fallback = 'rgba(15,23,42,0.06)') => {
-  const color = String(value || '').trim()
-  return /^#[0-9a-f]{6}$/i.test(color) ? `${color}${alpha}` : fallback
-}
-
-const buildCatalogLabels = context => {
-  if (context === 'supplies') {
-    return {
-      itemSingular: 'insumo',
-      itemPlural: 'insumos',
-      categorySingular: 'categoria de insumo',
-      categoryPlural: 'categorias de insumo',
-      addCategoryLabel: 'Adicionar Categoria de Insumo',
-      newCategoryLabel: 'Nova Categoria de Insumo',
-      editCategoryLabel: 'Editar Categoria de Insumo',
-      searchPlaceholder: 'Buscar insumo pelo nome ou SKU',
-      allLabel: 'Todos os insumos',
-      emptyTitle: 'Nenhuma categoria de insumo',
-      emptySubtitleManager: 'Adicione a primeira categoria de insumo para começar',
-      countSingular: 'categoria de insumo',
-      countPlural: 'categorias de insumo',
-    }
-  }
+const useCategoryGridLayout = () => {
+  const { width } = useWindowDimensions()
+  const columns = width < 640 ? 2 : width < 960 ? 3 : width < 1280 ? 4 : 5
+  const isCompactMobile = width < 360
+  const gap = isCompactMobile ? 8 : 12
+  const containerWidth = Math.min(width || 0, 1600)
+  const cardWidth = (containerWidth - gap - (columns - 1) * gap) / columns
 
   return {
-    itemSingular: 'produto',
-    itemPlural: 'produtos',
-    categorySingular: 'categoria',
-    categoryPlural: 'categorias',
-    addCategoryLabel: 'Adicionar Categoria',
-    newCategoryLabel: 'Nova Categoria',
-    editCategoryLabel: 'Editar Categoria',
-    searchPlaceholder: 'Buscar produto pelo nome ou SKU',
-    allLabel: 'Todos',
-    emptyTitle: 'Nenhuma categoria',
-    emptySubtitleManager: 'Adicione a primeira categoria para começar',
-    countSingular: 'categoria',
-    countPlural: 'categorias',
+    cardWidth,
+    columns,
+    gap,
+    isCompactMobile,
+    isMobileCatalog: width < 640,
   }
 }
-
-const SkeletonCard = ({ width }) => (
-  <View style={inlineStyle_104_8({
-    width: width,
-  })}>
-    <View style={[skeletonStyles.card, { aspectRatio: 3 / 4 }]} />
-  </View>
-)
 
 const CategoriesPage = ({ route }) => {
   const [showImportModal, setShowImportModal] = useState(false)
@@ -141,26 +58,47 @@ const CategoriesPage = ({ route }) => {
   const [showMenuModelModal, setShowMenuModelModal] = useState(false)
   const [menuModels, setMenuModels] = useState([])
   const [selectedMenuModel, setSelectedMenuModel] = useState('')
-  const [productSearchText, setProductSearchText] = useState('')
-  const [productSearchResults, setProductSearchResults] = useState([])
-  const [productSearchLoading, setProductSearchLoading] = useState(false)
+  const [modalVisible, setModalVisible] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState(null)
+  const formRef = useRef(null)
   const navigation = useNavigation()
-  const {showError} = useMessage() || {}
-  const { width } = useWindowDimensions()
-  const interactionMode =
-    route?.params?.interactionMode ||
-    (app_type === 'MANAGER' ? 'manager' : 'pdv')
-  const isManagerApp = app_type === 'MANAGER' && interactionMode !== 'pdv'
+  const { styles: orderStyles } = css()
+  const { cardWidth, columns, gap, isCompactMobile, isMobileCatalog } = useCategoryGridLayout()
 
   const categoriesStore = useStore('categories')
   const { items, isLoading: storeLoading } = categoriesStore.getters
   const categoryActions = categoriesStore.actions
+  const modelActions = useStore('models').actions
+  const { currentCompany } = useStore('people').getters
+  const { colors: themeColors } = useStore('theme').getters
 
-  const modelsStore = useStore('models')
-  const modelActions = modelsStore.actions
+  const context = useMemo(
+    () => normalizeCatalogContext(route?.params?.context),
+    [route?.params?.context],
+  )
+  const labels = useMemo(() => buildCatalogLabels(context), [context])
+  const interactionMode =
+    route?.params?.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv')
+  const isManagerApp = app_type === 'MANAGER' && interactionMode !== 'pdv'
+  const routeCategoryId = useMemo(
+    () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
+    [route?.params?.category, route?.params?.categoryId],
+  )
+  const brandColors = useMemo(
+    () => resolveThemePalette(
+      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
+      colors,
+    ),
+    [currentCompany?.id, themeColors],
+  )
+  const operationalRouteParams = useMemo(() => {
+    const params = route?.params || {}
 
-  const peopleStore = useStore('people')
-  const { currentCompany } = peopleStore.getters
+    return ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement'].reduce(
+      (nextParams, key) => (params[key] === undefined ? nextParams : { ...nextParams, [key]: params[key] }),
+      {},
+    )
+  }, [route?.params])
   const {
     getCategoryStatuses,
     hasActivePlatforms,
@@ -170,53 +108,6 @@ const CategoriesPage = ({ route }) => {
     syncingKey: marketplaceSyncingKey,
   } = useMarketplaceCatalogSync(isManagerApp ? currentCompany?.id : null)
 
-  const themeStore = useStore('theme')
-  const { colors: themeColors } = themeStore.getters
-  const openImport = () => {
-    setShowImportModal(true)
-  }
-  const brandColors = useMemo(
-    () => resolveThemePalette(
-      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
-      colors,
-    ),
-    [themeColors, currentCompany?.id],
-  )
-
-  const [modalVisible, setModalVisible] = useState(false)
-  const [selectedCategory, setSelectedCategory] = useState(null)
-  const formRef = useRef(null)
-  const context = useMemo(
-    () => normalizeCatalogContext(route?.params?.context),
-    [route?.params?.context],
-  )
-  const labels = useMemo(() => buildCatalogLabels(context), [context])
-  const routeCategoryId = useMemo(
-    () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
-    [route?.params?.category, route?.params?.categoryId],
-  )
-  const operationalRouteParams = useMemo(() => {
-    const params = route?.params || {}
-    const nextParams = {}
-
-    if (params?.id) {
-      nextParams.id = params.id
-    }
-
-    if (params?.resumeExistingOrder === true) {
-      nextParams.resumeExistingOrder = true
-    }
-
-    if (typeof params?.allowLinkedOrderManagement === 'boolean') {
-      nextParams.allowLinkedOrderManagement = params.allowLinkedOrderManagement
-    }
-
-    return nextParams
-  }, [
-    route?.params?.allowLinkedOrderManagement,
-    route?.params?.id,
-    route?.params?.resumeExistingOrder,
-  ])
   const loadMenuModels = useCallback(async () => {
     if (!currentCompany?.id) {
       setMenuModels([])
@@ -228,11 +119,7 @@ const CategoriesPage = ({ route }) => {
     setIsLoadingMenuModels(true)
 
     try {
-      const response = await modelActions.getItems({
-        context: 'menu',
-        people: currentCompanyId,
-      })
-
+      const response = await modelActions.getItems({ context: 'menu', people: currentCompanyId })
       const availableModels = (Array.isArray(response) ? response : [])
         .filter(model => {
           const modelCompanyId = normalizeEntityId(model?.people || model?.company)
@@ -241,17 +128,16 @@ const CategoriesPage = ({ route }) => {
         .sort((first, second) =>
           String(first?.model || '').localeCompare(String(second?.model || ''), 'pt-BR', {
             sensitivity: 'base',
-          })
+          }),
         )
 
       setMenuModels(availableModels)
       setSelectedMenuModel(current =>
         current && availableModels.some(model => model?.['@id'] === current)
           ? current
-          : availableModels[0]?.['@id'] || ''
+          : availableModels[0]?.['@id'] || '',
       )
       modelActions.setError?.(null)
-
       return availableModels
     } catch {
       setMenuModels([])
@@ -265,33 +151,62 @@ const CategoriesPage = ({ route }) => {
 
   useFocusEffect(
     useCallback(() => {
-      const cached = readCachedCategories(currentCompany?.id, context)
-      if (cached.length > 0) {
-        categoryActions.setItems(cached)
-      } else {
-        categoryActions.setItems([])
+      if (currentCompany?.id && isManagerApp) {
+        loadMenuModels()
+        loadCatalogStatus().catch(() => {})
       }
-      if (currentCompany?.id) {
-        categoryActions
-          .getItems({
-            context: context,
-            'order[name]': 'ASC',
-            company: currentCompany.id,
-          })
-          .then(data => {
-            categoryActions.setItems(data || [])
-            writeCachedCategories(currentCompany.id, data || [], context)
-          })
-
-        if (isManagerApp) {
-          loadMenuModels()
-          loadCatalogStatus().catch(() => {})
-        }
-      }
-    }, [context, currentCompany?.id, categoryActions, isManagerApp, loadCatalogStatus, loadMenuModels])
+    }, [currentCompany?.id, isManagerApp, loadCatalogStatus, loadMenuModels]),
   )
 
-  const changeCategory = category => {
+  React.useEffect(() => {
+    if (!routeCategoryId || !isManagerApp) return
+    const category = (Array.isArray(items) ? items : [])
+      .find(item => normalizeEntityId(item) === routeCategoryId)
+
+    if (!category) return
+    if (modalVisible && normalizeEntityId(selectedCategory) === routeCategoryId) return
+
+    setSelectedCategory(category)
+    setModalVisible(true)
+  }, [isManagerApp, items, modalVisible, routeCategoryId, selectedCategory])
+
+  const requestParams = useMemo(() => ({
+    company: currentCompany?.id,
+    context,
+    'order[name]': 'ASC',
+  }), [context, currentCompany?.id])
+
+  const tableCardProps = useMemo(() => ({
+    key: `categories-${columns}`,
+    numColumns: columns,
+    columnWrapperStyle: columns > 1 ? { gap } : null,
+    contentContainerStyle: { gap, paddingBottom: 24 },
+  }), [columns, gap])
+
+  const rowStyle = useCallback(
+    () => ({
+      flex: 1,
+      maxWidth: cardWidth,
+    }),
+    [cardWidth],
+  )
+
+  const reloadCategories = useCallback(async () => {
+    if (!currentCompany?.id) return []
+
+    const data = await categoryActions.getItems(requestParams)
+    writeCachedCategories(currentCompany.id, data || [], context)
+    return data || []
+  }, [categoryActions, context, currentCompany?.id, requestParams])
+
+  const refreshSelectedCategory = useCallback(async () => {
+    const refreshed = await reloadCategories()
+    const fresh = refreshed.find(category => String(category.id) === String(selectedCategory?.id))
+    if (fresh) setSelectedCategory(fresh)
+    return fresh
+  }, [reloadCategories, selectedCategory?.id])
+
+  const changeCategory = useCallback(category => {
     const categoryId =
       category?._isAllProducts || category?.['@id'] === ALL_PRODUCTS_SENTINEL['@id']
         ? ALL_PRODUCTS_SENTINEL['@id']
@@ -310,66 +225,119 @@ const CategoriesPage = ({ route }) => {
       },
       merge: false,
     })
-  }
+  }, [categoryActions, context, interactionMode, navigation, operationalRouteParams])
 
-  const openCreateModal = () => {
+  const closeModal = useCallback(() => {
+    setModalVisible(false)
+    setSelectedCategory(null)
+    if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
+  }, [navigation, routeCategoryId])
+
+  const openCreateModal = useCallback(() => {
     if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
     setSelectedCategory(null)
     setModalVisible(true)
-  }
+  }, [navigation, routeCategoryId])
 
-  const openEditModal = category => {
+  const openEditModal = useCallback(category => {
     const categoryId = normalizeEntityId(category)
     if (categoryId && routeCategoryId !== categoryId) {
       navigation.setParams({ categoryId, category: undefined })
     }
     setSelectedCategory(category)
     setModalVisible(true)
-  }
+  }, [navigation, routeCategoryId])
 
-  const closeModal = () => {
-    setModalVisible(false)
-    setSelectedCategory(null)
-    if (routeCategoryId) navigation.setParams({ categoryId: undefined, category: undefined })
-  }
+  const openMenuModelPicker = useCallback(async () => {
+    if (!currentCompany?.id) {
+      Alert.alert(
+        global.t?.t?.('categories', 'title', 'companyNotSelected'),
+        global.t?.t?.('categories', 'message', 'selectCompanyForMenuModel'),
+      )
+      return
+    }
 
-  React.useEffect(() => {
-    if (!routeCategoryId || !isManagerApp) return
-    const category = (Array.isArray(items) ? items : [])
-      .find(item => normalizeEntityId(item) === routeCategoryId)
+    const availableModels =
+      menuModels.length > 0 || isLoadingMenuModels ? menuModels : await loadMenuModels()
 
-    if (!category) return
-    if (modalVisible && normalizeEntityId(selectedCategory) === routeCategoryId) return
+    if (!isLoadingMenuModels && availableModels.length === 0) {
+      Alert.alert(
+        global.t?.t?.('categories', 'title', 'noMenuModels'),
+        global.t?.t?.('categories', 'message', 'createMenuModelForCompany'),
+      )
+      return
+    }
 
-    setSelectedCategory(category)
-    setModalVisible(true)
-  }, [isManagerApp, items, modalVisible, routeCategoryId, selectedCategory])
+    setShowMenuModelModal(true)
+  }, [currentCompany?.id, isLoadingMenuModels, loadMenuModels, menuModels])
 
-  const reloadCategories = useCallback(async () => {
-    if (!currentCompany?.id) return []
-    const data = await categoryActions.getItems({
-      context: context,
-      'order[name]': 'ASC',
-      company: currentCompany.id,
-    })
-    writeCachedCategories(currentCompany.id, data || [], context)
-    return data || []
-  }, [context, currentCompany?.id, categoryActions])
+  const downloadCatalog = useCallback(async () => {
+    if (isDownloadingCatalog || !currentCompany?.id) return
 
-  const refreshSelectedCategory = useCallback(async () => {
-    const refreshed = await reloadCategories()
-    const fresh = refreshed.find(c => String(c.id) === String(selectedCategory?.id))
-    if (fresh) setSelectedCategory(fresh)
-    return fresh
-  }, [reloadCategories, selectedCategory?.id])
+    const availableModels = menuModels.length > 0 ? menuModels : await loadMenuModels()
+    const modelIri =
+      selectedMenuModel && availableModels.some(model => model?.['@id'] === selectedMenuModel)
+        ? selectedMenuModel
+        : availableModels[0]?.['@id'] || ''
+
+    if (!modelIri) return openMenuModelPicker()
+
+    setIsDownloadingCatalog(true)
+    try {
+      await downloadCompanyMenuCatalog({
+        companyId: currentCompany.id,
+        companyName: currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
+        modelReference: modelIri,
+      })
+    } catch (error) {
+      Alert.alert(global.t?.t?.('categories', 'title', 'downloadError'), error?.message)
+    } finally {
+      setIsDownloadingCatalog(false)
+    }
+  }, [
+    currentCompany,
+    isDownloadingCatalog,
+    loadMenuModels,
+    menuModels,
+    openMenuModelPicker,
+    selectedMenuModel,
+  ])
+
+  const downloadNormalizedCatalog = useCallback(async () => {
+    if (isDownloadingNormalizedCatalog || !currentCompany?.id) return
+
+    setIsDownloadingNormalizedCatalog(true)
+    try {
+      await downloadCompanyNormalizedCatalog({
+        companyId: currentCompany.id,
+        companyName: currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
+        context,
+      })
+    } catch (error) {
+      Alert.alert(global.t?.t?.('categories', 'title', 'exportError'), error?.message)
+    } finally {
+      setIsDownloadingNormalizedCatalog(false)
+    }
+  }, [context, currentCompany, isDownloadingNormalizedCatalog])
+
+  const handleSyncAllEligible = useCallback(async () => {
+    try {
+      await syncAllEligible()
+    } catch (error) {
+      Alert.alert(global.t?.t?.('categories', 'title', 'syncError'), error?.message)
+    }
+  }, [syncAllEligible])
+
+  const handleMarketplaceSync = useCallback(
+    (platformKey, status, syncKey) => syncEntity(platformKey, status, { syncKey }),
+    [syncEntity],
+  )
 
   const saveCategoryCover = useCallback(async relation => {
     if (!selectedCategory?.id || !relation?.id || !currentCompany?.id) return
 
     const parentId = normalizeEntityId(selectedCategory.parent)
-    const companyIri = currentCompany?.['@id']
-      ? String(currentCompany['@id'])
-      : `/people/${normalizeEntityId(currentCompany.id)}`
+    const companyIri = currentCompany?.['@id'] || `/people/${normalizeEntityId(currentCompany.id)}`
 
     await categoryActions.save({
       id: selectedCategory.id,
@@ -384,899 +352,133 @@ const CategoriesPage = ({ route }) => {
         imageCoverRelationId: relation.id,
       },
     })
-
     await refreshSelectedCategory()
   }, [categoryActions, context, currentCompany, refreshSelectedCategory, selectedCategory])
 
-  const selectedMenuModelLabel = useMemo(() => {
-    if (isLoadingMenuModels) {
-      return 'Carregando modelo'
-    }
-
-    return menuModels.find(model => model?.['@id'] === selectedMenuModel)?.model || 'Selecionar modelo'
-  }, [isLoadingMenuModels, menuModels, selectedMenuModel])
-  const normalizedProductSearchText = useMemo(
-    () => String(productSearchText || '').trim(),
-    [productSearchText],
-  )
-
-  const openProductSearchResults = useCallback(
-    query => {
-      const normalizedQuery = String(query || '').trim()
-      if (!normalizedQuery) {
-        return
-      }
-
-      setProductSearchResults([])
-      navigation.navigate({
-        name: 'ProductsPage',
-        params: {
-          ...operationalRouteParams,
-          categoryId: ALL_PRODUCTS_SENTINEL['@id'],
-          context,
-          interactionMode,
-          searchQuery: normalizedQuery,
-          showBottomCart: interactionMode === 'pdv',
-          showBottomToolBar: interactionMode === 'pdv',
-        },
-        merge: false,
-      })
-    },
-    [context, interactionMode, navigation, operationalRouteParams],
-  )
-  const handleCustomizeProduct = useCallback(
-    product => {
-      const productId = normalizeEntityId(product)
-
-      if (!productId) {
-        showError?.('Nao foi possivel identificar o produto selecionado.')
-        return
-      }
-
-      setProductSearchText('')
-      setProductSearchResults([])
-      navigation.navigate('CustomizeScreen', {
-        ...operationalRouteParams,
-        productId,
-        interactionMode,
-      })
-    },
-    [interactionMode, navigation, operationalRouteParams, showError],
-  )
-  const openMenuModelPicker = useCallback(async () => {
-    if (!currentCompany?.id) {
-      Alert.alert('Empresa nao selecionada', 'Selecione uma empresa para escolher o modelo do cardapio.')
-      return
-    }
-
-    const availableModels =
-      menuModels.length > 0 || isLoadingMenuModels ? menuModels : await loadMenuModels()
-
-    if (!isLoadingMenuModels && availableModels.length === 0) {
-      Alert.alert(
-        'Nenhum modelo encontrado',
-        'Cadastre um modelo com contexto menu para a empresa selecionada.',
-      )
-      return
-    }
-
-    setShowMenuModelModal(true)
-  }, [currentCompany?.id, isLoadingMenuModels, loadMenuModels, menuModels])
-
-  React.useEffect(() => {
-    let isMounted = true
-
-    if (!currentCompany?.id || normalizedProductSearchText.length < 2) {
-      setProductSearchResults([])
-      setProductSearchLoading(false)
-      return undefined
-    }
-
-    setProductSearchLoading(true)
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        const results = await searchCompanyProducts({
-          companyId: currentCompany.id,
-          query: normalizedProductSearchText,
-        })
-
-        if (isMounted) {
-          setProductSearchResults(Array.isArray(results) ? results : [])
-        }
-      } catch {
-        if (isMounted) {
-          setProductSearchResults([])
-        }
-      } finally {
-        if (isMounted) {
-          setProductSearchLoading(false)
-        }
-      }
-    }, 180)
-
-    return () => {
-      isMounted = false
-      clearTimeout(timeoutId)
-    }
-  }, [currentCompany?.id, normalizedProductSearchText])
-
-  const downloadCatalog = useCallback(async () => {
-    if (isDownloadingCatalog) {
-      return
-    }
-
-    if (!currentCompany?.id) {
-      Alert.alert('Empresa nao selecionada', 'Selecione uma empresa para baixar o cardapio.')
-      return
-    }
-
-    const availableModels = menuModels.length > 0 ? menuModels : await loadMenuModels()
-    const modelIri =
-      selectedMenuModel && availableModels.some(model => model?.['@id'] === selectedMenuModel)
-        ? selectedMenuModel
-        : availableModels[0]?.['@id'] || ''
-
-    if (!modelIri) {
-      Alert.alert(
-        'Nenhum modelo encontrado',
-        'Cadastre um modelo com contexto menu para a empresa selecionada antes de baixar o cardapio.',
-      )
-      return
-    }
-
-    setIsDownloadingCatalog(true)
-
-    try {
-      const downloadResult = await downloadCompanyMenuCatalog({
-        companyId: currentCompany.id,
-        companyName:
-          currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
-        modelReference: modelIri,
-      })
-
-      if (downloadResult?.savedUri && !downloadResult?.shared && Platform.OS !== 'web') {
-        Alert.alert('Cardapio salvo', `Arquivo salvo em ${downloadResult.savedUri}`)
-      }
-    } catch (error) {
-      Alert.alert(
-        'Erro ao baixar cardapio',
-        error?.message || 'Nao foi possivel gerar o cardapio em PDF.',
-      )
-    } finally {
-      setIsDownloadingCatalog(false)
-    }
-  }, [
-    currentCompany?.alias,
-    currentCompany?.id,
-    currentCompany?.name,
-    interactionMode,
+  const toolbarActions = useMemo(() => isManagerApp ? buildCategoryToolbarActions({
+    canUseCompany: Boolean(currentCompany?.id),
+    hasActivePlatforms,
     isDownloadingCatalog,
-    loadMenuModels,
-    menuModels,
-    selectedMenuModel,
-  ])
-
-  const downloadNormalizedCatalog = useCallback(async () => {
-    if (isDownloadingNormalizedCatalog) {
-      return
-    }
-
-    if (!currentCompany?.id) {
-      Alert.alert(
-        'Empresa nao selecionada',
-        'Selecione uma empresa para exportar o CSV normalizado.',
-      )
-      return
-    }
-
-    setIsDownloadingNormalizedCatalog(true)
-
-    try {
-      const downloadResult = await downloadCompanyNormalizedCatalog({
-        companyId: currentCompany.id,
-        companyName:
-          currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
-        context,
-      })
-
-      if (downloadResult?.savedUri && !downloadResult?.shared && Platform.OS !== 'web') {
-        Alert.alert('CSV salvo', `Arquivo salvo em ${downloadResult.savedUri}`)
-      }
-    } catch (error) {
-      Alert.alert(
-        'Erro ao exportar CSV',
-        error?.message || 'Nao foi possivel gerar o CSV normalizado.',
-      )
-    } finally {
-      setIsDownloadingNormalizedCatalog(false)
-    }
-  }, [
-    context,
-    currentCompany?.alias,
-    currentCompany?.id,
-    currentCompany?.name,
     isDownloadingNormalizedCatalog,
+    isLoadingMenuModels,
+    marketplaceSyncingKey,
+    onDownloadCatalog: downloadCatalog,
+    onDownloadNormalizedCatalog: downloadNormalizedCatalog,
+    onImport: () => setShowImportModal(true),
+    onOpenIntegrations: () => navigation.navigate('IntegrationsPage'),
+    onOpenMenuModelPicker: openMenuModelPicker,
+    onSyncAllEligible: handleSyncAllEligible,
+  }) : [], [
+    currentCompany?.id,
+    downloadCatalog,
+    downloadNormalizedCatalog,
+    handleSyncAllEligible,
+    hasActivePlatforms,
+    isDownloadingCatalog,
+    isDownloadingNormalizedCatalog,
+    isLoadingMenuModels,
+    isManagerApp,
+    marketplaceSyncingKey,
+    navigation,
+    openMenuModelPicker,
   ])
 
-  const openIntegrationsPage = useCallback(() => {
-    navigation.navigate('IntegrationsPage')
-  }, [navigation])
-
-  const handleSyncAllEligible = useCallback(async () => {
-    try {
-      await syncAllEligible()
-    } catch (error) {
-      Alert.alert(
-        'Sincronizacao nao concluida',
-        error?.message || 'Nao foi possivel sincronizar os produtos elegiveis.',
-      )
-    }
-  }, [syncAllEligible])
-
-  const handleMarketplaceSync = useCallback(
-    async (platformKey, status, syncKey) => {
-      try {
-        await syncEntity(platformKey, status, { syncKey })
-      } catch (error) {
-        Alert.alert(
-          'Sincronizacao nao concluida',
-          error?.message || 'Nao foi possivel sincronizar este item.',
-        )
-        throw error
-      }
-    },
-    [syncEntity],
-  )
-
-  const getColumns = () => {
-    if (width < 640) return 2
-    if (width < 960) return 3
-    if (width < 1280) return 4
-    return 5
-  }
-
-  const columns = getColumns()
-  const maxContentWidth = 1600
-  const containerWidth = Math.min(width, maxContentWidth)
-  const isMobileCatalog = width < 640
-  const isCompactMobile = width < 360
-  const gap = isCompactMobile ? 8 : 12
-  const gridContentWidth = containerWidth - gap
-  const cardWidth = (gridContentWidth - (columns - 1) * gap) / columns
-  const scrollBottomPadding = isManagerApp
-    ? 84
-    : interactionMode === 'pdv'
-      ? (isCompactMobile ? 148 : 164)
-      : 0
-
-  const { styles: orderStyles } = css()
-  const modalTitle = selectedCategory ? labels.editCategoryLabel : labels.newCategoryLabel
-  const skeletonCount = columns * 3
+  const renderCategoryCard = useCallback(({ item }) => (
+    <CategoryCard
+      brandColors={brandColors}
+      category={item}
+      getCategoryStatuses={getCategoryStatuses}
+      isCompactMobile={isCompactMobile}
+      isManagerApp={isManagerApp}
+      isMobileCatalog={isMobileCatalog}
+      marketplaceSyncingKey={marketplaceSyncingKey}
+      onEdit={openEditModal}
+      onOpen={changeCategory}
+      onSync={handleMarketplaceSync}
+    />
+  ), [
+    brandColors,
+    changeCategory,
+    getCategoryStatuses,
+    handleMarketplaceSync,
+    isCompactMobile,
+    isManagerApp,
+    isMobileCatalog,
+    marketplaceSyncingKey,
+    openEditModal,
+  ])
 
   return (
     <SafeAreaView style={[orderStyles.container, styles.container]}>
       {!storeLoading && <StateStore store="categories" />}
-      <View
-        style={[
-          styles.searchStickyShell,
-          isCompactMobile && styles.searchStickyShellCompact,
-        ]}
-      >
-        <View
-          style={[
-            inlineStyle_424_14({
-              containerWidth: containerWidth,
-              gap: gap,
-            }),
-            {
-              paddingTop: isCompactMobile ? 8 : 16,
-              paddingBottom: isCompactMobile ? 8 : 0,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.searchSection,
-              isCompactMobile && styles.searchSectionCompact,
-            ]}
-          >
-            <View
-              style={[
-                styles.searchInputWrap,
-                isCompactMobile && styles.searchInputWrapCompact,
-              ]}
-            >
-              <MaterialCommunityIcons name="magnify" size={20} color="#64748B" />
-              <TextInput
-                value={productSearchText}
-                onChangeText={setProductSearchText}
-                onSubmitEditing={() => openProductSearchResults(productSearchText)}
-                placeholder={labels.searchPlaceholder}
-                placeholderTextColor="#94A3B8"
-                style={[
-                  styles.searchInput,
-                  isCompactMobile && styles.searchInputCompact,
-                ]}
-                returnKeyType="search"
-              />
-              {productSearchLoading && (
-                <ActivityIndicator size="small" color={brandColors.primary} />
-              )}
-            </View>
-            {normalizedProductSearchText.length >= 2 && (
-              <View style={styles.searchSuggestionList}>
-                {productSearchResults.map(product => {
-                  const coverUrl = resolveProductCoverUrl(product)
-                  const isCustomProduct =
-                    String(product?.type || '').trim() === 'custom'
-
-                  return (
-                    <View
-                      key={product?.id || product?.['@id']}
-                      style={[
-                        styles.searchSuggestionItem,
-                        isCompactMobile && styles.searchSuggestionItemCompact,
-                      ]}
-                    >
-                      <View style={styles.searchSuggestionThumb}>
-                        {coverUrl ? (
-                          <Image
-                            source={{uri: coverUrl}}
-                            style={styles.searchSuggestionImage}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <MaterialCommunityIcons
-                            name="image-outline"
-                            size={22}
-                            color="#94A3B8"
-                          />
-                        )}
-                      </View>
-                      <View style={styles.searchSuggestionCopy}>
-                        <Text
-                          style={[
-                            styles.searchSuggestionTitle,
-                            isCompactMobile &&
-                              styles.searchSuggestionTitleCompact,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {product?.product || 'Produto sem nome'}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.searchSuggestionPrice,
-                            isCompactMobile &&
-                              styles.searchSuggestionPriceCompact,
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {Formatter.formatMoney(product?.price || 0)}
-                        </Text>
-                      </View>
-                      {isCustomProduct ? (
-                        <TouchableOpacity
-                          activeOpacity={0.86}
-                          onPress={() => handleCustomizeProduct(product)}
-                          style={styles.searchSuggestionCustomizeButton}
-                        >
-                          <Text style={styles.searchSuggestionCustomizeText}>
-                            CUSTOMIZAR
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <View style={styles.searchSuggestionQuantity}>
-                          <ProductQuantity product={product} />
-                        </View>
-                      )}
-                    </View>
-                  )
-                })}
-                {!productSearchLoading && productSearchResults.length === 0 && (
-                  <TouchableOpacity
-                    style={[
-                      styles.searchSuggestionItem,
-                      isCompactMobile && styles.searchSuggestionItemCompact,
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => openProductSearchResults(productSearchText)}
-                  >
-                    <View style={styles.searchSuggestionCopy}>
-                      <Text
-                        style={[
-                          styles.searchSuggestionTitle,
-                          isCompactMobile && styles.searchSuggestionTitleCompact,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        Ver produtos para "{normalizedProductSearchText}"
-                      </Text>
-                      <Text
-                        style={[
-                          styles.searchSuggestionMeta,
-                          isCompactMobile && styles.searchSuggestionMetaCompact,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        Abrir lista filtrada.
-                      </Text>
-                    </View>
-                    <MaterialCommunityIcons
-                      name="arrow-right"
-                      size={18}
-                      color="#94A3B8"
-                    />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
+      <View style={styles.tableContent}>
+        <DefaultTable
+          accentColor={brandColors.primary}
+          add={isManagerApp}
+          addButtonPlacement="bottom"
+          addLabel={labels.addCategoryLabel}
+          cardListProps={tableCardProps}
+          compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
+          defaultColor="$primary"
+          initialViewMode="cards"
+          onAdd={openCreateModal}
+          onDataLoaded={data => writeCachedCategories(currentCompany?.id, data || [], context)}
+          onEditRow={openEditModal}
+          onRowPress={changeCategory}
+          renderCard={renderCategoryCard}
+          requestParams={requestParams}
+          rowStyle={rowStyle}
+          searchKey="search"
+          searchPlaceholder={global.t?.t?.('categories', 'input', 'search')}
+          showSearch
+          showRowActions={false}
+          showTotalItemsInCompactToolbar
+          storeName="categories"
+          toolbarActions={toolbarActions}
+          visibleColumnsPreferenceKey={`categories:${context}`}
+        />
       </View>
-      <ScrollView
-        style={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: scrollBottomPadding },
-        ]}
-      >
-        <View
-          style={[
-            inlineStyle_424_14({
-              containerWidth: containerWidth,
-              gap: gap,
-            }),
-            { paddingTop: isCompactMobile ? 10 : 16 },
-          ]}
-        >
-          {isManagerApp && (
-            <>
-              <Modal
-                visible={showImportModal}
-                animationType="slide"
-                transparent={false}
-              >
-                <ImportsPage
-                  context={{
-                    "context": "product",
-                    "title": "Importação de Produtos",
-                    "searchPlaceholder": "Buscar importações de produtos..."
-                  }}
-                  onClose={() => setShowImportModal(false)}
-                />
-              </Modal>
-              <Modal
-                visible={showMenuModelModal}
-                animationType="slide"
-                transparent
-                onRequestClose={() => setShowMenuModelModal(false)}
-              >
-                <View style={styles.pickerModalOverlay}>
-                  <View style={styles.pickerModalContent}>
-                    <View style={styles.pickerModalHeader}>
-                      <Text style={styles.pickerModalTitle}>Selecionar modelo do cardapio</Text>
-                      <TouchableOpacity
-                        onPress={() => setShowMenuModelModal(false)}
-                        style={styles.pickerModalClose}
-                      >
-                        <MaterialCommunityIcons name="close" size={20} color="#64748B" />
-                      </TouchableOpacity>
-                    </View>
 
-                    <ScrollView style={styles.pickerModalBody}>
-                      {isLoadingMenuModels ? (
-                        <View style={styles.pickerState}>
-                          <ActivityIndicator size="small" color={brandColors.primary} />
-                          <Text style={styles.pickerStateText}>Carregando modelos...</Text>
-                        </View>
-                      ) : menuModels.length > 0 ? (
-                        menuModels.map(model => {
-                          const isSelected = model?.['@id'] === selectedMenuModel
+      {isManagerApp ? (
+        <>
+          <CategoryImportModal
+            visible={showImportModal}
+            onClose={() => setShowImportModal(false)}
+          />
+          <MenuModelPickerModal
+            brandColors={brandColors}
+            isLoading={isLoadingMenuModels}
+            models={menuModels}
+            selectedModel={selectedMenuModel}
+            visible={showMenuModelModal}
+            onClose={() => setShowMenuModelModal(false)}
+            onSelect={model => {
+              setSelectedMenuModel(model)
+              setShowMenuModelModal(false)
+            }}
+          />
+        </>
+      ) : null}
 
-                          return (
-                            <TouchableOpacity
-                              key={model?.['@id'] || model?.id}
-                              style={[
-                                styles.modelOption,
-                                isSelected && styles.modelOptionSelected,
-                              ]}
-                              activeOpacity={0.85}
-                              onPress={() => {
-                                setSelectedMenuModel(model?.['@id'] || '')
-                                setShowMenuModelModal(false)
-                              }}
-                            >
-                              <View style={styles.modelOptionCopy}>
-                                <Text
-                                  style={[
-                                    styles.modelOptionTitle,
-                                    isSelected && styles.modelOptionTitleSelected,
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {model?.model || 'Modelo sem nome'}
-                                </Text>
-                                <Text style={styles.modelOptionSubtitle}>
-                                  Contexto: menu
-                                </Text>
-                              </View>
-                              {isSelected ? (
-                                <MaterialCommunityIcons
-                                  name="check-circle"
-                                  size={22}
-                                  color={brandColors.primary}
-                                />
-                              ) : (
-                                <MaterialCommunityIcons
-                                  name="radiobox-blank"
-                                  size={22}
-                                  color="#CBD5E1"
-                                />
-                              )}
-                            </TouchableOpacity>
-                          )
-                        })
-                      ) : (
-                        <View style={styles.pickerState}>
-                          <MaterialCommunityIcons
-                            name="file-document-outline"
-                            size={36}
-                            color="#CBD5E1"
-                          />
-                          <Text style={styles.pickerStateText}>
-                            Nenhum modelo de cardapio encontrado para esta empresa.
-                          </Text>
-                        </View>
-                      )}
-                    </ScrollView>
-                  </View>
-                </View>
-              </Modal>
-              <View style={styles.topActionsRow}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.importButton]}
-                  onPress={openImport}
-                  activeOpacity={0.85}
-                >
-                  <Icon name="file-excel-o" size={18} color="#2E7D32" />
-                  <Text style={[styles.actionButtonText, styles.importButtonText]}>
-                    Importar CSV
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.modelButton]}
-                  onPress={openMenuModelPicker}
-                  activeOpacity={0.85}
-                  disabled={!currentCompany?.id}
-                >
-                  {isLoadingMenuModels ? (
-                    <ActivityIndicator size="small" color="#7C3AED" />
-                  ) : (
-                    <MaterialCommunityIcons name="file-document-edit-outline" size={18} color="#7C3AED" />
-                  )}
-                  <View style={styles.modelButtonCopy}>
-                    <Text style={styles.modelButtonLabel}>Modelo</Text>
-                    <Text style={styles.modelButtonValue} numberOfLines={1}>
-                      {selectedMenuModelLabel}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.integrationButton]}
-                  onPress={openIntegrationsPage}
-                  activeOpacity={0.85}
-                >
-                  <MaterialCommunityIcons name="cloud-sync-outline" size={18} color="#0369A1" />
-                  <Text style={[styles.actionButtonText, styles.integrationButtonText]}>
-                    Sincronias
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.syncEligibleButton,
-                    (!hasActivePlatforms || marketplaceSyncingKey === 'all') && styles.disabledActionButton,
-                  ]}
-                  onPress={handleSyncAllEligible}
-                  activeOpacity={0.85}
-                  disabled={!hasActivePlatforms || marketplaceSyncingKey === 'all'}
-                >
-                  {marketplaceSyncingKey === 'all' ? (
-                    <ActivityIndicator size="small" color="#047857" />
-                  ) : (
-                    <MaterialCommunityIcons name="cloud-upload-outline" size={18} color="#047857" />
-                  )}
-                  <Text style={[styles.actionButtonText, styles.syncEligibleButtonText]}>
-                    {marketplaceSyncingKey === 'all' ? 'Sincronizando...' : 'Sincronizar todos os elegiveis'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.normalizedCatalogButton,
-                    (isDownloadingNormalizedCatalog || !currentCompany?.id) && styles.disabledActionButton,
-                  ]}
-                  onPress={downloadNormalizedCatalog}
-                  activeOpacity={0.85}
-                  disabled={isDownloadingNormalizedCatalog || !currentCompany?.id}
-                >
-                  {isDownloadingNormalizedCatalog ? (
-                    <ActivityIndicator size="small" color="#9A3412" />
-                  ) : (
-                    <MaterialCommunityIcons name="file-download-outline" size={18} color="#9A3412" />
-                  )}
-                  <Text style={[styles.actionButtonText, styles.normalizedCatalogButtonText]}>
-                    {isDownloadingNormalizedCatalog ? 'Exportando...' : 'Exportar CSV'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.actionButton,
-                    styles.catalogButton,
-                    { backgroundColor: brandColors.primary, borderColor: brandColors.primary },
-                    (isDownloadingCatalog || !currentCompany?.id) && styles.disabledActionButton,
-                  ]}
-                  onPress={downloadCatalog}
-                  activeOpacity={0.85}
-                  disabled={isDownloadingCatalog || !currentCompany?.id}
-                >
-                  {isDownloadingCatalog ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <MaterialCommunityIcons name="file-download-outline" size={18} color="#fff" />
-                  )}
-                  <Text style={[styles.actionButtonText, styles.catalogButtonText]}>
-                    {isDownloadingCatalog ? 'Baixando...' : 'Baixar cardapio'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-          {/* Skeleton loading */}
-          {storeLoading && (
-            <View style={[styles.grid, { gap }]}>
-              {Array.from({ length: skeletonCount }).map((_, i) => (
-                <SkeletonCard key={i} width={cardWidth} />
-              ))}
-            </View>
-          )}
-
-          {/* Empty state */}
-          {!storeLoading && items.length === 0 && (
-            <View style={styles.emptyContainer}>
-              <View style={styles.emptyIconWrap}>
-                <MaterialCommunityIcons name="tag-off-outline" size={48} color="#CBD5E1" />
-              </View>
-              <Text style={styles.emptyTitle}>{labels.emptyTitle}</Text>
-              <Text style={styles.emptySubtitle}>
-                {isManagerApp
-                  ? labels.emptySubtitleManager
-                  : `Nenhuma ${labels.categorySingular} disponível no momento`}
-              </Text>
-            </View>
-          )}
-
-          {/* Grid */}
-          {!storeLoading && (
-            <>
-              {items.length > 0 && (
-                <Text
-                  style={[
-                    styles.countLabel,
-                    isCompactMobile && styles.countLabelCompact,
-                  ]}
-                >
-                  {items.length} {items.length === 1 ? labels.countSingular : labels.countPlural}
-                </Text>
-              )}
-
-              <View style={[styles.grid, { gap }]}>
-                {/* Card fixo "Sem Categoria" — sempre exibido */}
-                <View style={inlineStyle_617_22({
-                  cardWidth: cardWidth,
-                })}>
-                  <TouchableOpacity
-                    style={styles.cardTouchable}
-                    onPress={() => changeCategory(ALL_PRODUCTS_SENTINEL)}
-                    activeOpacity={0.88}
-                  >
-                    <View
-                      style={[
-                        styles.noCategoryCard,
-                        isCompactMobile && styles.noCategoryCardCompact,
-                        isMobileCatalog && styles.noCategoryCardMobile,
-                        { aspectRatio: 3 / 4 },
-                        isMobileCatalog && {
-                          borderColor: withHexAlpha(brandColors.primary, '80', brandColors.primary),
-                          backgroundColor: withHexAlpha(brandColors.primary, '0A', '#FFFFFF'),
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.noCategoryIconWrap,
-                          isMobileCatalog && {
-                            backgroundColor: withHexAlpha(brandColors.primary, '18'),
-                          },
-                        ]}
-                      >
-                        <MaterialCommunityIcons
-                          name="view-grid-plus-outline"
-                          size={isMobileCatalog ? 34 : 32}
-                          color={isMobileCatalog ? brandColors.primary : '#94A3B8'}
-                        />
-                      </View>
-                      <Text
-                        style={[
-                          styles.noCategoryName,
-                          isCompactMobile && styles.noCategoryNameCompact,
-                          isMobileCatalog && styles.noCategoryNameMobile,
-                          isMobileCatalog && { color: brandColors.text || '#0F172A' },
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {isMobileCatalog && context === 'products'
-                          ? 'Todos os produtos'
-                          : labels.allLabel}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-                {items.map(category => (
-                  <View key={category.id} style={inlineStyle_631_42({
-                    cardWidth: cardWidth,
-                  })}>
-                    <TouchableOpacity
-                      style={styles.cardTouchable}
-                      onPress={() => changeCategory(category)}
-                      activeOpacity={0.88}
-                    >
-                      <View
-                        style={[
-                          styles.cardImage,
-                          isCompactMobile && styles.cardImageCompact,
-                          isMobileCatalog && styles.cardImageMobile,
-                          { backgroundColor: category.color },
-                        ]}
-                      >
-                        {!!buildCoverUrl(category.categoryFiles, category?.extraData?.imageCoverRelationId) ? (
-                          <Image
-                            source={{ uri: buildCoverUrl(category.categoryFiles, category?.extraData?.imageCoverRelationId) }}
-                            style={styles.cardCoverImage}
-                            resizeMode="cover"
-                          />
-                        ) : null}
-
-                        <View
-                          style={[
-                            styles.cardOverlay,
-                            isCompactMobile && styles.cardOverlayCompact,
-                            isMobileCatalog && styles.cardOverlayMobile,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.cardOverlayName,
-                              isCompactMobile && styles.cardOverlayNameCompact,
-                              isMobileCatalog && styles.cardOverlayNameMobile,
-                            ]}
-                            numberOfLines={2}
-                          >
-                            {category.name}
-                          </Text>
-                        </View>
-
-                        {isManagerApp && (
-                          <View style={styles.syncOverlay}>
-                            <MarketplaceSyncIndicators
-                              entityLabel={category.name}
-                              entityType="category"
-                              statuses={getCategoryStatuses(category)}
-                              onSync={handleMarketplaceSync}
-                              syncingKey={marketplaceSyncingKey}
-                            />
-                          </View>
-                        )}
-
-                        {isManagerApp && (
-                          <TouchableOpacity
-                            onPress={() => openEditModal(category)}
-                            style={styles.editOverlay}
-                            activeOpacity={0.75}
-                          >
-                            <MaterialCommunityIcons name="pencil" size={14} color="#fff" />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            </>
-          )}
-        </View>
-      </ScrollView>
-      {isManagerApp && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}
-            onPress={openCreateModal}
-            activeOpacity={0.85}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.bottomBarButtonText}>{labels.addCategoryLabel}</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      <AnimatedModal
+      <CategoryEditorModal
+        brandColors={brandColors}
+        category={selectedCategory}
+        companyId={currentCompany?.id}
+        context={context}
+        formRef={formRef}
+        title={selectedCategory ? labels.editCategoryLabel : labels.newCategoryLabel}
         visible={modalVisible}
-        onRequestClose={closeModal}
-        style={inlineStyle_692_8}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <TouchableOpacity onPress={closeModal} style={styles.headerCloseButton}>
-              <MaterialCommunityIcons name="close" size={18} color="#64748B" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-            <View style={styles.modalBody}>
-              <CategoryForm
-                context={context}
-                ref={formRef}
-                category={selectedCategory}
-                onClose={closeModal}
-                onSaved={saved => {
-                  setSelectedCategory(saved || null)
-                  loadCatalogStatus().catch(() => {})
-                }}
-              />
-
-              {selectedCategory?.id && (
-                <View style={styles.attachmentSection}>
-                  <AttachmentManager
-                    entityType="category"
-                    entityId={selectedCategory.id}
-                    attachments={selectedCategory.categoryFiles || []}
-                    companyId={currentCompany?.id}
-                    context="products-category"
-                    coverRelationId={selectedCategory?.extraData?.imageCoverRelationId}
-                    onChanged={refreshSelectedCategory}
-                    onCoverChanged={saveCategoryCover}
-                  />
-                </View>
-              )}
-            </View>
-          </ScrollView>
-
-          <View style={styles.modalFooter}>
-            <TouchableOpacity style={styles.modalCancelButton} onPress={closeModal}>
-              <Text style={styles.modalCancelButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalSaveButton, { backgroundColor: brandColors.primary }]}
-              onPress={() => formRef.current?.submit()}
-            >
-              <Text style={styles.modalSaveButtonText}>
-                {selectedCategory ? 'Salvar' : 'Criar'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </AnimatedModal>
+        onAttachmentsChanged={refreshSelectedCategory}
+        onClose={closeModal}
+        onCoverChanged={saveCategoryCover}
+        onSaved={saved => {
+          setSelectedCategory(saved || null)
+          reloadCategories().catch(() => {})
+          loadCatalogStatus().catch(() => {})
+        }}
+      />
     </SafeAreaView>
-  );
+  )
 }
 
 export default CategoriesPage

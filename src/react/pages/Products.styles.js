@@ -29,6 +29,12 @@ const skeletonStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
   scroll: { flex: 1 },
+  managerTableContent: {
+    flex: 1,
+    minHeight: 0,
+    paddingHorizontal: 8,
+    paddingTop: 12,
+  },
 
   emptyContainer: {
     flex: 1,
