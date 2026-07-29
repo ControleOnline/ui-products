@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState, useCallback } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { useWindowDimensions, View, Text, Image, TouchableOpacity } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
@@ -11,6 +11,7 @@ import ProductSalesTab from '@controleonline/ui-products/src/react/components/Pr
 import ProductStockForm from '@controleonline/ui-products/src/react/components/ProductStockForm';
 import ProductSuppliersTab from '@controleonline/ui-products/src/react/components/ProductSuppliersTab';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
+import ProductDetailsTabBar from '@controleonline/ui-products/src/react/components/ProductDetailsTabBar';
 import {
   buildProductCostBreakdown,
   emptyPricingBreakdown,
@@ -69,6 +70,10 @@ const ProductDetails = ({ route, navigation }) => {
   const { width } = useWindowDimensions();
   const productsStore = useStore('products');
   const productGroupProductStore = useStore('product_group_product');
+  const productsActionsRef = useRef(productsStore?.actions);
+  const productGroupProductStoreRef = useRef(productGroupProductStore);
+  productsActionsRef.current = productsStore?.actions;
+  productGroupProductStoreRef.current = productGroupProductStore;
   const [productSummary, setProductSummary] = useState(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(Boolean(ProductId));
   const [costPrice, setCostPrice] = useState(0);
@@ -97,7 +102,7 @@ const ProductDetails = ({ route, navigation }) => {
 
     setIsLoadingSummary(true);
     try {
-      const data = await productsStore?.actions?.get(ProductId);
+      const data = await productsActionsRef.current?.get(ProductId);
       setProductSummary(data || null);
     } catch {
       // Mantem tela utilizavel mesmo se o resumo falhar.
@@ -105,7 +110,7 @@ const ProductDetails = ({ route, navigation }) => {
     } finally {
       setIsLoadingSummary(false);
     }
-  }, [ProductId, productsStore?.actions]);
+  }, [ProductId]);
 
   const loadCostSummary = useCallback(async () => {
     if (!ProductId) {
@@ -119,7 +124,7 @@ const ProductDetails = ({ route, navigation }) => {
     try {
       const nextBreakdown = await buildProductCostBreakdown({
         productId: ProductId,
-        productGroupProductStore,
+        productGroupProductStore: productGroupProductStoreRef.current,
       });
 
       setPricingBreakdown(nextBreakdown);
@@ -130,7 +135,7 @@ const ProductDetails = ({ route, navigation }) => {
     } finally {
       setIsLoadingCost(false);
     }
-  }, [ProductId, productGroupProductStore?.actions]);
+  }, [ProductId]);
 
   const inferredContext = productSummary ? inferProductContext(productSummary) : null;
   const context = normalizeCatalogContext(routeParams.context || inferredContext || 'products');
@@ -158,6 +163,9 @@ const ProductDetails = ({ route, navigation }) => {
     ? getSupplyTypeLabel(effectiveSupplyType)
     : entityLabels.singular;
   const canHaveFeedstocks = Boolean(ProductId && productSummary && productType !== 'feedstock');
+  const canHaveGroups = Boolean(
+    ProductId && ['custom', 'manufactured', 'service'].includes(productType),
+  );
 
   const normalizeProductDetailsBrowserUrl = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -318,14 +326,15 @@ const ProductDetails = ({ route, navigation }) => {
       <View style={styles.tabsContainer}>
         <Tab.Navigator
           initialLayout={{ width }}
-          screenListeners={
-            {
-              focus: scheduleNormalizeProductDetailsBrowserUrl,
-              state: scheduleNormalizeProductDetailsBrowserUrl,
-              tabPress: scheduleNormalizeProductDetailsBrowserUrl,
-            }
-          }
+          tabBar={props => (
+            <ProductDetailsTabBar
+              {...props}
+              activeColor={brandColors.primary}
+              scrollEnabled={shouldScrollTabs}
+            />
+          )}
           screenOptions={{
+            lazy: true,
             tabBarScrollEnabled: shouldScrollTabs,
             tabBarActiveTintColor: brandColors.primary,
             tabBarIndicatorStyle: { backgroundColor: brandColors.primary, height: 3 },
@@ -367,54 +376,58 @@ const ProductDetails = ({ route, navigation }) => {
             )}
           </Tab.Screen>
 
-          {ProductId ? (
-            <Tab.Screen name="Fornecedores">
-              {props => (
-                <ProductSuppliersTab
-                  {...props}
-                  product={productSummary}
-                  isLoading={isLoadingSummary}
-                  onRefresh={loadProductSummary}
-                />
-              )}
-            </Tab.Screen>
-          ) : null}
+          <Tab.Screen
+            name="Fornecedores"
+            options={{ tabBarVisible: Boolean(ProductId) }}
+          >
+            {props => (
+              <ProductSuppliersTab
+                {...props}
+                product={productSummary}
+                isLoading={isLoadingSummary}
+                onRefresh={loadProductSummary}
+              />
+            )}
+          </Tab.Screen>
 
-          {ProductId && context === 'products' ? (
-            <Tab.Screen name="Vendas">
-              {props => (
-                <ProductSalesTab
-                  {...props}
-                  product={productSummary}
-                  isLoading={isLoadingSummary}
-                  brandColors={brandColors}
-                />
-              )}
-            </Tab.Screen>
-          ) : null}
+          <Tab.Screen
+            name="Vendas"
+            options={{ tabBarVisible: Boolean(ProductId && context === 'products') }}
+          >
+            {props => (
+              <ProductSalesTab
+                {...props}
+                product={productSummary}
+                isLoading={isLoadingSummary}
+                brandColors={brandColors}
+              />
+            )}
+          </Tab.Screen>
 
-          {canHaveFeedstocks ? (
-            <Tab.Screen name="Insumos">
-              {() => (
-                <View style={styles.feedstockTabContent}>
-                  <View style={styles.feedstockCard}>
-                    <ProductFeedStock
-                      productIri={`/products/${ProductId}`}
-                      parentProductId={ProductId}
-                      brandColors={brandColors}
-                      targetLabel="este produto"
-                    />
-                  </View>
+          <Tab.Screen
+            name="Insumos"
+            options={{ tabBarVisible: canHaveFeedstocks }}
+          >
+            {() => (
+              <View style={styles.feedstockTabContent}>
+                <View style={styles.feedstockCard}>
+                  <ProductFeedStock
+                    productIri={`/products/${ProductId}`}
+                    parentProductId={ProductId}
+                    brandColors={brandColors}
+                    targetLabel="este produto"
+                  />
                 </View>
-              )}
-            </Tab.Screen>
-          ) : null}
+              </View>
+            )}
+          </Tab.Screen>
 
-          {(productSummary?.type == 'custom' || productSummary?.type == 'manufactured' || productSummary?.type == 'service') &&
-            <Tab.Screen name="Grupos">
-              {props => <ProductGroups {...props} ProductId={ProductId} />}
-            </Tab.Screen>
-          }
+          <Tab.Screen
+            name="Grupos"
+            options={{ tabBarVisible: canHaveGroups }}
+          >
+            {props => <ProductGroups {...props} ProductId={ProductId} />}
+          </Tab.Screen>
 
           <Tab.Screen name="Estoque">
             {props => (
