@@ -18,6 +18,16 @@ export default {
     messages: [],
     message: {},
     filters: {},
+    configs: {
+      searchKey: 'search',
+      import: {
+        enabled: true,
+        importType: 'product',
+        labelKey: ['products', 'button', 'importCsv'],
+        titleKey: ['products', 'title', 'productImport'],
+        searchPlaceholderKey: ['products', 'input', 'importSearch'],
+      },
+    },
     columns: [
       {
         sortable: true,

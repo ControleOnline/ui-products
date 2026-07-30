@@ -101,7 +101,7 @@ const ordersRoutes = [
       title: getCatalogEntityLabel(route.params?.context),
       showBottomCart: isPosApp,
     }),
-    initialParams: { store: 'products' },
+    initialParams: { store: 'products', categoryId: ALL_PRODUCTS_SENTINEL_ID },
   },
   {
     name: 'ProductDetails',

@@ -1,995 +1,196 @@
-/*
- * Contract imported from AGENTS.md
- * ## Escopo
- * - `ui-products` e o modulo React de catalogo, selecao e manutencao de produtos.
- * - Esta pagina centraliza a experiencia de produtos e a sincronizacao do catalogo.
- *
- * ## Estado
- *
- * ## Limites
- * - Nao duplicar a regra do catalogo em outros modulos.
- * - Manter aqui a coordenacao da tela React e dos filtros do catalogo.
- */
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import {
-  Alert, FlatList, ScrollView, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
-
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useMemo } from 'react';
+import { Alert, SafeAreaView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { app_type } from '@appType';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
+import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { api } from '@controleonline/ui-common/src/api';
-import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
-import ProductItem, {
-  getProductTypeLabel,
-  getProductTypePluralLabel,
-  resolveProductTypeTheme,
-} from '@controleonline/ui-products/src/react/components/products/ProductItem';
-import { useFocusEffect } from '@react-navigation/native';
-import {app_type} from '@appType';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import {resolveProductCoverUrl} from '@controleonline/ui-products/src/react/domain/productMedia';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
-import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
+import ProductItem, {
+  getProductTypeLabel,
+} from '@controleonline/ui-products/src/react/components/products/ProductItem';
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
-import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
-import {
-  isPosTotemMode,
-  isPosSingleItemMode,
-} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
-import {
-  shouldShowOperationalBottomNavigation,
-} from '@controleonline/ui-layout/src/react/utils/posBottomNavigation';
+import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels';
+import { resolveRouteCategoryId } from '@controleonline/ui-products/src/react/utils/categorySelection';
+import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue';
+import { styles } from './Products.styles';
 
-import {
-  readCachedCategories,
-  writeCachedCategories,
-} from '@controleonline/ui-products/src/react/utils/categoryCache';
-
-import {
-  ADD_PRODUCT_SELECTION_CHANGE_EVENT,
-  clearPendingAddProducts,
-  listPendingAddProducts,
-  resolvePendingAddProductId,
-} from '@controleonline/ui-orders/src/react/utils/addProductSession';
-
-import { skeletonStyles, styles } from './Products.styles'
-
-import {
-  mergeOrderWithOrderProducts,
-  withOrderProductQuantity,
-} from '@controleonline/ui-orders/src/utils/orderState';
-import {
-  resolveRouteCategoryId,
-  resolveCatalogCategory,
-} from '@controleonline/ui-products/src/react/utils/categorySelection';
-
-import { inlineStyle_413_16 } from './Products.styles';
-
-const SUPPLY_TYPE_OPTIONS = [
-  {
-    value: 'feedstock',
-    label: 'Matérias-primas',
-    description: 'Fontes canônicas de custo, estoque e consumo.',
-    icon: 'flask-outline',
-  },
-  {
-    value: 'component',
-    label: 'Componentes operacionais',
-    description: 'Opções comerciais ou operacionais que podem receber insumos.',
-    icon: 'shape-outline',
-  },
-  {
-    value: 'package',
-    label: 'Embalagens',
-    description: 'Itens de embalagem separados da matéria-prima.',
-    icon: 'package-variant-closed',
-  },
-];
-
-const getSupplyTypeOption = value =>
-  SUPPLY_TYPE_OPTIONS.find(option => option.value === value) || SUPPLY_TYPE_OPTIONS[0];
-
-const getSupplyActionLabel = value => {
-  const option = getSupplyTypeOption(value);
-  if (option.value === 'feedstock') return 'Adicionar matéria-prima';
-  if (option.value === 'component') return 'Adicionar componente operacional';
-  if (option.value === 'package') return 'Adicionar embalagem';
-  return 'Adicionar insumo';
-};
-
-const SUPPLY_EMPTY_LABELS = {
-  feedstock: {
-    emptyFound: 'Nenhuma matéria-prima encontrada',
-    emptyAll: 'Nenhuma matéria-prima cadastrada',
-    emptyCategory: 'Nenhuma matéria-prima',
-    emptyAllSubtitle: 'Nenhuma matéria-prima foi cadastrada ainda.',
-    emptyCategorySubtitle: 'Nenhuma matéria-prima disponível nesta visualização',
-  },
-  component: {
-    emptyFound: 'Nenhum componente operacional encontrado',
-    emptyAll: 'Nenhum componente operacional cadastrado',
-    emptyCategory: 'Nenhum componente operacional',
-    emptyAllSubtitle: 'Nenhum componente operacional foi cadastrado ainda.',
-    emptyCategorySubtitle: 'Nenhum componente operacional disponível nesta visualização',
-  },
-  package: {
-    emptyFound: 'Nenhuma embalagem encontrada',
-    emptyAll: 'Nenhuma embalagem cadastrada',
-    emptyCategory: 'Nenhuma embalagem',
-    emptyAllSubtitle: 'Nenhuma embalagem foi cadastrada ainda.',
-    emptyCategorySubtitle: 'Nenhuma embalagem disponível nesta visualização',
-  },
-};
-
-const ALL_PRODUCTS_PAGE_SIZE = 50;
-const DESKTOP_LIST_MIN_WIDTH = 900;
-const MOBILE_TYPE_HEADER_PREFIX = 'type-header';
-const MOBILE_PRODUCT_ROW_PREFIX = 'product-row';
-const SYNC_STATUS_LEGEND = [
-  { key: 'not-synced', label: 'Nao sinc.', color: '#94A3B8' },
-  { key: 'pending', label: 'Pendente', color: '#e67e22' },
-  { key: 'synced', label: 'Sinc.', color: '#16A34A' },
-];
-
-const getPendingOrderProductKey = productId => `pending-add-product-${productId}`;
-
-const buildPendingOrderProduct = ({ product, quantity, order }) => {
-  const productId = resolvePendingAddProductId(product);
-  const unitPrice = Number(product?.price || 0);
-
-  return withOrderProductQuantity(
-    {
-      id: getPendingOrderProductKey(productId),
-      '@id': `/pending_order_products/${productId}`,
-      __localPendingSelection: true,
-      product,
-      price: unitPrice,
-      value: unitPrice,
-      total: unitPrice * Math.max(0, Number(quantity || 0)),
-      order:
-        order?.['@id'] ||
-        (order?.id ? `/orders/${order.id}` : null),
-    },
-    quantity,
-  );
-};
-
-const applyPendingSelectionToOrder = ({ order, product, quantity }) => {
-  if (!order || !product) {
-    return order;
-  }
-
-  const productId = resolvePendingAddProductId(product);
-  if (!productId) {
-    return order;
-  }
-
-  const pendingKey = getPendingOrderProductKey(productId);
-  const currentOrderProducts = Array.isArray(order?.orderProducts)
-    ? order.orderProducts
-    : [];
-  const nextOrderProducts = currentOrderProducts.filter(orderProduct => {
-    const orderProductKey = String(
-      orderProduct?.id || orderProduct?.['@id'] || '',
-    );
-    return orderProductKey !== pendingKey;
-  });
-
-  if (Number(quantity || 0) > 0) {
-    nextOrderProducts.push(
-      buildPendingOrderProduct({
-        product,
-        quantity,
-        order,
-      }),
-    );
-  }
-
-  return mergeOrderWithOrderProducts(order, nextOrderProducts);
-};
-
-const normalizeProductTypeFilter = value => {
-  const normalizedValue = String(value || '').trim().toLowerCase();
-  return normalizedValue || null;
-};
-
-const normalizeProductId = value => {
-  if (!value && value !== 0) return '';
-
-  const raw = typeof value === 'object'
-    ? value?.id || value?.['@id'] || value?.value || ''
-    : value;
-
-  return String(raw || '').replace(/\D+/g, '').trim();
-};
+const DESKTOP_GRID_MIN_WIDTH = 960;
 
 const normalizeCatalogContext = value =>
   String(value || 'products').trim().toLowerCase() === 'supplies'
     ? 'supplies'
     : 'products';
 
-const buildCatalogLabels = (context, supplyType = 'feedstock') => {
-  if (context === 'supplies') {
-    const supplyLabels = SUPPLY_EMPTY_LABELS[supplyType] || SUPPLY_EMPTY_LABELS.feedstock;
+const normalizeProductTypeFilter = value => String(value || '').trim().toLowerCase() || null;
+
+const buildCatalogLabels = (context, typeFilter) => {
+  if (context !== 'supplies') {
     return {
-      singular: 'insumo',
-      plural: 'insumos',
-      addLabel: 'Adicionar Insumo',
-      emptyFound: supplyLabels.emptyFound,
-      emptyAll: supplyLabels.emptyAll,
-      emptyCategory: supplyLabels.emptyCategory,
-      emptyFoundSubtitle: query => `Nenhum resultado para "${query}".`,
-      emptyAllSubtitle: supplyLabels.emptyAllSubtitle,
-      emptyCategorySubtitle: supplyLabels.emptyCategorySubtitle,
+      addLabel: global.t?.t?.('products', 'button', 'add') || 'Adicionar Produto',
+      empty: 'Nenhum produto encontrado',
+      plural: 'produtos',
     };
   }
 
+  const resolvedType = normalizeProductTypeFilter(typeFilter) || 'feedstock';
+  const typeLabel = getProductTypeLabel(resolvedType) || 'Insumo';
+
   return {
-    singular: 'produto',
-    plural: 'produtos',
-    addLabel: 'Adicionar Produto',
-    emptyFound: 'Nenhum produto encontrado',
-    emptyAll: 'Nenhum produto cadastrado',
-    emptyCategory: 'Nenhum produto',
-    emptyFoundSubtitle: query => `Nenhum resultado para "${query}".`,
-    emptyAllSubtitle: 'Nenhum produto foi cadastrado ainda.',
-    emptyCategorySubtitle: 'Nenhum produto disponível nesta categoria',
+    addLabel: `Adicionar ${typeLabel}`,
+    empty: 'Nenhum insumo encontrado',
+    plural: 'insumos',
   };
 };
 
-const SkeletonProductCard = () => (
-  <View style={skeletonStyles.card}>
-    <View style={skeletonStyles.imageBlock} />
-    <View style={skeletonStyles.body}>
-      <View style={[skeletonStyles.line, { width: '60%', height: 14, marginBottom: 8 }]} />
-      <View style={[skeletonStyles.line, { width: '85%', height: 11, marginBottom: 6 }]} />
-      <View style={[skeletonStyles.line, { width: '40%', height: 11 }]} />
-      <View style={skeletonStyles.priceRow}>
-        <View style={[skeletonStyles.line, { width: 72, height: 20 }]} />
-        <View style={[skeletonStyles.line, { width: 48, height: 32, borderRadius: 8 }]} />
-      </View>
-    </View>
-  </View>
-);
+const buildRouteParams = (routeParams, context, interactionMode) => {
+  const params = {
+    context,
+    interactionMode,
+    showBottomCart: interactionMode === 'pdv',
+    showBottomToolBar: interactionMode === 'pdv',
+  };
 
-const ProductsPage = ({ navigation, route }) => {
-  const routeParams = route.params || {};
-  const context = normalizeCatalogContext(routeParams.context);
-  const interactionMode =
-    routeParams.interactionMode ||
-    (app_type === 'MANAGER' ? 'manager' : 'pdv');
+  ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement'].forEach(key => {
+    if (routeParams?.[key] !== undefined) {
+      params[key] = routeParams[key];
+    }
+  });
+
+  return params;
+};
+
+const buildRequestParams = ({
+  categoryId,
+  companyId,
+  context,
+  searchQuery,
+  typeFilter,
+}) => {
+  if (!companyId) return {};
+
+  const effectiveTypeFilter =
+    context === 'supplies'
+      ? (normalizeProductTypeFilter(typeFilter) || 'feedstock')
+      : normalizeProductTypeFilter(typeFilter);
+
+  const params = {
+    active: 1,
+    company: companyId,
+    'order[description]': 'ASC',
+    'order[product]': 'ASC',
+    type: effectiveTypeFilter
+      ? [effectiveTypeFilter]
+      : (
+          context === 'supplies'
+            ? ['feedstock', 'component', 'package']
+            : ['product', 'manufactured', 'custom', 'service', 'recipe']
+        ),
+  };
+
+  const normalizedSearch = String(searchQuery || '').trim();
+  if (normalizedSearch) {
+    params.search = normalizedSearch;
+  }
+
+  if (categoryId && categoryId !== ALL_PRODUCTS_SENTINEL_ID) {
+    params['productCategory.category'] = `/categories/${categoryId}`;
+  }
+
+  return params;
+};
+
+const ProductsPage = ({ navigation: navigationProp, route }) => {
+  const navigation = navigationProp || useNavigation();
+  const routeParams = route?.params || {};
+  const context = useMemo(() => normalizeCatalogContext(routeParams.context), [routeParams.context]);
+  const interactionMode = routeParams.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv');
+  const isManager = app_type === 'MANAGER' && interactionMode !== 'pdv';
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
-  const actions = productsStore.actions;
   const { isLoading: storeLoading } = productsStore.getters;
-  const error = productsStore.error;
-  const productCategoryStore = useStore('product_category');
-  const productCategoryActions = productCategoryStore.actions;
-
-  const ordersStore = useStore('orders');
-  const ordersActions = ordersStore.actions;
-
-  const categoriesStore = useStore('categories');
-  const categoriesGetters = categoriesStore.getters;
-  const categoryActions = categoriesStore.actions;
-  const { items: categories, item: storedCategory } = categoriesGetters;
-
-  const peopleStore = useStore('people');
-  const { currentCompany } = peopleStore.getters;
-  const deviceStore = useStore('device');
-  const { item: currentDevice } = deviceStore.getters;
-  const deviceConfigStore = useStore('device_config');
-  const runtimeDeviceConfig = deviceConfigStore.getters?.item;
-
-  const themeStore = useStore('theme');
-  const { colors: themeColors } = themeStore.getters;
-
-  const contextTypes = useMemo(() => {
-    if (context === 'products') {
-      return ['product', 'manufactured', 'custom', 'service', 'recipe'];
-    }
-
-    if (context === 'supplies') {
-      return ['package', 'component', 'feedstock'];
-    }
-
-    return [];
-  }, [context]);
+  const { currentCompany } = useStore('people').getters;
+  const { colors: themeColors } = useStore('theme').getters;
 
   const brandColors = useMemo(
-    () =>
-      resolveThemePalette(
-        { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
-        colors,
-      ),
-    [themeColors, currentCompany?.id],
+    () => resolveThemePalette(
+      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
+      colors,
+    ),
+    [currentCompany?.id, currentCompany?.theme?.colors, themeColors],
   );
-  const [categoryProducts, setCategoryProducts] = useState([]);
-  const [productCategoriesByProductId, setProductCategoriesByProductId] = useState({});
-  const [groupedProductsReady, setGroupedProductsReady] = useState(true);
-  const categoryProductsRef = useRef([]);
-  const productsRequestKeyRef = useRef('');
-  const productCategoryRequestKeyRef = useRef('');
-  const allProductsPaginationRef = useRef({
-    baseParams: null,
-    hasMore: false,
-    isLoading: false,
-    page: 0,
-    requestKey: '',
-  });
+
+  const categoryId = useMemo(
+    () => resolveRouteCategoryId(routeParams.categoryId || routeParams.category),
+    [routeParams.category, routeParams.categoryId],
+  );
+  const isAllProducts = !categoryId || categoryId === ALL_PRODUCTS_SENTINEL_ID;
   const typeFilter = useMemo(
     () => normalizeProductTypeFilter(routeParams.typeFilter),
     [routeParams.typeFilter],
   );
   const labels = useMemo(
-    () => buildCatalogLabels(context, typeFilter || 'feedstock'),
+    () => buildCatalogLabels(context, typeFilter),
     [context, typeFilter],
   );
-  const [visibleCount, setVisibleCount] = useState(50);
-  const [supplyTypeModalVisible, setSupplyTypeModalVisible] = useState(false);
-  const currentOrderRef = useRef(ordersStore.getters?.item || null);
-  const productListRef = useRef(null);
-  const actionsRef = useRef(actions);
-  const categoryActionsRef = useRef(categoryActions);
-  const ordersActionsRef = useRef(ordersActions);
-  const productCategoryActionsRef = useRef(productCategoryActions);
-  const currentOrderId = String(
-    routeParams.id ||
-      routeParams.order ||
-      currentOrderRef.current?.id ||
-      currentOrderRef.current?.['@id'] ||
-      '',
-  ).replace(/\D+/g, '');
-
-  const isManager =
-    app_type === 'MANAGER' && interactionMode !== 'pdv';
-  const shouldShowBottomNavigation = useMemo(
-    () =>
-      shouldShowOperationalBottomNavigation({
-        appType: app_type,
-        interactionMode,
-        isTotemMode: isPosTotemMode(runtimeDeviceConfig?.configs),
-      }),
-    [interactionMode, runtimeDeviceConfig?.configs],
+  const searchQuery = useMemo(
+    () => String(routeParams.searchQuery || '').trim(),
+    [routeParams.searchQuery],
   );
-  const isSingleItemMode =
-    routeParams.singleItemMode === true ||
-    isPosSingleItemMode(runtimeDeviceConfig?.configs);
+  const isSingleItemMode = Boolean(
+    routeParams.singleItemMode ||
+    routeParams?.singleItemMode === true,
+  );
+  const { currentOrderId } = useProductAddQueue({
+    isSingleItemMode,
+    orderId: routeParams.id || routeParams.order || '',
+  });
   const {
     getProductStatuses,
     loadCatalogStatus,
     syncEntity,
     syncingKey: marketplaceSyncingKey,
   } = useMarketplaceCatalogSync(isManager ? currentCompany?.id : null);
-  const fetchProductCatalogItems = useCallback(
-    async (params = {}) => {
-      if (isManager || context !== 'products') {
-        return actionsRef.current.getItems(params);
-      }
-      if (!currentCompany?.id) {
-        return [];
-      }
-
-      const response = await api.fetch('product-showcases/catalog', {
-        params: {
-          ...params,
-          integration_key: 'pos',
-          company: currentCompany.id,
-          device: currentDevice?.device || currentDevice?.id || '',
-          category: params['productCategory.category'],
-          search: params.product,
-        },
-      });
-
-      return Array.isArray(response?.member) ? response.member : [];
-    },
-    [context, currentCompany?.id, currentDevice?.device, currentDevice?.id, isManager],
-  );
-  const categoryRouteValue = routeParams.categoryId || routeParams.category;
-  const normalizedSearchQuery = useMemo(
-    () => String(routeParams.searchQuery || '').trim(),
-    [routeParams.searchQuery],
-  );
-  const category = useMemo(
-    () =>
-      resolveCatalogCategory({
-        storedCategory,
-        categories,
-        routeCategoryId: categoryRouteValue,
-      }),
-    [categories, categoryRouteValue, storedCategory],
-  );
-  const categoryId = useMemo(
-    () => resolveRouteCategoryId(category),
-    [category],
-  );
-  useEffect(() => {
-    if (!categoryId) return;
-    if (resolveRouteCategoryId(categoryRouteValue) === categoryId) return;
-    navigation.setParams({ categoryId });
-  }, [categoryId, categoryRouteValue, navigation]);
-  const isAllProducts =
-    category?._isAllProducts === true ||
-    category?.['@id'] === '__all_products__';
-
-  useEffect(() => {
-    currentOrderRef.current = ordersStore.getters?.item || null;
-  }, [ordersStore.getters?.item]);
-
-  useEffect(() => {
-    if (!shouldShowBottomNavigation) {
-      if (routeParams.showBottomToolBar !== true) {
-        return;
-      }
-
-      navigation.setParams({showBottomToolBar: false});
-      return;
-    }
-
-    if (routeParams.showBottomToolBar === true) {
-      return;
-    }
-
-    navigation.setParams({showBottomToolBar: true});
-  }, [navigation, routeParams.showBottomToolBar, shouldShowBottomNavigation]);
-
-  useEffect(() => {
-    actionsRef.current = actions;
-  }, [actions]);
-
-  useEffect(() => {
-    productCategoryActionsRef.current = productCategoryActions;
-  }, [productCategoryActions]);
-
-  useEffect(() => {
-    categoryActionsRef.current = categoryActions;
-  }, [categoryActions]);
-
-  useEffect(() => {
-    ordersActionsRef.current = ordersActions;
-  }, [ordersActions]);
-
-  const updateCategoryProducts = useCallback(products => {
-    const nextProducts = Array.isArray(products) ? products : [];
-    if (categoryProductsRef.current === nextProducts) return;
-    categoryProductsRef.current = nextProducts;
-    setCategoryProducts(nextProducts);
-  }, []);
-
-  const visibleTypeFilter = useMemo(
-    () => (context === 'supplies' ? typeFilter || 'feedstock' : typeFilter),
-    [context, typeFilter],
-  );
-
-  const visibleProducts = useMemo(() => {
-    if (!visibleTypeFilter) return categoryProducts;
-    return categoryProducts.filter(p => p.type === visibleTypeFilter);
-  }, [categoryProducts, visibleTypeFilter]);
-
-  const categoryProductIdsKey = useMemo(() => {
-    const ids = Array.from(
-      new Set(
-        categoryProducts
-          .map(product => normalizeProductId(product))
-          .filter(Boolean),
-      ),
-    );
-
-    return ids.join('|');
-  }, [categoryProducts]);
-
-  useEffect(() => {
-    setVisibleCount(50);
-  }, [categoryId, normalizedSearchQuery, typeFilter]);
-
-  useEffect(() => {
-    const productIds = categoryProductIdsKey
-      ? categoryProductIdsKey.split('|').filter(Boolean)
-      : [];
-
-    if (productIds.length === 0) {
-      productCategoryRequestKeyRef.current = '';
-      setProductCategoriesByProductId({});
-      return;
-    }
-
-    const requestKey = JSON.stringify([context, currentCompany?.id, productIds]);
-    if (productCategoryRequestKeyRef.current === requestKey) {
-      return;
-    }
-
-    productCategoryRequestKeyRef.current = requestKey;
-
-    productCategoryActionsRef.current
-      .getItems({
-        product: productIds.map(productId => `/products/${productId}`),
-      })
-      .then(data => {
-        if (productCategoryRequestKeyRef.current !== requestKey) {
-          return;
-        }
-
-        const nextCategoriesByProductId = {};
-        (Array.isArray(data) ? data : []).forEach(relation => {
-          const productId = normalizeProductId(relation?.product);
-          if (!productId) {
-            return;
-          }
-
-          if (!nextCategoriesByProductId[productId]) {
-            nextCategoriesByProductId[productId] = [];
-          }
-
-          nextCategoriesByProductId[productId].push(relation);
-        });
-
-        setProductCategoriesByProductId(nextCategoriesByProductId);
-      })
-      .catch(() => {
-        if (productCategoryRequestKeyRef.current === requestKey) {
-          setProductCategoriesByProductId({});
-        }
-      });
-  }, [categoryProductIdsKey, context, currentCompany?.id]);
-
-  const flushPendingAddProducts = useCallback(() => {
-    const currentOrderId = String(
-      currentOrderRef.current?.id ||
-      currentOrderRef.current?.['@id'] ||
-      '',
-    ).replace(/\D+/g, '');
-    const pendingSelections = listPendingAddProducts();
-
-    if (currentOrderId && pendingSelections.length > 0) {
-      const lastSelection = pendingSelections[pendingSelections.length - 1];
-      if (isSingleItemMode && !lastSelection?.productId) {
-        return;
-      }
-
-      const payload = isSingleItemMode
-        ? [{
-            product: lastSelection?.productId,
-            quantity: 1,
-          }]
-        : pendingSelections.map(selection => ({
-            product: selection.productId,
-            quantity: selection.quantity,
-          }));
-
-      const currentOrdersActions = ordersActionsRef.current;
-      currentOrdersActions.addToQueue(() =>
-        isSingleItemMode
-          ? currentOrdersActions.replaceProducts(currentOrderId, payload)
-          : currentOrdersActions.addProducts(currentOrderId, payload),
-      );
-    }
-
-    clearPendingAddProducts();
-    ordersActionsRef.current.initQueue();
-  }, [isSingleItemMode]);
-
-  const handlePendingSelectionChange = useCallback(
-    payload => {
-      const currentOrder = currentOrderRef.current;
-      if (!currentOrder) return;
-
-      const nextOrder = isSingleItemMode
-        ? mergeOrderWithOrderProducts(
-            currentOrder,
-            payload?.product
-              ? [
-                  buildPendingOrderProduct({
-                    order: currentOrder,
-                    product: payload.product,
-                    quantity: 1,
-                  }),
-                ]
-              : [],
-          )
-        : applyPendingSelectionToOrder({
-            order: currentOrder,
-            product: payload?.product,
-            quantity: payload?.quantity,
-          });
-
-      currentOrderRef.current = nextOrder;
-      ordersActionsRef.current.syncOrder?.(nextOrder);
-    },
-    [isSingleItemMode],
-  );
-
-  useEffect(() => {
-    eventBus.on(ADD_PRODUCT_SELECTION_CHANGE_EVENT, handlePendingSelectionChange);
-    return () => eventBus.off(ADD_PRODUCT_SELECTION_CHANGE_EVENT, handlePendingSelectionChange);
-  }, [handlePendingSelectionChange]);
-
-  const isDesktopList = width >= DESKTOP_LIST_MIN_WIDTH;
-  const shouldGroupByType =
-    isAllProducts &&
-    context === 'products' &&
-    !normalizedSearchQuery;
-  const productsData = useMemo(
-    () => (shouldGroupByType ? visibleProducts : visibleProducts.slice(0, visibleCount)),
-    [shouldGroupByType, visibleProducts, visibleCount],
-  );
-  const shouldShowTypeJumpBar = !isDesktopList && shouldGroupByType;
-  const typeGroups = useMemo(() => {
-    if (!shouldGroupByType) {
-      return [];
-    }
-
-    const groupsByType = {};
-    productsData.forEach(product => {
-      const type = String(product?.type || '').trim() || 'product';
-      if (!groupsByType[type]) {
-        groupsByType[type] = {
-          key: type,
-          label: getProductTypeLabel(type),
-          products: [],
-        };
-      }
-      groupsByType[type].products.push(product);
-    });
-
-    return Object.values(groupsByType).sort((first, second) =>
-      first.label.localeCompare(second.label, 'pt-BR', { sensitivity: 'base' }),
-    );
-  }, [context, isAllProducts, normalizedSearchQuery, productsData, shouldGroupByType]);
-  const groupedProductsData = useMemo(() => {
-    if (!shouldGroupByType) {
-      return productsData.map(product => ({
-        key: `${MOBILE_PRODUCT_ROW_PREFIX}-${product.id}`,
-        product,
-        type: 'product',
-      }));
-    }
-
-    return typeGroups.flatMap(group => [
-      {
-        count: group.products.length,
-        key: `${MOBILE_TYPE_HEADER_PREFIX}-${group.key}`,
-        label: group.label,
-        type: 'header',
-      },
-      ...group.products.map(product => ({
-        key: `${MOBILE_PRODUCT_ROW_PREFIX}-${product.id}`,
-        product,
-        type: 'product',
-      })),
-    ]);
-  }, [productsData, shouldGroupByType, typeGroups]);
-  const hasSingleItemGroup = isSingleItemMode && typeGroups.length === 1;
-  const hasSingleItemMedia = useMemo(
-    () => isSingleItemMode && productsData.some(product => !!resolveProductCoverUrl(product)),
-    [isSingleItemMode, productsData],
-  );
-  const singleItemColumnCount = isSingleItemMode
-    ? width <= 340
-      ? 1
-      : width < DESKTOP_LIST_MIN_WIDTH
-        ? hasSingleItemMedia
-          ? 2
-          : 1
-        : 4
-    : 1;
-  const typeJumpTargets = useMemo(() => {
-    const targets = {};
-    groupedProductsData.forEach((item, index) => {
-      if (item.type === 'header') {
-        targets[item.key.replace(`${MOBILE_TYPE_HEADER_PREFIX}-`, '')] = index;
-      }
-    });
-    return targets;
-  }, [groupedProductsData]);
-  const listData = useMemo(
-    () =>
-      hasSingleItemGroup
-        ? typeGroups[0].products
-        : shouldGroupByType
-          ? groupedProductsData
-          : productsData,
-    [groupedProductsData, hasSingleItemGroup, productsData, shouldGroupByType, typeGroups],
-  );
-
-  const changeCategoryProduct = (p, changeStorage = false) => {
-    if (isAllProducts) {
-      updateCategoryProducts(p);
-      return;
-    }
-
-    const index = categories.findIndex(c => resolveRouteCategoryId(c) === categoryId);
-    if (index < 0) {
-      updateCategoryProducts(p);
-      return;
-    }
-
-    let c = [...categories];
-    c[index]['products'] = p;
-    updateCategoryProducts(p);
-    categoryActionsRef.current.setItems(c);
-
-    if (changeStorage)
-      writeCachedCategories(currentCompany?.id, c, context);
-  };
-
-  const resetAllProductsPagination = useCallback(() => {
-    allProductsPaginationRef.current = {
-      baseParams: null,
-      hasMore: false,
-      isLoading: false,
-      page: 0,
-      requestKey: '',
-    };
-    setGroupedProductsReady(true);
-  }, []);
-
-  const loadAllProductsPage = useCallback(async page => {
-    const pagination = allProductsPaginationRef.current;
-    const requestKey = pagination.requestKey;
-
-    if (!pagination.baseParams || !requestKey || pagination.isLoading) {
-      return false;
-    }
-
-    if (page > 1 && !pagination.hasMore) {
-      return false;
-    }
-
-    pagination.isLoading = true;
-
-    try {
-      const data = await fetchProductCatalogItems({
-        ...pagination.baseParams,
-        page,
-      });
-
-      if (productsRequestKeyRef.current !== requestKey) {
-        return false;
-      }
-
-      const nextPageProducts = Array.isArray(data) ? data : [];
-      const currentProducts = page === 1 ? [] : categoryProductsRef.current;
-      const currentProductIds = new Set(
-        currentProducts.map(product => String(product?.id || product?.['@id'] || '')),
-      );
-      const mergedProducts = [
-        ...currentProducts,
-        ...nextPageProducts.filter(product => {
-          const productId = String(product?.id || product?.['@id'] || '');
-          return productId && !currentProductIds.has(productId);
-        }),
-      ];
-
-      updateCategoryProducts(mergedProducts);
-      setVisibleCount(count => Math.max(count, mergedProducts.length));
-
-      const totalItems = Number(productsStore.getters?.totalItems || 0);
-      const hasMore = totalItems > 0
-        ? mergedProducts.length < totalItems
-        : nextPageProducts.length >= ALL_PRODUCTS_PAGE_SIZE;
-      pagination.page = page;
-      pagination.hasMore = hasMore;
-
-      return hasMore;
-    } catch {
-      // The central store error flow handles request failures.
-      return false;
-    } finally {
-      pagination.isLoading = false;
-    }
-  }, [fetchProductCatalogItems, updateCategoryProducts]);
-
-  const loadAllProductsUntilComplete = useCallback(async requestKey => {
-    let page = 1;
-    let hasMore = await loadAllProductsPage(page);
-
-    while (
-      hasMore &&
-      productsRequestKeyRef.current === requestKey &&
-      allProductsPaginationRef.current.requestKey === requestKey
-    ) {
-      page += 1;
-      hasMore = await loadAllProductsPage(page);
-    }
-
-    if (
-      productsRequestKeyRef.current === requestKey &&
-      allProductsPaginationRef.current.requestKey === requestKey
-    ) {
-      setGroupedProductsReady(true);
-    }
-  }, [loadAllProductsPage]);
-
-  useEffect(() => {
-    if (isManager) {
-      return;
-    }
-
-    if (!category) {
-      productsRequestKeyRef.current = '';
-      resetAllProductsPagination();
-      setGroupedProductsReady(true);
-      updateCategoryProducts([]);
-      return;
-    }
-
-    const effectiveTypeFilter = context === 'supplies'
-      ? (typeFilter || 'feedstock')
-      : typeFilter;
-    const baseParams = {
-      active: 1,
-      'order[product]': 'ASC',
-      'order[description]': 'ASC',
-      company: currentCompany?.id,
-      type: effectiveTypeFilter ? [effectiveTypeFilter] : contextTypes,
-    };
-
-    if (normalizedSearchQuery) {
-      resetAllProductsPagination();
-      setGroupedProductsReady(true);
-      const requestKey = JSON.stringify(['search', baseParams, normalizedSearchQuery]);
-      if (productsRequestKeyRef.current === requestKey) return;
-      productsRequestKeyRef.current = requestKey;
-      fetchProductCatalogItems({
-        ...baseParams,
-        product: normalizedSearchQuery,
-      })
-        .then(data => {
-          if (productsRequestKeyRef.current !== requestKey) return;
-          updateCategoryProducts(data || []);
-        })
-        .catch(() => {});
-      return;
-    }
-
-    if (isAllProducts) {
-      const requestKey = JSON.stringify([
-        'all',
-        shouldGroupByType ? 'grouped' : 'paged',
-        baseParams,
-      ]);
-      if (productsRequestKeyRef.current === requestKey) return;
-      productsRequestKeyRef.current = requestKey;
-      allProductsPaginationRef.current = {
-        baseParams,
-        hasMore: true,
-        isLoading: false,
-        page: 0,
-        requestKey,
-      };
-      updateCategoryProducts([]);
-      if (shouldGroupByType) {
-        setGroupedProductsReady(false);
-        loadAllProductsUntilComplete(requestKey);
-      } else {
-        setGroupedProductsReady(true);
-        loadAllProductsPage(1);
-      }
-      return;
-    }
-
-    resetAllProductsPagination();
-    setGroupedProductsReady(true);
-
-    if (
-      categories &&
-      categories.length > 0 &&
-      categoryId
-    ) {
-      const index = categories.findIndex(c => resolveRouteCategoryId(c) === categoryId);
-
-      if (index >= 0 && categories[index]?.products?.length > 0) {
-        updateCategoryProducts(categories[index]['products']);
-      } else {
-        const requestKey = JSON.stringify(['category', baseParams, categoryId]);
-        if (productsRequestKeyRef.current === requestKey) return;
-        productsRequestKeyRef.current = requestKey;
-        fetchProductCatalogItems({
-          ...baseParams,
-          'productCategory.category':
-            category?.['@id'] || `/categories/${categoryId}`,
-        })
-          .then(data => {
-            if (productsRequestKeyRef.current !== requestKey) return;
-            if (data && Object.keys(data).length > 0)
-              changeCategoryProduct(data, true);
-          })
-          .catch(() => { });
-      }
-    }
-  }, [
-    category,
-    categoryId,
-    categories,
-    contextTypes,
-    currentCompany?.id,
-    fetchProductCatalogItems,
-    isManager,
-    isAllProducts,
-    loadAllProductsUntilComplete,
-    loadAllProductsPage,
-    normalizedSearchQuery,
-    resetAllProductsPagination,
-    shouldGroupByType,
-    typeFilter,
-    updateCategoryProducts,
-  ]);
 
   useFocusEffect(
     useCallback(() => {
-      clearPendingAddProducts();
-      if (isManager) {
+      if (currentCompany?.id && isManager) {
         loadCatalogStatus().catch(() => {});
       }
-
-      return () => {
-        flushPendingAddProducts();
-        const cats = readCachedCategories(currentCompany?.id, context);
-        if (cats.length > 0) categoryActionsRef.current.setItems(cats);
-      };
-    }, [context, currentCompany?.id, flushPendingAddProducts, isManager, loadCatalogStatus]),
+    }, [currentCompany?.id, isManager, loadCatalogStatus]),
   );
 
-  const buildCategoryRouteParams = useCallback((overrides = {}) => {
-    const params = {
+  const requestParams = useMemo(
+    () => buildRequestParams({
+      categoryId,
+      companyId: currentCompany?.id,
       context,
-      interactionMode,
-      showBottomCart: interactionMode === 'pdv',
-      showBottomToolBar: interactionMode === 'pdv',
-    };
-
-    if (categoryId) {
-      params.categoryId = categoryId;
-    }
-
-    if (context === 'supplies') {
-      params.typeFilter = overrides.typeFilter || typeFilter || 'feedstock';
-      params.initialProductType = overrides.initialProductType || params.typeFilter;
-    } else if (typeFilter) {
-      params.typeFilter = typeFilter;
-    }
-
-    return params;
-  }, [categoryId, context, interactionMode, typeFilter]);
-
-  const selectedSupplyType = useMemo(
-    () => getSupplyTypeOption(typeFilter || 'feedstock'),
-    [typeFilter],
+      searchQuery,
+      typeFilter,
+    }),
+    [categoryId, context, currentCompany?.id, searchQuery, typeFilter],
   );
 
-  const handleSelectSupplyType = useCallback(value => {
-    setSupplyTypeModalVisible(false);
-    navigation.setParams({ typeFilter: value });
-  }, [navigation]);
+  const exportCatalog = useCallback(async () => {
+    if (!currentCompany?.id) return;
 
-  const handleProductPress = product => {
-    if (!isManager) return;
-    navigation.navigate({
-      name: 'ProductDetails',
-      params: {
-        ProductId: product.id,
-        ...buildCategoryRouteParams({
-          typeFilter: context === 'supplies' ? product.type : undefined,
-          initialProductType: context === 'supplies' ? product.type : undefined,
-        }),
-      },
-      merge: false,
-    });
-  };
-
-  const handleAddProduct = () => {
-    if (!isManager) return;
-    navigation.navigate({
-      name: 'ProductDetails',
-      params: buildCategoryRouteParams({
-        typeFilter: visibleTypeFilter,
-        initialProductType: visibleTypeFilter,
-      }),
-      merge: false,
-    });
-  };
+    try {
+      await api.fetch('normalized-catalog/download', {
+        params: {
+          company: currentCompany.id,
+          context,
+        },
+      });
+    } catch (error) {
+      Alert.alert(
+        global.t?.t?.('products', 'title', 'exportError') || 'Exportacao nao concluida',
+        error?.message || 'Nao foi possivel exportar o catalogo.',
+      );
+    }
+  }, [context, currentCompany?.id]);
 
   const handleMarketplaceSync = useCallback(
     async (platformKey, status, syncKey) => {
@@ -1006,607 +207,169 @@ const ProductsPage = ({ navigation, route }) => {
     [syncEntity],
   );
 
-  const managerTableRequestParams = useMemo(() => {
-    if (!isManager || !currentCompany?.id) {
-      return {};
+  const handleProductPress = useCallback(
+    product => {
+      if (!isManager) return;
+
+      navigation.navigate({
+        name: 'ProductDetails',
+        params: {
+          ProductId: product.id,
+          ...buildRouteParams(routeParams, context, interactionMode),
+          typeFilter: context === 'supplies' ? product.type : undefined,
+          initialProductType: context === 'supplies' ? product.type : undefined,
+        },
+        merge: false,
+      });
+    },
+    [context, interactionMode, isManager, navigation, routeParams],
+  );
+
+  const handleAddProduct = useCallback(() => {
+    if (!isManager) return;
+
+    navigation.navigate({
+      name: 'ProductDetails',
+      params: buildRouteParams(routeParams, context, interactionMode),
+      merge: false,
+    });
+  }, [context, interactionMode, isManager, navigation, routeParams]);
+
+  const handleOpenCategories = useCallback(() => {
+    navigation.navigate({
+      name: 'CategoriesPage',
+      params: buildRouteParams(routeParams, context, interactionMode),
+      merge: false,
+    });
+  }, [context, interactionMode, navigation, routeParams]);
+
+  const handleShowAllProducts = useCallback(() => {
+    navigation.navigate({
+      name: 'ProductsPage',
+      params: {
+        ...buildRouteParams(routeParams, context, interactionMode),
+        categoryId: undefined,
+        category: undefined,
+      },
+      merge: false,
+    });
+  }, [context, interactionMode, navigation, routeParams]);
+
+  const toolbarActions = useMemo(() => {
+    const actions = [
+      {
+        key: 'products-categories',
+        icon: 'grid',
+        label: global.t?.t?.('products', 'button', 'categories') || 'Categorias',
+        onPress: handleOpenCategories,
+      },
+    ];
+
+    if (!isAllProducts) {
+      actions.unshift({
+        key: 'products-all',
+        icon: 'layers',
+        label: global.t?.t?.('products', 'button', 'allProducts') || 'Todos os produtos',
+        onPress: handleShowAllProducts,
+      });
     }
 
-    const effectiveTypeFilter = context === 'supplies'
-      ? (typeFilter || 'feedstock')
-      : typeFilter;
-    const params = {
-      active: 1,
-      'order[product]': 'ASC',
-      'order[description]': 'ASC',
-      company: currentCompany.id,
-      type: effectiveTypeFilter ? [effectiveTypeFilter] : contextTypes,
-    };
-    const effectiveCategoryId = categoryId || resolveRouteCategoryId(categoryRouteValue);
+    return actions;
+  }, [handleOpenCategories, handleShowAllProducts, isAllProducts]);
 
-    if (!isAllProducts && effectiveCategoryId) {
-      params['productCategory.category'] = `/categories/${effectiveCategoryId}`;
-    }
-
-    if (normalizedSearchQuery) {
-      params.product = normalizedSearchQuery;
-    }
-
-    return params;
-  }, [
-    categoryId,
-    categoryRouteValue,
-    context,
-    contextTypes,
-    currentCompany?.id,
-    isAllProducts,
-    isManager,
-    normalizedSearchQuery,
-    typeFilter,
-  ]);
-
-  const renderManagerProductCard = useCallback(
-    ({item}) => (
-      <TouchableOpacity
-        activeOpacity={0.84}
-        onPress={() => handleProductPress(item)}
-      >
+  const renderProductCard = useCallback(
+    ({ item }) => {
+      const productCard = (
         <ProductItem
-          product={item}
-          category={category}
-          productCategories={productCategoriesByProductId[normalizeProductId(item)] || []}
           catalogContext={context}
-          displayMode={isDesktopList ? 'table' : 'card'}
+          displayMode={isManager && width >= DESKTOP_GRID_MIN_WIDTH ? 'table' : 'card'}
           interactionMode={interactionMode}
-          palette={brandColors}
-          singleItemMode={false}
-          orderId={currentOrderId}
-          marketplaceStatuses={getProductStatuses(item)}
-          onMarketplaceSync={handleMarketplaceSync}
+          marketplaceStatuses={isManager ? getProductStatuses(item) : []}
           marketplaceSyncingKey={marketplaceSyncingKey}
+          orderId={currentOrderId}
+          palette={brandColors}
+          product={item}
+          productCategories={[]}
+          singleItemMode={isSingleItemMode}
+          onMarketplaceSync={handleMarketplaceSync}
         />
-      </TouchableOpacity>
-    ),
+      );
+
+      return isManager ? (
+        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)}>
+          {productCard}
+        </TouchableOpacity>
+      ) : (
+        productCard
+      );
+    },
     [
       brandColors,
-      category,
       context,
       currentOrderId,
       getProductStatuses,
       handleMarketplaceSync,
       handleProductPress,
       interactionMode,
-      isDesktopList,
+      isManager,
+      isSingleItemMode,
       marketplaceSyncingKey,
-      productCategoriesByProductId,
+      width,
     ],
   );
 
-  const maxContentWidth = isSingleItemMode ? 1160 : isDesktopList ? 1600 : 860;
-  const containerWidth = Math.min(width, maxContentWidth);
-  const isCompactMobile = width < 360;
-  const shouldWaitForGroupedProducts = shouldGroupByType && !groupedProductsReady;
-  const shouldShowInitialSkeleton =
-    (storeLoading && categoryProducts.length === 0) ||
-    shouldWaitForGroupedProducts;
-  const shouldShowEmptyState =
-    !shouldWaitForGroupedProducts &&
-    !storeLoading &&
-    visibleProducts.length === 0 &&
-    !error;
-  const shouldShowProductList =
-    !shouldWaitForGroupedProducts &&
-    visibleProducts.length > 0;
-  const listContentStyle = {
-    ...(isDesktopList
-      ? {
-          alignSelf: 'center',
-          width: containerWidth,
-        }
-      : {}),
-    paddingTop: isCompactMobile ? 12 : 16,
-    paddingHorizontal: isCompactMobile ? 12 : 16,
-    paddingBottom: interactionMode === 'pdv'
-      ? (isCompactMobile ? 136 : 152)
-      : isManager
-        ? (isCompactMobile ? 96 : 104)
-      : (isCompactMobile ? 12 : 16),
-  };
-  const renderSupplyHeader = () => {
-    if (context !== 'supplies') return null;
+  const cardListProps = useMemo(
+    () => ({
+      key: `products-${width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4}`,
+      numColumns: width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4,
+      columnWrapperStyle: width < 640 ? null : { gap: 12 },
+      contentContainerStyle: {
+        gap: 12,
+        paddingBottom: isManager ? 104 : 16,
+        paddingHorizontal: 12,
+      },
+    }),
+    [isManager, width],
+  );
 
-    return (
-      <View style={styles.supplyHeader}>
-        <View style={styles.supplyHeaderText}>
-          <Text style={styles.supplyHeaderTitle}>Cadastro mestre de insumos</Text>
-          <Text style={styles.supplyHeaderDescription}>
-            Separe fontes de custo dos componentes operacionais antes de vincular fichas técnicas.
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.supplyTypeSelector}
-          onPress={() => setSupplyTypeModalVisible(true)}
-          activeOpacity={0.75}
-        >
-          <View style={styles.supplyTypeSelectorIcon}>
-            <MaterialCommunityIcons name={selectedSupplyType.icon} size={16} color={brandColors.primary} />
-          </View>
-          <View style={styles.supplyTypeSelectorText}>
-            <Text style={styles.supplyTypeSelectorLabel}>Visualização</Text>
-            <Text style={styles.supplyTypeSelectorValue} numberOfLines={1}>{selectedSupplyType.label}</Text>
-          </View>
-          <MaterialCommunityIcons name="chevron-down" size={18} color="#64748B" />
-        </TouchableOpacity>
-      </View>
-    );
-  };
-  const renderDesktopHeader = () => {
-    if (!isDesktopList || isSingleItemMode) {
-      return null;
-    }
-
-    return (
-      <View
-        style={[
-          styles.tableHeader,
-          {
-            backgroundColor: brandColors.tableHeaderBackground,
-            borderColor: brandColors.tableHeaderBorder,
-          },
-        ]}
-      >
-        <Text style={[styles.tableHeaderImage, { color: brandColors.tableHeaderText }]}>Imagem</Text>
-        <Text style={[styles.tableHeaderId, { color: brandColors.tableHeaderText }]}>ID</Text>
-        <Text style={[styles.tableHeaderProduct, { color: brandColors.tableHeaderText }]}>Produto</Text>
-        <View style={styles.tableHeaderSync}>
-          <Text style={[styles.tableHeaderSyncTitle, { color: brandColors.tableHeaderText }]}>
-            Canais sincronizados
-          </Text>
-          <View style={styles.tableHeaderSyncLegend}>
-            {SYNC_STATUS_LEGEND.map(item => (
-              <View key={item.key} style={styles.tableHeaderSyncLegendItem}>
-                <View
-                  style={[
-                    styles.tableHeaderSyncLegendDot,
-                    {
-                      backgroundColor: item.color,
-                      borderColor: `${item.color}55`,
-                    },
-                  ]}
-                />
-                <Text style={[styles.tableHeaderSyncLegendText, { color: brandColors.tableHeaderText }]}>
-                  {item.label}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-        <Text style={[styles.tableHeaderCategory, { color: brandColors.tableHeaderText }]}>Categoria</Text>
-        <Text style={[styles.tableHeaderType, { color: brandColors.tableHeaderText }]}>Tipo</Text>
-        <Text style={[styles.tableHeaderQueue, { color: brandColors.tableHeaderText }]}>Fila</Text>
-        <Text style={[styles.tableHeaderPrice, { color: brandColors.tableHeaderText }]}>Preço</Text>
-        <Text style={[styles.tableHeaderAction, { color: brandColors.tableHeaderText }]}>Ação</Text>
-      </View>
-    );
-  };
-  const scrollToTypeGroup = typeKey => {
-    const index = typeJumpTargets[typeKey];
-    if (typeof index !== 'number') {
-      return;
-    }
-
-    const lastTypeGroupKey = typeGroups[typeGroups.length - 1]?.key;
-    if (typeKey === lastTypeGroupKey) {
-      productListRef.current?.scrollToEnd?.({ animated: true });
-      return;
-    }
-
-    productListRef.current?.scrollToIndex?.({
-      animated: true,
-      index,
-      viewOffset: 8,
-    });
-  };
-  const renderTypeJumpButton = group => {
-    const typeConf = resolveProductTypeTheme(group.key, brandColors) || {};
-
-    return (
-      <TouchableOpacity
-        key={group.key}
-        style={[
-          styles.typeJumpButton,
-          {
-            backgroundColor: typeConf.backgroundColor,
-            borderColor: typeConf.textColor,
-          },
-        ]}
-        activeOpacity={0.8}
-        onPress={() => scrollToTypeGroup(group.key)}
-      >
-        <Text style={[styles.typeJumpText, { color: typeConf.textColor }]}>
-          {group.label}
-        </Text>
-        <Text style={[styles.typeJumpCount, { color: typeConf.textColor }]}>
-          {group.products.length}
-        </Text>
-      </TouchableOpacity>
-    );
-  };
-  const renderTypeJumpBar = () => {
-    if (!shouldShowTypeJumpBar || typeGroups.length <= 1) {
-      return null;
-    }
-
-    return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.typeJumpContent}
-        style={styles.typeJumpScroll}
-      >
-        {typeGroups.map(renderTypeJumpButton)}
-      </ScrollView>
-    );
-  };
-  const renderListHeader = () => {
-    const singleItemType = hasSingleItemGroup ? typeGroups[0]?.key : '';
-    const singleItemTitle = singleItemType
-      ? getProductTypePluralLabel(singleItemType)
-      : 'Itens disponíveis';
-
-    return (
-      <View>
-        {isSingleItemMode && (
-          <View style={styles.singleItemHeading}>
-            <Text style={[styles.singleItemHeadingTitle, {color: brandColors.text}]}>
-              {singleItemTitle}
-            </Text>
-            <Text
-              style={[
-                styles.singleItemHeadingCount,
-                {color: brandColors.textSecondary},
-              ]}
-            >
-              {visibleProducts.length}{' '}
-              {visibleProducts.length === 1 ? 'disponível' : 'disponíveis'}
-            </Text>
-          </View>
-        )}
-        {renderSupplyHeader()}
-        {renderDesktopHeader()}
-      </View>
-    );
-  };
-  const renderStickyTypeJumpBar = () => {
-    if (!shouldShowProductList) {
-      return null;
-    }
-
-    const typeJumpBar = renderTypeJumpBar();
-    if (!typeJumpBar) {
-      return null;
-    }
-
-    return (
-      <View
-        style={[
-          styles.stickyTypeJumpBar,
-          {
-            backgroundColor: brandColors.background,
-            borderColor: brandColors.border,
-          },
-        ]}
-      >
-        <View
-          style={[
-            styles.stickyTypeJumpInner,
-            {
-              width: containerWidth,
-              paddingHorizontal: isCompactMobile ? 12 : 16,
-            },
-          ]}
-        >
-          {typeJumpBar}
-        </View>
-      </View>
-    );
-  };
-  const renderTypeHeader = item => {
-    const typeKey = String(item.key || '').replace(`${MOBILE_TYPE_HEADER_PREFIX}-`, '');
-    const typeConf = resolveProductTypeTheme(typeKey, brandColors) || {};
-    const desktopTypeColor = typeConf.textColor;
-    const desktopTypeBackground = typeConf.backgroundColor;
-
-    return (
-      <View
-        style={[
-          isDesktopList ? styles.tableTypeSectionHeader : styles.typeSectionHeader,
-          {
-            backgroundColor: isDesktopList
-              ? desktopTypeBackground
-              : brandColors.background,
-            borderColor: isDesktopList
-              ? desktopTypeColor
-              : brandColors.border,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            isDesktopList ? styles.tableTypeSectionTitle : styles.typeSectionTitle,
-            { color: isDesktopList ? desktopTypeColor : brandColors.text },
-          ]}
-        >
-          {isDesktopList
-            ? `${item.label} · ${item.count} ${item.count === 1 ? 'item' : 'itens'}`
-            : isSingleItemMode
-              ? getProductTypePluralLabel(typeKey)
-              : item.label}
-        </Text>
-        {!isDesktopList && (
-          <Text style={[styles.typeSectionCount, { color: brandColors.textSecondary }]}>
-            {item.count}
-          </Text>
-        )}
-      </View>
-    );
-  };
-
-  if (isManager) {
-    return (
-      <SafeAreaView style={styles.container}>
-        {!storeLoading && <StateStore store="products" />}
-        <View style={styles.managerTableContent}>
-          {context === 'supplies' && renderSupplyHeader()}
-          <DefaultTable
-            accentColor={brandColors.primary}
-            add
-            addButtonPlacement="bottom"
-            addLabel={context === 'supplies'
-              ? getSupplyActionLabel(visibleTypeFilter)
-              : labels.addLabel}
-            compactBreakpoint={DESKTOP_LIST_MIN_WIDTH}
-            initialViewMode="cards"
-            onAdd={handleAddProduct}
-            onDataLoaded={updateCategoryProducts}
-            renderCard={renderManagerProductCard}
-            requestParams={managerTableRequestParams}
-            showRowActions={false}
-            showTotalItemsInCompactToolbar
-            storeName="products"
-            visibleColumnsPreferenceKey={`products:${context}:manager`}
-          />
-        </View>
-        {context === 'supplies' && (
-          <AnimatedModal
-            visible={supplyTypeModalVisible}
-            onRequestClose={() => setSupplyTypeModalVisible(false)}
-            style={styles.supplyTypeModalWrap}
-          >
-            <View style={styles.supplyTypeModal}>
-              <View style={styles.supplyTypeModalHeader}>
-                <Text style={styles.supplyTypeModalTitle}>Visualização de insumos</Text>
-                <TouchableOpacity
-                  style={styles.supplyTypeModalClose}
-                  onPress={() => setSupplyTypeModalVisible(false)}
-                  activeOpacity={0.75}
-                >
-                  <MaterialCommunityIcons name="close" size={18} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-              {SUPPLY_TYPE_OPTIONS.map(option => {
-                const active = option.value === selectedSupplyType.value;
-                return (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[styles.supplyTypeOption, active && styles.supplyTypeOptionActive]}
-                    onPress={() => handleSelectSupplyType(option.value)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.supplyTypeOptionIcon, active && { backgroundColor: `${brandColors.primary}18` }]}>
-                      <MaterialCommunityIcons
-                        name={option.icon}
-                        size={18}
-                        color={active ? brandColors.primary : '#64748B'}
-                      />
-                    </View>
-                    <View style={styles.supplyTypeOptionText}>
-                      <Text style={[styles.supplyTypeOptionTitle, active && { color: brandColors.primary }]}>
-                        {option.label}
-                      </Text>
-                      <Text style={styles.supplyTypeOptionDescription}>{option.description}</Text>
-                    </View>
-                    {active && (
-                      <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
-                    )}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </AnimatedModal>
-        )}
-      </SafeAreaView>
-    );
-  }
+  const exportAction = isManager
+    ? {
+        key: 'export-csv',
+        icon: 'download',
+        label: global.t?.t?.('products', 'button', 'exportCsv') || 'Exportar CSV',
+        onPress: exportCatalog,
+      }
+    : null;
 
   return (
     <SafeAreaView style={styles.container}>
-      {!storeLoading && <StateStore store="products" />}
-      {shouldShowInitialSkeleton && (
-        <ScrollView style={styles.scroll}>
-          <View style={inlineStyle_413_16({
-            containerWidth: containerWidth,
-          })}>
-            {Array.from({ length: 5 }).map((_, i) => (
-              <SkeletonProductCard key={i} />
-            ))}
-          </View>
-        </ScrollView>
-      )}
-      {shouldShowEmptyState && (
-        <View style={context === 'supplies' ? styles.emptyWithHeader : styles.emptyContainer}>
-          {context === 'supplies' && (
-            <View style={styles.emptyHeaderWrap}>
-              {renderSupplyHeader()}
-            </View>
-          )}
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons
-              name={isAllProducts ? 'view-grid-outline' : 'package-variant-closed'}
-              size={48}
-              color="#CBD5E1"
-            />
-            <Text style={styles.emptyTitle}>
-              {normalizedSearchQuery
-                ? labels.emptyFound
-                : isAllProducts
-                  ? labels.emptyAll
-                  : labels.emptyCategory}
-            </Text>
-            <Text style={styles.emptySubtitle}>
-              {normalizedSearchQuery
-                ? labels.emptyFoundSubtitle(normalizedSearchQuery)
-                : isAllProducts
-                  ? labels.emptyAllSubtitle
-                  : labels.emptyCategorySubtitle}
-            </Text>
-          </View>
-        </View>
-      )}
-      {renderStickyTypeJumpBar()}
-      {shouldShowProductList && (
-        <FlatList
-          key={`products-${isSingleItemMode ? singleItemColumnCount : 1}`}
-          ref={productListRef}
-          data={listData}
-          keyExtractor={item =>
-            String(shouldGroupByType && !hasSingleItemGroup ? item.key : item.id)
-          }
-          contentContainerStyle={listContentStyle}
-          columnWrapperStyle={
-            hasSingleItemGroup && singleItemColumnCount > 1
-              ? styles.singleItemGridRow
-              : undefined
-          }
-          ListHeaderComponent={renderListHeader}
-          numColumns={hasSingleItemGroup ? singleItemColumnCount : 1}
-          stickyHeaderIndices={isDesktopList && !isSingleItemMode ? [0] : undefined}
-          onScrollToIndexFailed={info => {
-            setTimeout(() => {
-              productListRef.current?.scrollToIndex?.({
-                animated: true,
-                index: info.index,
-                viewOffset: 8,
-              });
-            }, 120);
-          }}
-          onEndReached={() => {
-            if (isAllProducts) {
-              const pagination = allProductsPaginationRef.current;
-              loadAllProductsPage(pagination.page + 1);
-              return;
-            }
-
-            if (visibleCount < visibleProducts.length)
-              setVisibleCount(v => v + 50);
-          }}
-          renderItem={({ item }) => {
-            if (shouldGroupByType && !hasSingleItemGroup && item.type === 'header') {
-              return renderTypeHeader(item);
-            }
-
-            const product = shouldGroupByType && !hasSingleItemGroup ? item.product : item;
-            // No PDV/single-item, o card nao pode roubar o toque do botao interno.
-            const CardWrapper = isManager ? TouchableOpacity : View;
-            const wrapperProps = isManager
-              ? {onPress: () => handleProductPress(product)}
-              : isSingleItemMode
-                ? {style: styles.singleItemGridCell}
-                : {};
-
-            return (
-              <CardWrapper {...wrapperProps}>
-                <ProductItem
-                  product={product}
-                  category={category}
-                  productCategories={productCategoriesByProductId[normalizeProductId(product)] || []}
-                  catalogContext={context}
-                  displayMode={isDesktopList && !isSingleItemMode ? 'table' : 'card'}
-                  interactionMode={interactionMode}
-                  palette={brandColors}
-                  singleItemMode={isSingleItemMode}
-                  orderId={currentOrderId}
-                  marketplaceStatuses={isManager ? getProductStatuses(product) : []}
-                  onMarketplaceSync={handleMarketplaceSync}
-                  marketplaceSyncingKey={marketplaceSyncingKey}
-                />
-              </CardWrapper>
-            );
-          }}
+      {!storeLoading ? <StateStore store="products" /> : null}
+      <View style={styles.managerTableContent}>
+        <DefaultTable
+          accentColor={brandColors.primary}
+          add={isManager}
+          addButtonPlacement="bottom"
+          addLabel={labels.addLabel}
+          cardListProps={cardListProps}
+          compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
+          defaultColor="$primary"
+          exportAction={exportAction}
+          initialViewMode="cards"
+          onAdd={handleAddProduct}
+          onEditRow={handleProductPress}
+          onRowPress={handleProductPress}
+          renderCard={renderProductCard}
+          requestParams={requestParams}
+          searchKey="search"
+          searchPlaceholder={global.t?.t?.('products', 'input', 'search') || 'Search'}
+          showRowActions={false}
+          showSearch
+          showTotalItemsInCompactToolbar
+          storeName="products"
+          toolbarActions={toolbarActions}
+          visibleColumnsPreferenceKey={`products:${context}:${interactionMode}`}
         />
-      )}
-      {context === 'supplies' && (
-        <AnimatedModal
-          visible={supplyTypeModalVisible}
-          onRequestClose={() => setSupplyTypeModalVisible(false)}
-          style={styles.supplyTypeModalWrap}
-        >
-          <View style={styles.supplyTypeModal}>
-            <View style={styles.supplyTypeModalHeader}>
-              <Text style={styles.supplyTypeModalTitle}>Visualização de insumos</Text>
-              <TouchableOpacity
-                style={styles.supplyTypeModalClose}
-                onPress={() => setSupplyTypeModalVisible(false)}
-                activeOpacity={0.75}
-              >
-                <MaterialCommunityIcons name="close" size={18} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-            {SUPPLY_TYPE_OPTIONS.map(option => {
-              const active = option.value === selectedSupplyType.value;
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[styles.supplyTypeOption, active && styles.supplyTypeOptionActive]}
-                  onPress={() => handleSelectSupplyType(option.value)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.supplyTypeOptionIcon, active && { backgroundColor: `${brandColors.primary}18` }]}>
-                    <MaterialCommunityIcons
-                      name={option.icon}
-                      size={18}
-                      color={active ? brandColors.primary : '#64748B'}
-                    />
-                  </View>
-                  <View style={styles.supplyTypeOptionText}>
-                    <Text style={[styles.supplyTypeOptionTitle, active && { color: brandColors.primary }]}>
-                      {option.label}
-                    </Text>
-                    <Text style={styles.supplyTypeOptionDescription}>{option.description}</Text>
-                  </View>
-                  {active && (
-                    <MaterialCommunityIcons name="check-circle" size={18} color={brandColors.primary} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </AnimatedModal>
-      )}
-      {isManager && (
-        <View style={styles.bottomBar}>
-          <TouchableOpacity
-            style={[styles.bottomBarButton, { backgroundColor: brandColors.primary }]}
-            onPress={handleAddProduct}
-          >
-            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.bottomBarButtonText}>
-              {context === 'supplies'
-                ? getSupplyActionLabel(visibleTypeFilter)
-                : labels.addLabel}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      </View>
     </SafeAreaView>
   );
 };
