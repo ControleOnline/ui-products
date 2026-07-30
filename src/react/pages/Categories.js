@@ -21,7 +21,6 @@ import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/con
 import { styles } from './Categories.styles'
 import CategoryCard from './CategoriesPage/CategoryCard'
 import CategoryEditorModal from './CategoriesPage/CategoryEditorModal'
-import CategoryImportModal from './CategoriesPage/CategoryImportModal'
 import MenuModelPickerModal from './CategoriesPage/MenuModelPickerModal'
 import { buildCatalogLabels } from './CategoriesPage/catalogLabels'
 import { buildCategoryToolbarActions } from './CategoriesPage/categoryToolbarActions'
@@ -51,7 +50,6 @@ const useCategoryGridLayout = () => {
 }
 
 const CategoriesPage = ({ route }) => {
-  const [showImportModal, setShowImportModal] = useState(false)
   const [isDownloadingCatalog, setIsDownloadingCatalog] = useState(false)
   const [isDownloadingNormalizedCatalog, setIsDownloadingNormalizedCatalog] = useState(false)
   const [isLoadingMenuModels, setIsLoadingMenuModels] = useState(false)
@@ -355,31 +353,44 @@ const CategoriesPage = ({ route }) => {
     await refreshSelectedCategory()
   }, [categoryActions, context, currentCompany, refreshSelectedCategory, selectedCategory])
 
+  const openAllProducts = useCallback(() => {
+    categoryActions.setItem(ALL_PRODUCTS_SENTINEL)
+    navigation.navigate({
+      name: 'ProductsPage',
+      params: {
+        ...operationalRouteParams,
+        categoryId: ALL_PRODUCTS_SENTINEL['@id'],
+        context,
+        interactionMode,
+        showBottomCart: interactionMode === 'pdv',
+        showBottomToolBar: interactionMode === 'pdv',
+      },
+      merge: false,
+    })
+  }, [categoryActions, context, interactionMode, navigation, operationalRouteParams])
+
   const toolbarActions = useMemo(() => isManagerApp ? buildCategoryToolbarActions({
     canUseCompany: Boolean(currentCompany?.id),
     hasActivePlatforms,
     isDownloadingCatalog,
-    isDownloadingNormalizedCatalog,
     isLoadingMenuModels,
     marketplaceSyncingKey,
     onDownloadCatalog: downloadCatalog,
-    onDownloadNormalizedCatalog: downloadNormalizedCatalog,
-    onImport: () => setShowImportModal(true),
+    onOpenAllProducts: openAllProducts,
     onOpenIntegrations: () => navigation.navigate('IntegrationsPage'),
     onOpenMenuModelPicker: openMenuModelPicker,
     onSyncAllEligible: handleSyncAllEligible,
   }) : [], [
     currentCompany?.id,
     downloadCatalog,
-    downloadNormalizedCatalog,
     handleSyncAllEligible,
     hasActivePlatforms,
     isDownloadingCatalog,
-    isDownloadingNormalizedCatalog,
     isLoadingMenuModels,
     isManagerApp,
     marketplaceSyncingKey,
     navigation,
+    openAllProducts,
     openMenuModelPicker,
   ])
 
@@ -420,6 +431,15 @@ const CategoriesPage = ({ route }) => {
           cardListProps={tableCardProps}
           compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
           defaultColor="$primary"
+          exportAction={isManagerApp ? {
+            key: 'export-csv',
+            icon: 'download',
+            label: isDownloadingNormalizedCatalog
+              ? global.t?.t?.('categories', 'label', 'exporting')
+              : global.t?.t?.('categories', 'button', 'exportCsv'),
+            disabled: isDownloadingNormalizedCatalog || !currentCompany?.id,
+            onPress: downloadNormalizedCatalog,
+          } : null}
           initialViewMode="cards"
           onAdd={openCreateModal}
           onDataLoaded={data => writeCachedCategories(currentCompany?.id, data || [], context)}
@@ -440,24 +460,18 @@ const CategoriesPage = ({ route }) => {
       </View>
 
       {isManagerApp ? (
-        <>
-          <CategoryImportModal
-            visible={showImportModal}
-            onClose={() => setShowImportModal(false)}
-          />
-          <MenuModelPickerModal
-            brandColors={brandColors}
-            isLoading={isLoadingMenuModels}
-            models={menuModels}
-            selectedModel={selectedMenuModel}
-            visible={showMenuModelModal}
-            onClose={() => setShowMenuModelModal(false)}
-            onSelect={model => {
-              setSelectedMenuModel(model)
-              setShowMenuModelModal(false)
-            }}
-          />
-        </>
+        <MenuModelPickerModal
+          brandColors={brandColors}
+          isLoading={isLoadingMenuModels}
+          models={menuModels}
+          selectedModel={selectedMenuModel}
+          visible={showMenuModelModal}
+          onClose={() => setShowMenuModelModal(false)}
+          onSelect={model => {
+            setSelectedMenuModel(model)
+            setShowMenuModelModal(false)
+          }}
+        />
       ) : null}
 
       <CategoryEditorModal

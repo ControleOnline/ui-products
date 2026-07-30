@@ -4,21 +4,20 @@ export const buildCategoryToolbarActions = ({
   canUseCompany,
   hasActivePlatforms,
   isDownloadingCatalog,
-  isDownloadingNormalizedCatalog,
   isLoadingMenuModels,
   marketplaceSyncingKey,
   onDownloadCatalog,
-  onDownloadNormalizedCatalog,
-  onImport,
+  onOpenAllProducts,
   onOpenIntegrations,
   onOpenMenuModelPicker,
   onSyncAllEligible,
 }) => [
   {
-    key: 'import-csv',
-    icon: 'upload',
-    label: t('button', 'importCsv'),
-    onPress: onImport,
+    key: 'all-products',
+    icon: 'package',
+    label: t('button', 'allProducts'),
+    disabled: !canUseCompany,
+    onPress: onOpenAllProducts,
   },
   {
     key: 'menu-model',
@@ -43,15 +42,6 @@ export const buildCategoryToolbarActions = ({
       : t('button', 'syncEligible'),
     disabled: !hasActivePlatforms || marketplaceSyncingKey === 'all',
     onPress: onSyncAllEligible,
-  },
-  {
-    key: 'export-csv',
-    icon: 'download',
-    label: isDownloadingNormalizedCatalog
-      ? t('label', 'exporting')
-      : t('button', 'exportCsv'),
-    disabled: isDownloadingNormalizedCatalog || !canUseCompany,
-    onPress: onDownloadNormalizedCatalog,
   },
   {
     key: 'download-menu',
