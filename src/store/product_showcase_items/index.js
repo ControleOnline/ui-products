@@ -130,6 +130,17 @@ export default {
         },
       },
       {
+        sortable: false,
+        editable: false,
+        name: 'settings',
+        align: 'left',
+        label: 'marketplaceData',
+        inputType: 'extra-data',
+        format(value) {
+          return value || null;
+        },
+      },
+      {
         sortable: true,
         editable: true,
         name: 'price',
