@@ -1383,14 +1383,7 @@ const ProductsPage = ({ navigation, route }) => {
     return (
       <SafeAreaView style={styles.container}>
         {!storeLoading && <StateStore store="products" />}
-        <View
-          style={[
-            styles.managerTableContent,
-            {
-              paddingBottom: isCompactMobile ? 96 : 104,
-            },
-          ]}
-        >
+        <View style={styles.managerTableContent}>
           {context === 'supplies' && renderSupplyHeader()}
           <DefaultTable
             accentColor={brandColors.primary}
