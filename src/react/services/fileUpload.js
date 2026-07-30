@@ -1,5 +1,5 @@
 import {Platform} from 'react-native';
-import {APP_ENV} from '@controleonline/../../config/env.js';
+import {env as APP_ENV} from '@env';
 
 const extractId = value => {
   if (!value && value !== 0) return null;
