@@ -1,5 +1,6 @@
 import {
   ALL_PRODUCTS_SENTINEL_ID,
+  ALL_PRODUCTS_SENTINEL,
 } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 
 export const resolveRouteCategoryId = value => {
@@ -42,4 +43,34 @@ export const shouldSyncStoredCategory = ({
   const resolvedStoredCategoryId = resolveRouteCategoryId(storedCategory);
 
   return resolvedStoredCategoryId !== resolvedCategoryId;
+};
+
+export const resolveCatalogCategory = ({
+  storedCategory,
+  categories,
+  routeCategoryId,
+}) => {
+  const normalizedRouteCategoryId = resolveRouteCategoryId(routeCategoryId);
+
+  if (
+    storedCategory &&
+    typeof storedCategory === 'object' &&
+    (
+      storedCategory?._isAllProducts ||
+      resolveRouteCategoryId(storedCategory) === normalizedRouteCategoryId
+    )
+  ) {
+    return storedCategory;
+  }
+
+  if (
+    normalizedRouteCategoryId === '' ||
+    normalizedRouteCategoryId === ALL_PRODUCTS_SENTINEL_ID
+  ) {
+    return ALL_PRODUCTS_SENTINEL;
+  }
+
+  return (Array.isArray(categories) ? categories : []).find(currentCategory => {
+    return resolveRouteCategoryId(currentCategory) === normalizedRouteCategoryId;
+  }) || null;
 };

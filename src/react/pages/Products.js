@@ -11,8 +11,6 @@
  * - Manter aqui a coordenacao da tela React e dos filtros do catalogo.
  */
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels';
-
 import {
   Alert, FlatList, ScrollView, View, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
 
@@ -63,6 +61,7 @@ import {
 } from '@controleonline/ui-orders/src/utils/orderState';
 import {
   resolveRouteCategoryId,
+  resolveCatalogCategory,
 } from '@controleonline/ui-products/src/react/utils/categorySelection';
 
 import { inlineStyle_413_16 } from './Products.styles';
@@ -188,33 +187,6 @@ const applyPendingSelectionToOrder = ({ order, product, quantity }) => {
   }
 
   return mergeOrderWithOrderProducts(order, nextOrderProducts);
-};
-
-const resolveSelectedCategory = ({
-  storedCategory,
-  categories,
-  routeCategoryId,
-}) => {
-  const normalizedRouteCategoryId = resolveRouteCategoryId(routeCategoryId);
-
-  if (
-    storedCategory &&
-    typeof storedCategory === 'object' &&
-    (
-      storedCategory?._isAllProducts ||
-      resolveRouteCategoryId(storedCategory) === normalizedRouteCategoryId
-    )
-  ) {
-    return storedCategory;
-  }
-
-  if (normalizedRouteCategoryId === ALL_PRODUCTS_SENTINEL['@id']) {
-    return ALL_PRODUCTS_SENTINEL;
-  }
-
-  return (Array.isArray(categories) ? categories : []).find(currentCategory => {
-    return resolveRouteCategoryId(currentCategory) === normalizedRouteCategoryId;
-  }) || null;
 };
 
 const normalizeProductTypeFilter = value => {
@@ -422,7 +394,7 @@ const ProductsPage = ({ navigation, route }) => {
   );
   const category = useMemo(
     () =>
-      resolveSelectedCategory({
+      resolveCatalogCategory({
         storedCategory,
         categories,
         routeCategoryId: categoryRouteValue,

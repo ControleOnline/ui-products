@@ -1,5 +1,6 @@
 const {
   resolveRouteCategoryId,
+  resolveCatalogCategory,
   shouldSyncStoredCategory,
 } = require('../../../react/utils/categorySelection')
 const {
@@ -47,5 +48,20 @@ describe('categorySelection', () => {
         storedCategory: {'@id': '/categories/9', category: 'Pizzas'},
       }),
     ).toBe(false)
+  })
+
+  it('defaults catalog selection to all products when route category is missing', () => {
+    expect(
+      resolveCatalogCategory({
+        storedCategory: null,
+        categories: [
+          {id: 1, '@id': '/categories/1', name: 'Bebidas'},
+        ],
+        routeCategoryId: '',
+      }),
+    ).toMatchObject({
+      '@id': ALL_PRODUCTS_SENTINEL_ID,
+      name: 'Todos os produtos',
+    })
   })
 })
