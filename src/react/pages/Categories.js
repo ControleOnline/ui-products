@@ -92,11 +92,25 @@ const CategoriesPage = ({ route }) => {
   const operationalRouteParams = useMemo(() => {
     const params = route?.params || {}
 
-    return ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement'].reduce(
+    return ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].reduce(
       (nextParams, key) => (params[key] === undefined ? nextParams : { ...nextParams, [key]: params[key] }),
       {},
     )
   }, [route?.params])
+  const hideCatalogToolbar = useMemo(() => {
+    const asBoolean = value => {
+      if (typeof value === 'string') {
+        return value.trim().toLowerCase() === 'true'
+      }
+
+      return value === true
+    }
+
+    return (
+      asBoolean(route?.params?.hideCatalogToolbar) ||
+      asBoolean(route?.params?.hideBottomToolBar)
+    )
+  }, [route?.params?.hideBottomToolBar, route?.params?.hideCatalogToolbar])
   const {
     getCategoryStatuses,
     hasActivePlatforms,
@@ -451,6 +465,7 @@ const CategoriesPage = ({ route }) => {
           searchKey="search"
           searchPlaceholder={global.t?.t?.('categories', 'input', 'search')}
           showSearch
+          showToolbar={!hideCatalogToolbar}
           showRowActions={false}
           showTotalItemsInCompactToolbar
           storeName="categories"

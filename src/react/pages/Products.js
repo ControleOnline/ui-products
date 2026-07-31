@@ -53,7 +53,7 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
     showBottomToolBar: interactionMode === 'pdv',
   };
 
-  ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement'].forEach(key => {
+  ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].forEach(key => {
     if (routeParams?.[key] !== undefined) {
       params[key] = routeParams[key];
     }
@@ -140,6 +140,17 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     () => String(routeParams.searchQuery || '').trim(),
     [routeParams.searchQuery],
   );
+  const hideCatalogToolbar = useMemo(() => {
+    const asBoolean = value => {
+      if (typeof value === 'string') {
+        return value.trim().toLowerCase() === 'true';
+      }
+
+      return value === true;
+    };
+
+    return asBoolean(routeParams.hideCatalogToolbar) || asBoolean(routeParams.hideBottomToolBar);
+  }, [routeParams.hideBottomToolBar, routeParams.hideCatalogToolbar]);
   const isSingleItemMode = Boolean(
     routeParams.singleItemMode ||
     routeParams?.singleItemMode === true,
@@ -364,6 +375,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           searchPlaceholder={global.t?.t?.('products', 'input', 'search') || 'Search'}
           showRowActions={false}
           showSearch
+          showToolbar={!hideCatalogToolbar}
           showTotalItemsInCompactToolbar
           storeName="products"
           toolbarActions={toolbarActions}
