@@ -499,6 +499,7 @@ const ProductForm = ({
     categoryActions.getItems({
       context,
       company: companyId,
+      'order[sortOrder]': 'ASC',
       'order[name]': 'ASC',
     }).catch(() => {
       setCategoriesRequestKey('');

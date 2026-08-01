@@ -185,6 +185,7 @@ const CategoriesPage = ({ route }) => {
   const requestParams = useMemo(() => ({
     company: currentCompany?.id,
     context,
+    'order[sortOrder]': 'ASC',
     'order[name]': 'ASC',
   }), [context, currentCompany?.id])
 
