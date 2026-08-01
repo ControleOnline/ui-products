@@ -14,3 +14,7 @@
 - O catalogo `single-item` usa cards responsivos inteiramente acionaveis: exibe `productFiles` quando houver midia cadastrada e usa card compacto sem placeholder quando nao houver. A grade deve priorizar uma coluna em maquininhas e no modo compacto de celular, duas colunas com midia em celular e quatro colunas no desktop, sempre preservando o shell universal.
 - A liberacao de itens para fila de producao deve respeitar o contrato do pedido: apenas pedidos ja `paid` ou entregas com `order-charge-on-delivery-enabled` ativo podem enfileirar producao.
 - A tela de distribuicao de vitrines de preco deve ser uma listagem `DefaultTable` sobre o store `product_showcase_items`; `externalFilters` deve ficar antes da tabela e `filters` define o modal interno da tabela. Busca, ordenacao, paginacao, resumo e loading pertencem ao store/DefaultTable, nao a cards, chips ou listas locais na tela.
+
+## Qualidade de código
+
+- A barra comum de modularizacao, testes, smoke tests e limite de tamanho de componentes vive em `https://github.com/ControleOnline/agents-mcp/blob/master/skills/shared/code-quality.md`.
