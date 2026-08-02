@@ -29,7 +29,8 @@ import { inlineStyle_101_14 } from './ProductGroups.styles';
 /*
  * Campos válidos de product_group (confirmados no banco):
  *  id, company_id, product_group, price_calculation,
- *  required, minimum, maximum, active, show_in_display, group_order
+ *  required, minimum, maximum, active, show_in_display, show_in_print,
+ *  show_unit_quantity, customization_type, group_order
  * A associação produto ↔ grupo também é gravada em product_group_parent.
  *
  * Removidos por não existirem no banco:
@@ -41,6 +42,18 @@ const PRICE_CALCULATION_OPTIONS = [
   { value: 'average', label: 'Média' },
   { value: 'biggest', label: 'Maior' },
   { value: 'free', label: 'Brinde' },
+];
+
+const CUSTOMIZATION_TYPE_OPTIONS = [
+  { value: 'neutral', label: 'Neutro (○)' },
+  { value: 'addition', label: 'Adição (+)' },
+  { value: 'removal', label: 'Remoção (−)' },
+];
+
+const UNIT_QUANTITY_OPTIONS = [
+  { value: 'inherit', label: 'Usar configuração do display' },
+  { value: 'show', label: 'Mostrar 1x' },
+  { value: 'hide', label: 'Ocultar 1x' },
 ];
 
 const parseInteger = value => {
@@ -93,6 +106,15 @@ const normalizeGroupDraft = group => ({
   productGroup: String(group?.productGroup || ''),
   required: Boolean(group?.required),
   showInDisplay: group?.id ? group?.showInDisplay !== false : false,
+  showInPrint: group?.id
+    ? (group?.showInPrint ?? group?.showInDisplay ?? false)
+    : false,
+  customizationType: String(group?.customizationType || 'neutral'),
+  unitQuantityMode: group?.showUnitQuantity === true
+    ? 'show'
+    : group?.showUnitQuantity === false
+      ? 'hide'
+      : 'inherit',
   minimum: String(group?.minimum ?? ''),
   maximum: String(group?.maximum ?? ''),
   groupOrder: String(group?.groupOrder ?? '0'),
@@ -263,7 +285,7 @@ const GroupEditModal = ({
 
             {/* Exibição */}
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Exibir em displays e impressão</Text>
+              <Text style={styles.switchLabel}>Exibir nome quando o display permitir</Text>
               <View style={styles.switchRight}>
                 <Text style={styles.switchValue}>{draft.showInDisplay ? 'Sim' : 'Não'}</Text>
                 <Switch
@@ -274,6 +296,35 @@ const GroupEditModal = ({
                 />
               </View>
             </View>
+
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>Exibir nome na impressão</Text>
+              <View style={styles.switchRight}>
+                <Text style={styles.switchValue}>{draft.showInPrint ? 'Sim' : 'Não'}</Text>
+                <Switch
+                  value={Boolean(draft.showInPrint)}
+                  onValueChange={v => onChangeDraft('showInPrint', v)}
+                  trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+
+            <SelectField
+              label="Tipo da customização"
+              value={draft.customizationType}
+              options={CUSTOMIZATION_TYPE_OPTIONS}
+              onSelect={value => onChangeDraft('customizationType', value)}
+              brandColors={brandColors}
+            />
+
+            <SelectField
+              label="Quantidade quando houver 1 unidade"
+              value={draft.unitQuantityMode}
+              options={UNIT_QUANTITY_OPTIONS}
+              onSelect={value => onChangeDraft('unitQuantityMode', value)}
+              brandColors={brandColors}
+            />
 
             {/* Mínimo / Máximo */}
             <View style={styles.row}>
@@ -707,6 +758,11 @@ const ProductGroups = ({ ProductId }) => {
             productGroup: String(modalDraft.productGroup).trim(),
             required: Boolean(modalDraft.required),
             showInDisplay: Boolean(modalDraft.showInDisplay),
+            showInPrint: Boolean(modalDraft.showInPrint),
+            customizationType: modalDraft.customizationType || 'neutral',
+            showUnitQuantity: modalDraft.unitQuantityMode === 'inherit'
+              ? null
+              : modalDraft.unitQuantityMode === 'show',
             minimum: minimum ?? null,
             maximum: maximum ?? null,
             groupOrder,
@@ -718,6 +774,11 @@ const ProductGroups = ({ ProductId }) => {
             productGroup: String(modalDraft.productGroup || 'Novo Grupo').trim(),
             required: Boolean(modalDraft.required),
             showInDisplay: Boolean(modalDraft.showInDisplay),
+            showInPrint: Boolean(modalDraft.showInPrint),
+            customizationType: modalDraft.customizationType || 'neutral',
+            showUnitQuantity: modalDraft.unitQuantityMode === 'inherit'
+              ? null
+              : modalDraft.unitQuantityMode === 'show',
             minimum: minimum ?? 0,
             maximum: maximum ?? 1,
             groupOrder,

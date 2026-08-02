@@ -1303,31 +1303,26 @@ export default function MenuCostsPage({ navigation, route }) {
     );
   }, [db, downloadTextFile]);
 
-  const importJson = useCallback(() => {
-    if (typeof document === 'undefined') {
-      showError?.('Importação local disponível apenas no navegador.');
-      return;
+  const importJsonFile = useCallback(async file => {
+    try {
+      if (!file) return null;
+
+      const rawText =
+        typeof file.text === 'function'
+          ? await file.text()
+          : file.uri
+            ? await (await fetch(file.uri)).text()
+            : '';
+
+      const imported = validateImportedDb(JSON.parse(String(rawText || '{}')));
+      await persistDb(imported);
+      setSelectedId(getSectionDefaultSelection(imported, activeTab));
+      showSuccess?.('JSON importado para a base local da Engenharia.');
+      return file;
+    } catch (error) {
+      showError?.(error?.message || 'Não foi possível importar este JSON.');
+      return null;
     }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
-    input.onchange = event => {
-      const file = event.target?.files?.[0];
-      if (!file) return;
-      const reader = new window.FileReader();
-      reader.onload = async readerEvent => {
-        try {
-          const imported = validateImportedDb(JSON.parse(String(readerEvent.target?.result || '{}')));
-          await persistDb(imported);
-          setSelectedId(getSectionDefaultSelection(imported, activeTab));
-          showSuccess?.('JSON importado para a base local da Engenharia.');
-        } catch (error) {
-          showError?.(error?.message || 'Não foi possível importar este JSON.');
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
   }, [activeTab, persistDb, showError, showSuccess]);
 
   const activeTabMeta = MAIN_TABS.find(tab => tab.key === activeTab) || MAIN_TABS[0];

@@ -40,6 +40,20 @@ export default {
       },
       {
         sortable: true,
+        editable: true,
+        inputType: 'number',
+        name: 'groupOrder',
+        label: 'sortOrder',
+        defaultSort: 'ASC',
+        format(value) {
+          return value ?? '';
+        },
+        saveFormat(value) {
+          return Number(value || 0);
+        },
+      },
+      {
+        sortable: true,
         name: 'priceCalculation',
         externalFilter: false,
         editable: false,

@@ -224,6 +224,7 @@ export default function ManagerCategoriesPage({ navigation, route }) {
 
     return categoryActions.getItems({
       company: currentCompanyIri,
+      'order[sortOrder]': 'ASC',
       'order[name]': 'ASC',
     });
   }, [categoryActions, currentCompanyIri]);

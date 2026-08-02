@@ -39,13 +39,7 @@ const categoryLabel = category =>
   category?.name || category?.category || category?.title || 'Categoria';
 
 const categoryOrder = category => {
-  const value = category?.extraData?.sortOrder ??
-    category?.sortOrder ??
-    category?.groupOrder ??
-    category?.order ??
-    category?.menuOrder ??
-    category?.position ??
-    category?.categoryOrder;
+  const value = category?.sortOrder;
   const parsed = Number.parseInt(String(value ?? ''), 10);
   return Number.isFinite(parsed) ? parsed : 9999;
 };

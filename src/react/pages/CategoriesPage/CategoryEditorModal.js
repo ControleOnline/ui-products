@@ -3,7 +3,7 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal'
 import CategoryForm from '@controleonline/ui-common/src/react/components/CategoryForm'
-import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager'
+import DefaultUpload from '@controleonline/ui-default/src/react/components/upload/DefaultUpload'
 
 import { inlineStyle_692_8, styles } from '../Categories.styles'
 
@@ -45,8 +45,10 @@ const CategoryEditorModal = ({
 
           {category?.id ? (
             <View style={styles.attachmentSection}>
-              <AttachmentManager
-                entityType="category"
+              <DefaultUpload
+                relationStoreName="category_file"
+                relationField="category"
+                relationResource="categories"
                 entityId={category.id}
                 attachments={category.categoryFiles || []}
                 companyId={companyId}
@@ -54,6 +56,13 @@ const CategoryEditorModal = ({
                 coverRelationId={category?.extraData?.imageCoverRelationId}
                 onChanged={onAttachmentsChanged}
                 onCoverChanged={onCoverChanged}
+                title="Imagens"
+                triggerLabel="Gerenciar imagens"
+                managerTitle="Gerenciador de imagens"
+                searchPlaceholder="Buscar imagem"
+                uploadButtonLabel="Enviar nova"
+                emptyAttachmentLabel="Nenhuma imagem anexada."
+                emptyLibraryLabel="Nenhuma imagem encontrada."
               />
             </View>
           ) : null}

@@ -15,11 +15,11 @@ const SingleItemProductCard = ({product, palette = {}, orderId = ''}) => {
     () => ({
       background: palette.cardBackground,
       border: palette.cardBorder,
-      selectedBorder: palette.checkboxBorder,
-      selectedBackground: palette.checkboxSelectedBackground,
-      selectedMark: palette.checkboxSelectedMark,
       shadow: palette.cardShadow,
       text: palette.cardText,
+      radioBorder: palette.radioBorder,
+      radioSelectedBorder: palette.radioSelectedBorder,
+      radioSelectedDot: palette.radioSelectedDot,
     }),
     [palette],
   );
@@ -43,10 +43,9 @@ const SingleItemProductCard = ({product, palette = {}, orderId = ''}) => {
             !hasMedia && isNarrow && styles.cardCompactNarrow,
             {
               backgroundColor: colors.background,
-              borderColor: isSelected ? colors.selectedBorder : colors.border,
+              borderColor: colors.border,
               shadowColor: colors.shadow,
             },
-            isSelected && styles.cardSelected,
           ]}
         >
           {hasMedia && (
@@ -100,12 +99,9 @@ const SingleItemProductCard = ({product, palette = {}, orderId = ''}) => {
                 style={[
                   styles.radio,
                   {
-                    backgroundColor: isSelected
-                      ? colors.selectedBackground
-                      : colors.background,
                     borderColor: isSelected
-                      ? colors.selectedBackground
-                      : colors.text,
+                      ? colors.radioSelectedBorder
+                      : colors.radioBorder,
                   },
                 ]}
               >
@@ -113,7 +109,7 @@ const SingleItemProductCard = ({product, palette = {}, orderId = ''}) => {
                   <View
                     style={[
                       styles.radioMark,
-                      {backgroundColor: colors.selectedMark},
+                      {backgroundColor: colors.radioSelectedDot},
                     ]}
                   />
                 )}

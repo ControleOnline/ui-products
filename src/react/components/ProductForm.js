@@ -5,7 +5,7 @@ import { useStore } from '@store';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { useNavigation } from '@react-navigation/native';
-import AttachmentManager from '@controleonline/ui-products/src/react/components/AttachmentManager';
+import DefaultUpload from '@controleonline/ui-default/src/react/components/upload/DefaultUpload';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import styles from './ProductForm.styles';
@@ -499,6 +499,7 @@ const ProductForm = ({
     categoryActions.getItems({
       context,
       company: companyId,
+      'order[sortOrder]': 'ASC',
       'order[name]': 'ASC',
     }).catch(() => {
       setCategoriesRequestKey('');
@@ -1012,8 +1013,10 @@ const ProductForm = ({
         {/* Seção: Imagens */}
         {!!product?.id ? (
           <SectionCard title="Imagens" icon="image-multiple-outline" isOpen={openSections.has('imagens')} hasError={false} onToggle={() => toggleSection('imagens')}>
-            <AttachmentManager
-              entityType="product"
+            <DefaultUpload
+              relationStoreName="product_file"
+              relationField="product"
+              relationResource="products"
               entityId={product.id}
               attachments={product.productFiles || []}
               companyId={currentCompany?.id}
@@ -1021,6 +1024,13 @@ const ProductForm = ({
               coverRelationId={product?.extraData?.imageCoverRelationId}
               onChanged={reloadProduct}
               onCoverChanged={saveProductCover}
+              title="Imagens"
+              triggerLabel="Gerenciar imagens"
+              managerTitle="Gerenciador de imagens"
+              searchPlaceholder="Buscar imagem"
+              uploadButtonLabel="Enviar nova"
+              emptyAttachmentLabel="Nenhuma imagem anexada."
+              emptyLibraryLabel="Nenhuma imagem encontrada."
             />
           </SectionCard>
         ) : (

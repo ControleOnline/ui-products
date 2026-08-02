@@ -49,7 +49,7 @@ const ProductShowcasesPage = () => {
 
     return {
       'showcase.company': `/people/${currentCompany.id}`,
-      'order[showcase.name]': 'ASC',
+      'order[sortOrder]': 'ASC',
       'order[product.product]': 'ASC',
     };
   }, [currentCompany?.id]);

@@ -70,6 +70,22 @@ export default {
       },
       {
         sortable: true,
+        editable: true,
+        inputType: 'number',
+        name: 'sortOrder',
+        label: 'sortOrder',
+        defaultSort: 'ASC',
+        format(value) {
+          return value ?? '';
+        },
+        saveFormat(value) {
+          return value === '' || value === null || value === undefined
+            ? null
+            : Number(value);
+        },
+      },
+      {
+        sortable: true,
         name: 'showcase',
         sortField: 'showcase.name',
         align: 'left',
