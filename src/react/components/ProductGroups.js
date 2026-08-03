@@ -223,7 +223,7 @@ const SelectField = ({ label, value, options, onSelect, buttonPalette }) => {
 /* ─── Modal de edição do grupo ─── */
 const GroupEditModal = ({
   visible, group, draft, onClose, onSave,
-  saving, error, fieldErrors, onChangeDraft, buttonPalette,
+  saving, error, fieldErrors, onChangeDraft, buttonPalette, switchPalette,
 }) => {
   if (!draft) return null;
 
@@ -276,8 +276,9 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.required)}
                   onValueChange={v => onChangeDraft('required', v)}
-                  trackColor={{ false: '#E2E8F0', true: buttonPalette.buttonBackground }}
-                  thumbColor="#fff"
+                  trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                  thumbColor={Boolean(draft.required) ? switchPalette.onThumb : switchPalette.offThumb}
+                  ios_backgroundColor={switchPalette.offTrack}
                 />
               </View>
             </View>
@@ -290,8 +291,9 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.showInDisplay)}
                   onValueChange={v => onChangeDraft('showInDisplay', v)}
-                  trackColor={{ false: '#E2E8F0', true: buttonPalette.buttonBackground }}
-                  thumbColor="#fff"
+                  trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                  thumbColor={Boolean(draft.showInDisplay) ? switchPalette.onThumb : switchPalette.offThumb}
+                  ios_backgroundColor={switchPalette.offTrack}
                 />
               </View>
             </View>
@@ -303,8 +305,9 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.showInPrint)}
                   onValueChange={v => onChangeDraft('showInPrint', v)}
-                  trackColor={{ false: '#E2E8F0', true: buttonPalette.buttonBackground }}
-                  thumbColor="#fff"
+                  trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                  thumbColor={Boolean(draft.showInPrint) ? switchPalette.onThumb : switchPalette.offThumb}
+                  ios_backgroundColor={switchPalette.offTrack}
                 />
               </View>
             </View>
@@ -574,6 +577,21 @@ const ProductGroups = ({ ProductId }) => {
     themeColors.buttonText,
     themeColors.buttonTextSecondary,
     themeColors.iconDanger,
+  ]);
+  const switchPalette = useMemo(() => ({
+    onTrack: themeColors.switchOnTrack,
+    offTrack: themeColors.switchOffTrack,
+    onThumb: themeColors.switchOnThumb,
+    offThumb: themeColors.switchOffThumb,
+    disabledTrack: themeColors.switchDisabledTrack,
+    disabledThumb: themeColors.switchDisabledThumb,
+  }), [
+    themeColors.switchDisabledThumb,
+    themeColors.switchDisabledTrack,
+    themeColors.switchOffThumb,
+    themeColors.switchOffTrack,
+    themeColors.switchOnThumb,
+    themeColors.switchOnTrack,
   ]);
 
   const [groups, setGroups] = useState([]);
@@ -1058,6 +1076,7 @@ const ProductGroups = ({ ProductId }) => {
         fieldErrors={fieldErrors}
         onChangeDraft={handleChangeDraft}
         buttonPalette={buttonPalette}
+        switchPalette={switchPalette}
       />
       <GroupImportModal
         visible={importModalVisible}

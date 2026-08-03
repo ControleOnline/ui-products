@@ -351,6 +351,21 @@ const ProductForm = ({
     buttonText: themeColors.buttonText,
     buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
   }), [themeColors.buttonBackground, themeColors.buttonBorder, themeColors.buttonIcon, themeColors.buttonText]);
+  const switchPalette = useMemo(() => ({
+    onTrack: themeColors.switchOnTrack,
+    offTrack: themeColors.switchOffTrack,
+    onThumb: themeColors.switchOnThumb,
+    offThumb: themeColors.switchOffThumb,
+    disabledTrack: themeColors.switchDisabledTrack,
+    disabledThumb: themeColors.switchDisabledThumb,
+  }), [
+    themeColors.switchDisabledThumb,
+    themeColors.switchDisabledTrack,
+    themeColors.switchOffThumb,
+    themeColors.switchOffTrack,
+    themeColors.switchOnThumb,
+    themeColors.switchOnTrack,
+  ]);
   const storedCategory = categoryGetters.item;
   const selectedRouteCategoryId =
     extractCategoryIdValue(routeCategoryIdParam) ||
@@ -950,11 +965,23 @@ const ProductForm = ({
         <SectionCard title="Configurações" icon="cog-outline" isOpen={openSections.has('config')} hasError={errorSections.has('config')} onToggle={() => toggleSection('config')}>
           <View style={styles.switchRow}>
             <Text style={styles.switchLabel}>Ativo</Text>
-            <Switch value={Boolean(product.active)} onValueChange={val => handleChange('active', val)} />
+            <Switch
+              value={Boolean(product.active)}
+              onValueChange={val => handleChange('active', val)}
+              trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+              thumbColor={Boolean(product.active) ? switchPalette.onThumb : switchPalette.offThumb}
+              ios_backgroundColor={switchPalette.offTrack}
+            />
           </View>
           <View style={[styles.switchRow, styles.switchRowLast]}>
             <Text style={styles.switchLabel}>Destaque</Text>
-            <Switch value={Boolean(product.featured)} onValueChange={val => handleChange('featured', val)} />
+            <Switch
+              value={Boolean(product.featured)}
+              onValueChange={val => handleChange('featured', val)}
+              trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+              thumbColor={Boolean(product.featured) ? switchPalette.onThumb : switchPalette.offThumb}
+              ios_backgroundColor={switchPalette.offTrack}
+            />
           </View>
           <View style={styles.switchRow}>
             <View style={inlineStyle_673_18}>
@@ -972,6 +999,9 @@ const ProductForm = ({
                   handleChange('defaultInInventory', '');
                 }
               }}
+              trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+              thumbColor={controlarEstoque ? switchPalette.onThumb : switchPalette.offThumb}
+              ios_backgroundColor={switchPalette.offTrack}
             />
           </View>
           {controlarEstoque && (

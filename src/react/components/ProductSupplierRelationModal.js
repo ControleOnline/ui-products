@@ -519,14 +519,14 @@ const ProductSupplierRelationModal = ({
                     style={[
                       styles.providersEmptyButton,
                       {
-                        backgroundColor: buttonPalette.buttonBackgroundSecondary,
-                        borderColor: buttonPalette.buttonBorderSecondary,
+                        backgroundColor: buttonPalette.buttonBackground,
+                        borderColor: buttonPalette.buttonBorder,
                       },
                     ]}
                     onPress={openProvidersIndex}
                     activeOpacity={0.8}>
-                    <Icon name="open-in-new" size={16} color={buttonPalette.buttonIconSecondary} />
-                    <Text style={[styles.providersEmptyButtonText, { color: buttonPalette.buttonTextSecondary }]}>Abrir fornecedores</Text>
+                    <Icon name="open-in-new" size={16} color={buttonPalette.buttonIcon} />
+                    <Text style={[styles.providersEmptyButtonText, { color: buttonPalette.buttonText }]}>Abrir fornecedores</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -590,10 +590,10 @@ const ProductSupplierRelationModal = ({
                       isActive && styles.roleButtonActive,
                       {
                         backgroundColor: isActive
-                          ? buttonPalette.buttonBackgroundSecondary
+                          ? buttonPalette.buttonBackground
                           : buttonPalette.buttonBackgroundSecondary,
                         borderColor: isActive
-                          ? buttonPalette.buttonBorderSecondary
+                          ? buttonPalette.buttonBorder
                           : buttonPalette.buttonBorderSecondary,
                       },
                     ]}
@@ -603,9 +603,11 @@ const ProductSupplierRelationModal = ({
                       style={[
                         styles.roleButtonText,
                         isActive && styles.roleButtonTextActive,
-                        isActive
-                          ? { color: buttonPalette.buttonTextSecondary }
-                          : { color: themeColors.textSecondary },
+                        {
+                          color: isActive
+                            ? buttonPalette.buttonText
+                            : buttonPalette.buttonTextSecondary,
+                        },
                       ]}
                     >
                       {option.label}
