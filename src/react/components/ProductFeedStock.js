@@ -83,7 +83,7 @@ const getFeedstockScopeLabel = item =>
       : '';
 
 /* ─── Modal de cadastro rápido de insumo ─── */
-const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, brandColors, units }) => {
+const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, buttonPalette, units }) => {
   const [name, setName] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
 
@@ -137,11 +137,17 @@ const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, br
               return (
                 <TouchableOpacity
                   key={String(u.id)}
-                  style={[styles.unitChip, active && { borderColor: brandColors?.primary, backgroundColor: '#EFF6FF' }]}
+                  style={[
+                    styles.unitChip,
+                    active && {
+                      borderColor: buttonPalette.buttonBorderSecondary,
+                      backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                    },
+                  ]}
                   onPress={() => setSelectedUnitId(String(u.id))}
                   activeOpacity={0.75}
                 >
-                  <Text style={[styles.unitChipText, active && { color: brandColors?.primary, fontWeight: '700' }]}>
+                  <Text style={[styles.unitChipText, active && { color: buttonPalette.buttonTextSecondary, fontWeight: '700' }]}>
                     {u.label}
                   </Text>
                 </TouchableOpacity>
@@ -153,16 +159,33 @@ const QuickRegisterProductModal = ({ visible, onClose, onSave, saving, error, br
           </ScrollView>
         </View>
         <View style={styles.formFooter}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <TouchableOpacity
+            style={[
+              styles.cancelBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                borderColor: buttonPalette.buttonBorderSecondary,
+              },
+            ]}
+            onPress={onClose}
+          >
+            <Text style={[styles.cancelBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, !canSave && { opacity: 0.55 }]}
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackground,
+                borderColor: buttonPalette.buttonBorder,
+                borderWidth: 1,
+              },
+              !canSave && { opacity: 0.55 },
+            ]}
             onPress={() => canSave && onSave(name.trim(), selectedUnitId)}
             disabled={!canSave}
           >
-            <MaterialCommunityIcons name="plus-circle-outline" size={16} color="#fff" />
-            <Text style={styles.saveBtnText}>{saving ? 'Cadastrando...' : 'Cadastrar'}</Text>
+            <MaterialCommunityIcons name="plus-circle-outline" size={16} color={buttonPalette.buttonIcon} />
+            <Text style={[styles.saveBtnText, { color: buttonPalette.buttonText }]}>{saving ? 'Cadastrando...' : 'Cadastrar'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -183,6 +206,7 @@ const FeedStockSearchModal = ({
   onLoadMore,
   excludeId,
   onQuickRegister,
+  buttonPalette,
 }) => {
   const [search, setSearch] = useState('');
   const onSearchRef = useRef(onSearch);
@@ -275,9 +299,19 @@ const FeedStockSearchModal = ({
                 {requestQuery ? 'Nenhum insumo encontrado' : 'Nenhum insumo ativo disponível'}
               </Text>
               {!!onQuickRegister && (
-                <TouchableOpacity style={styles.quickRegBtn} onPress={onQuickRegister} activeOpacity={0.8}>
-                  <MaterialCommunityIcons name="plus-circle-outline" size={15} color="#3B82F6" />
-                  <Text style={styles.quickRegBtnText}>Cadastrar novo insumo</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.quickRegBtn,
+                    {
+                      backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                      borderColor: buttonPalette.buttonBorderSecondary,
+                    },
+                  ]}
+                  onPress={onQuickRegister}
+                  activeOpacity={0.8}
+                >
+                  <MaterialCommunityIcons name="plus-circle-outline" size={15} color={buttonPalette.buttonIconSecondary} />
+                  <Text style={[styles.quickRegBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cadastrar novo insumo</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -312,9 +346,19 @@ const FeedStockSearchModal = ({
         </ScrollView>
 
         {!!onQuickRegister && filtered.length > 0 && (
-          <TouchableOpacity style={styles.searchFooterRegBtn} onPress={onQuickRegister} activeOpacity={0.8}>
-            <MaterialCommunityIcons name="plus-circle-outline" size={15} color="#3B82F6" />
-            <Text style={styles.quickRegBtnText}>Cadastrar novo insumo</Text>
+          <TouchableOpacity
+            style={[
+              styles.searchFooterRegBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                borderColor: buttonPalette.buttonBorderSecondary,
+              },
+            ]}
+            onPress={onQuickRegister}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="plus-circle-outline" size={15} color={buttonPalette.buttonIconSecondary} />
+            <Text style={[styles.quickRegBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cadastrar novo insumo</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -325,7 +369,7 @@ const FeedStockSearchModal = ({
 /* ─── Modal de formulário do insumo ─── */
 const FeedStockFormModal = ({
   visible, title, draft, onClose, onSave,
-  saving, error, fieldErrors, onChangeDraft, brandColors,
+  saving, error, fieldErrors, onChangeDraft, buttonPalette,
 }) => {
   if (!draft) return null;
 
@@ -401,16 +445,33 @@ const FeedStockFormModal = ({
         </View>
 
         <View style={styles.formFooter}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <TouchableOpacity
+            style={[
+              styles.cancelBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                borderColor: buttonPalette.buttonBorderSecondary,
+              },
+            ]}
+            onPress={onClose}
+          >
+            <Text style={[styles.cancelBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, saving && { opacity: 0.6 }]}
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackground,
+                borderColor: buttonPalette.buttonBorder,
+                borderWidth: 1,
+              },
+              saving && { opacity: 0.6 },
+            ]}
             onPress={onSave}
             disabled={saving}
           >
-            <MaterialCommunityIcons name="content-save-outline" size={16} color="#fff" />
-            <Text style={styles.saveBtnText}>{saving ? 'Salvando...' : 'Salvar'}</Text>
+            <MaterialCommunityIcons name="content-save-outline" size={16} color={buttonPalette.buttonIcon} />
+            <Text style={[styles.saveBtnText, { color: buttonPalette.buttonText }]}>{saving ? 'Salvando...' : 'Salvar'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -424,15 +485,39 @@ const ProductFeedStock = ({
   productIri,
   productGroupIri,
   parentProductId,
-  brandColors,
   targetLabel = 'este produto',
 }) => {
   const store = useStore('product_group_product');
   const productsStore = useStore('products');
   const peopleStore = useStore('people');
   const productUnitStore = useStore('product_unit');
+  const themeStore = useStore('theme');
 
   const { currentCompany } = peopleStore.getters;
+  const themeColors = themeStore?.getters?.colors || {};
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+    buttonBackgroundSecondary: themeColors.buttonBackgroundSecondary,
+    buttonBorderSecondary: themeColors.buttonBorderSecondary,
+    buttonTextSecondary: themeColors.buttonTextSecondary,
+    buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
+    iconDanger: themeColors.iconDanger,
+    textDanger: themeColors.textDanger,
+  }), [
+    themeColors.buttonBackground,
+    themeColors.buttonBackgroundSecondary,
+    themeColors.buttonBorder,
+    themeColors.buttonBorderSecondary,
+    themeColors.buttonIcon,
+    themeColors.buttonIconSecondary,
+    themeColors.buttonText,
+    themeColors.buttonTextSecondary,
+    themeColors.iconDanger,
+    themeColors.textDanger,
+  ]);
 
   const targetProductIri =
     toIri(productIri, '/products/') ||
@@ -877,18 +962,32 @@ const ProductFeedStock = ({
                 </View>
                 <View style={styles.itemActions}>
                   <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={[
+                      styles.actionBtn,
+                      {
+                        backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                        borderColor: buttonPalette.buttonBorderSecondary,
+                        borderWidth: 1,
+                      },
+                    ]}
                     onPress={() => openEdit(item)}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    <MaterialCommunityIcons name="pencil-outline" size={14} color="#64748B" />
+                    <MaterialCommunityIcons name="pencil-outline" size={14} color={buttonPalette.buttonIconSecondary} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: '#FFF1F1' }]}
+                    style={[
+                      styles.actionBtn,
+                      {
+                        backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                        borderColor: buttonPalette.buttonBorderSecondary,
+                        borderWidth: 1,
+                      },
+                    ]}
                     onPress={() => setConfirmDelete(item)}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    <MaterialCommunityIcons name="trash-can-outline" size={14} color="#c10015" />
+                    <MaterialCommunityIcons name="trash-can-outline" size={14} color={buttonPalette.iconDanger} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -898,12 +997,19 @@ const ProductFeedStock = ({
           {/* Botão adicionar insumo */}
           {loaded && (
             <TouchableOpacity
-              style={styles.addBtn}
+              style={[
+                styles.addBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                  borderColor: buttonPalette.buttonBorderSecondary,
+                  borderStyle: 'solid',
+                },
+              ]}
               onPress={() => setSearchVisible(true)}
               activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="plus" size={14} color="#64748B" />
-              <Text style={styles.addBtnText}>Adicionar insumo</Text>
+              <MaterialCommunityIcons name="plus" size={14} color={buttonPalette.buttonIconSecondary} />
+              <Text style={[styles.addBtnText, { color: buttonPalette.buttonTextSecondary }]}>Adicionar insumo</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -921,6 +1027,7 @@ const ProductFeedStock = ({
         onLoadMore={handleLoadMoreProducts}
         excludeId={targetProductNumericId}
         onQuickRegister={openQuickReg}
+        buttonPalette={buttonPalette}
       />
       {/* Modal: cadastro rápido de insumo */}
       <QuickRegisterProductModal
@@ -929,7 +1036,7 @@ const ProductFeedStock = ({
         onSave={handleQuickRegSave}
         saving={quickRegSaving}
         error={quickRegError}
-        brandColors={brandColors}
+        buttonPalette={buttonPalette}
         units={unitOptions}
       />
       {/* Modal: formulário add/editar */}
@@ -943,7 +1050,7 @@ const ProductFeedStock = ({
         error={formError}
         fieldErrors={fieldErrors}
         onChangeDraft={handleChangeDraft}
-        brandColors={brandColors}
+        buttonPalette={buttonPalette}
       />
       {/* Modal: confirmar exclusão */}
       <AnimatedModal
@@ -964,15 +1071,32 @@ const ProductFeedStock = ({
             Esta ação não pode ser desfeita.
           </Text>
           <View style={styles.confirmFooter}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDelete(null)}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+            <TouchableOpacity
+              style={[
+                styles.cancelBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                  borderColor: buttonPalette.buttonBorderSecondary,
+                },
+              ]}
+              onPress={() => setConfirmDelete(null)}
+            >
+              <Text style={[styles.cancelBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.deleteBtn, removing && { opacity: 0.6 }]}
+              style={[
+                styles.deleteBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackground,
+                  borderColor: buttonPalette.buttonBorder,
+                  borderWidth: 1,
+                },
+                removing && { opacity: 0.6 },
+              ]}
               onPress={handleRemove}
               disabled={removing}
             >
-              <Text style={styles.deleteBtnText}>{removing ? 'Removendo...' : 'Remover'}</Text>
+              <Text style={[styles.deleteBtnText, { color: buttonPalette.buttonText }]}>{removing ? 'Removendo...' : 'Remover'}</Text>
             </TouchableOpacity>
           </View>
         </View>

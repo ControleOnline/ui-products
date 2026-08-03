@@ -110,15 +110,23 @@ const resolvePeriodLabel = period =>
 const resolveMetricLabel = metric =>
   CHART_METRICS.find(item => item.key === metric)?.label || 'Receita';
 
-const renderChip = (option, currentValue, onPress, extraStyle = null) => {
+const renderChip = (option, currentValue, onPress, palette) => {
   const active = currentValue === option.key;
+  const chipStyle = {
+    backgroundColor: active
+      ? palette.buttonBackground
+      : palette.buttonBackgroundSecondary,
+    borderColor: active
+      ? palette.buttonBorder
+      : palette.buttonBorderSecondary,
+  };
 
   return (
     <TouchableOpacity
       key={option.key}
       style={[
         styles.chip,
-        active && [styles.chipActive, extraStyle],
+        chipStyle,
       ]}
       onPress={() => onPress(option.key)}
       activeOpacity={0.8}
@@ -127,10 +135,16 @@ const renderChip = (option, currentValue, onPress, extraStyle = null) => {
         <MaterialCommunityIcons
           name={option.icon}
           size={14}
-          color={active ? '#0369A1' : '#475569'}
+          color={active ? palette.buttonIcon : palette.buttonIconSecondary}
         />
       ) : null}
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>
+      <Text
+        style={[
+          styles.chipText,
+          active && styles.chipTextActive,
+          { color: active ? palette.buttonText : palette.buttonTextSecondary },
+        ]}
+      >
         {option.label}
       </Text>
     </TouchableOpacity>
@@ -140,7 +154,28 @@ const renderChip = (option, currentValue, onPress, extraStyle = null) => {
 const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
   const { width } = useWindowDimensions();
   const peopleStore = useStore('people');
+  const themeStore = useStore('theme');
   const { currentCompany } = peopleStore.getters;
+  const themeColors = themeStore?.getters?.colors || {};
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+    buttonBackgroundSecondary: themeColors.buttonBackgroundSecondary,
+    buttonBorderSecondary: themeColors.buttonBorderSecondary,
+    buttonTextSecondary: themeColors.buttonTextSecondary,
+    buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
+  }), [
+    themeColors.buttonBackground,
+    themeColors.buttonBackgroundSecondary,
+    themeColors.buttonBorder,
+    themeColors.buttonBorderSecondary,
+    themeColors.buttonIcon,
+    themeColors.buttonIconSecondary,
+    themeColors.buttonText,
+    themeColors.buttonTextSecondary,
+  ]);
   const accentColor = brandColors.primary || '#0EA5E9';
   const requestIdRef = useRef(0);
 
@@ -391,14 +426,14 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
           <View style={styles.controlGroup}>
             <Text style={styles.controlLabel}>Agrupamento</Text>
             <View style={styles.chipsRow}>
-              {CHART_PERIODS.map(option => renderChip(option, chartPeriod, setChartPeriod, { borderColor: withOpacity(accentColor, 0.22) }))}
+              {CHART_PERIODS.map(option => renderChip(option, chartPeriod, setChartPeriod, buttonPalette))}
             </View>
           </View>
 
           <View style={styles.controlGroup}>
             <Text style={styles.controlLabel}>Métrica do gráfico</Text>
             <View style={styles.chipsRow}>
-              {CHART_METRICS.map(option => renderChip(option, chartMetric, setChartMetric, { borderColor: withOpacity(accentColor, 0.22) }))}
+              {CHART_METRICS.map(option => renderChip(option, chartMetric, setChartMetric, buttonPalette))}
             </View>
           </View>
         </View>
@@ -406,8 +441,19 @@ const ProductSalesTab = ({ product, isLoading = false, brandColors = {} }) => {
         {error ? (
           <View style={styles.errorCard}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={loadSales} activeOpacity={0.85}>
-              <Text style={styles.retryButtonText}>Tentar novamente</Text>
+            <TouchableOpacity
+              style={[
+                styles.retryButton,
+                {
+                  backgroundColor: buttonPalette.buttonBackground,
+                  borderColor: buttonPalette.buttonBorder,
+                  borderWidth: 1,
+                },
+              ]}
+              onPress={loadSales}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.retryButtonText, { color: buttonPalette.buttonText }]}>Tentar novamente</Text>
             </TouchableOpacity>
           </View>
         ) : null}

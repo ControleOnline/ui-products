@@ -333,6 +333,7 @@ const ProductForm = ({
   const productUnitStore = useStore('product_unit');
   const queuesStore = useStore('queues');
   const inventoriesStore = useStore('inventories');
+  const themeStore = useStore('theme');
   const { actions: productActions } = productsStore;
   const { actions: categoryActions, getters: categoryGetters } = categoriesStore;
   const { actions: productCategoryActions } = productCategoryStore;
@@ -340,9 +341,16 @@ const ProductForm = ({
   const { getters: productUnitGetters } = productUnitStore;
   const { getters: queuesGetters } = queuesStore;
   const { getters: inventoriesGetters } = inventoriesStore;
+  const themeColors = themeStore?.getters?.colors || {};
 
   const { currentCompany } = peopleGetters;
   const entityLabels = useMemo(() => buildEntityLabels(context), [context]);
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+  }), [themeColors.buttonBackground, themeColors.buttonBorder, themeColors.buttonIcon, themeColors.buttonText]);
   const storedCategory = categoryGetters.item;
   const selectedRouteCategoryId =
     extractCategoryIdValue(routeCategoryIdParam) ||
@@ -1044,11 +1052,22 @@ const ProductForm = ({
       <View style={styles.saveBar}>
         <TouchableOpacity
           onPress={handleSave}
-          style={[styles.saveButton, { backgroundColor: brandColors.primary }]}
+          style={[
+            styles.saveButton,
+            {
+              backgroundColor: buttonPalette.buttonBackground,
+              borderColor: buttonPalette.buttonBorder,
+              borderWidth: 1,
+            },
+          ]}
           activeOpacity={0.85}
         >
-          <MaterialCommunityIcons name="content-save-outline" size={20} color="#fff" />
-          <Text style={styles.saveButtonText}>{entityLabels.saveAction}</Text>
+          <MaterialCommunityIcons
+            name="content-save-outline"
+            size={20}
+            color={buttonPalette.buttonIcon}
+          />
+          <Text style={[styles.saveButtonText, { color: buttonPalette.buttonText }]}>{entityLabels.saveAction}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

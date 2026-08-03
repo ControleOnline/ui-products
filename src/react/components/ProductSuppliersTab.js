@@ -4,7 +4,6 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useStore } from '@store';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
-import { colors } from '@controleonline/../../src/styles/colors';
 import ProductSupplierRelationModal from '@controleonline/ui-products/src/react/components/ProductSupplierRelationModal';
 import styles from './ProductSuppliersTab.styles';
 
@@ -99,8 +98,38 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
   const navigation = useNavigation();
   const { showDialog, showError, showSuccess } = useMessage();
   const productPeopleStore = useStore('product_people');
+  const themeStore = useStore('theme');
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingRelation, setEditingRelation] = useState(null);
+  const themeColors = themeStore?.getters?.colors || {};
+
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+    buttonBackgroundSecondary: themeColors.buttonBackgroundSecondary,
+    buttonBorderSecondary: themeColors.buttonBorderSecondary,
+    buttonTextSecondary: themeColors.buttonTextSecondary,
+    buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
+    iconDanger: themeColors.iconDanger,
+    textDanger: themeColors.textDanger,
+    iconDisabled: themeColors.iconDisabled,
+    cardIconBackground: themeColors.cardIconBackground,
+  }), [
+    themeColors.buttonBackground,
+    themeColors.buttonBackgroundSecondary,
+    themeColors.buttonBorder,
+    themeColors.buttonBorderSecondary,
+    themeColors.buttonIcon,
+    themeColors.buttonIconSecondary,
+    themeColors.buttonText,
+    themeColors.buttonTextSecondary,
+    themeColors.cardIconBackground,
+    themeColors.iconDanger,
+    themeColors.iconDisabled,
+    themeColors.textDanger,
+  ]);
 
   const productId = useMemo(
     () => extractId(product?.id || product?.['@id']),
@@ -191,7 +220,7 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
   if (isLoading) {
     return (
       <View style={styles.loadingWrap}>
-        <ActivityIndicator color={colors.primary} />
+        <ActivityIndicator color={buttonPalette.buttonIcon} />
         <Text style={styles.loadingText}>Carregando fornecedores...</Text>
       </View>
     );
@@ -203,7 +232,7 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
         <View style={styles.content}>
           <View style={styles.section}>
             <View style={styles.emptyState}>
-              <Icon name="error-outline" size={22} color="#94A3B8" />
+              <Icon name="error-outline" size={22} color={buttonPalette.iconDisabled} />
               <Text style={styles.emptyTitle}>Nao foi possivel carregar o produto</Text>
               <Text style={styles.emptySubtitle}>
                 Tente abrir este cadastro novamente para visualizar os fornecedores vinculados.
@@ -233,16 +262,27 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
             </View>
 
             {productId ? (
-              <TouchableOpacity style={styles.addButton} onPress={openCreateModal} activeOpacity={0.85}>
-                <Icon name="add" size={18} color="#FFFFFF" />
-                <Text style={styles.addButtonText}>Vincular</Text>
+              <TouchableOpacity
+                style={[
+                  styles.addButton,
+                  {
+                    backgroundColor: buttonPalette.buttonBackground,
+                    borderColor: buttonPalette.buttonBorder,
+                    borderWidth: 1,
+                  },
+                ]}
+                onPress={openCreateModal}
+                activeOpacity={0.85}
+              >
+                <Icon name="add" size={18} color={buttonPalette.buttonIcon} />
+                <Text style={[styles.addButtonText, { color: buttonPalette.buttonText }]}>Vincular</Text>
               </TouchableOpacity>
             ) : null}
           </View>
 
           {relations.length === 0 ? (
             <View style={styles.emptyState}>
-              <Icon name="local-shipping" size={24} color="#94A3B8" />
+              <Icon name="local-shipping" size={24} color={buttonPalette.iconDisabled} />
               <Text style={styles.emptyTitle}>Nenhum fornecedor vinculado</Text>
               <Text style={styles.emptySubtitle}>
                 Use o botao acima para cadastrar quem fornece este produto e preencher custo,
@@ -251,11 +291,18 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
 
               {productId ? (
                 <TouchableOpacity
-                  style={styles.emptyActionButton}
+                  style={[
+                    styles.emptyActionButton,
+                    {
+                      backgroundColor: buttonPalette.buttonBackground,
+                      borderColor: buttonPalette.buttonBorder,
+                      borderWidth: 1,
+                    },
+                  ]}
                   onPress={openCreateModal}
                   activeOpacity={0.85}>
-                  <Icon name="add-business" size={18} color="#FFFFFF" />
-                  <Text style={styles.emptyActionButtonText}>Cadastrar fornecedor</Text>
+                  <Icon name="add-business" size={18} color={buttonPalette.buttonIcon} />
+                  <Text style={[styles.emptyActionButtonText, { color: buttonPalette.buttonText }]}>Cadastrar fornecedor</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -269,8 +316,8 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
                   key={String(relation?.id || `${supplier?.id || 'supplier'}-${relation?.priority || 0}`)}
                   style={styles.card}>
                   <View style={styles.cardHeader}>
-                    <View style={styles.cardAvatar}>
-                      <Icon name="storefront" size={20} color={colors.primary} />
+                    <View style={[styles.cardAvatar, { backgroundColor: buttonPalette.cardIconBackground }] }>
+                      <Icon name="storefront" size={20} color={buttonPalette.buttonIconSecondary} />
                     </View>
 
                     <View style={styles.cardBody}>
@@ -313,27 +360,46 @@ const ProductSuppliersTab = ({ product, isLoading = false, onRefresh }) => {
 
                   <View style={styles.cardActions}>
                     <TouchableOpacity
-                      style={styles.cardActionButton}
+                      style={[
+                        styles.cardActionButton,
+                        {
+                          backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                          borderColor: buttonPalette.buttonBorderSecondary,
+                        },
+                      ]}
                       onPress={() => openSupplier(relation)}
                       activeOpacity={0.85}>
-                      <Icon name="open-in-new" size={16} color={colors.primary} />
-                      <Text style={styles.cardActionText}>Abrir fornecedor</Text>
+                      <Icon name="open-in-new" size={16} color={buttonPalette.buttonIconSecondary} />
+                      <Text style={[styles.cardActionText, { color: buttonPalette.buttonTextSecondary }]}>Abrir fornecedor</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={styles.cardActionButton}
+                      style={[
+                        styles.cardActionButton,
+                        {
+                          backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                          borderColor: buttonPalette.buttonBorderSecondary,
+                        },
+                      ]}
                       onPress={() => openEditModal(relation)}
                       activeOpacity={0.85}>
-                      <Icon name="edit" size={16} color={colors.primary} />
-                      <Text style={styles.cardActionText}>Editar vinculo</Text>
+                      <Icon name="edit" size={16} color={buttonPalette.buttonIconSecondary} />
+                      <Text style={[styles.cardActionText, { color: buttonPalette.buttonTextSecondary }]}>Editar vinculo</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[styles.cardActionButton, styles.cardActionButtonDanger]}
+                      style={[
+                        styles.cardActionButton,
+                        styles.cardActionButtonDanger,
+                        {
+                          backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                          borderColor: buttonPalette.buttonBorderSecondary,
+                        },
+                      ]}
                       onPress={() => handleRemoveRelation(relation)}
                       activeOpacity={0.85}>
-                      <Icon name="delete-outline" size={16} color="#B91C1C" />
-                      <Text style={styles.cardActionTextDanger}>Remover</Text>
+                      <Icon name="delete-outline" size={16} color={buttonPalette.iconDanger} />
+                      <Text style={[styles.cardActionTextDanger, { color: buttonPalette.textDanger }]}>Remover</Text>
                     </TouchableOpacity>
                   </View>
                 </View>

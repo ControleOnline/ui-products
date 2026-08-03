@@ -5,7 +5,6 @@ import { useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
-import { colors } from '@controleonline/../../src/styles/colors';
 import styles from './ProductSupplierRelationModal.styles';
 import { inlineStyle_403_62 } from './ProductSupplierRelationModal.styles';
 const PAGE_SIZE = 20;
@@ -156,6 +155,7 @@ const ProductSupplierRelationModal = ({
   const { showError, showSuccess } = useMessage();
   const peopleStore = useStore('people');
   const productPeopleStore = useStore('product_people');
+  const themeStore = useStore('theme');
   const [draft, setDraft] = useState(() => normalizeDraft(relation));
   const [providers, setProviders] = useState([]);
   const [query, setQuery] = useState('');
@@ -165,6 +165,33 @@ const ProductSupplierRelationModal = ({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const requestRef = useRef(0);
+  const themeColors = themeStore?.getters?.colors || {};
+
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+    buttonBackgroundSecondary: themeColors.buttonBackgroundSecondary,
+    buttonBorderSecondary: themeColors.buttonBorderSecondary,
+    buttonTextSecondary: themeColors.buttonTextSecondary,
+    buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
+    iconDanger: themeColors.iconDanger,
+    iconSuccess: themeColors.iconSuccess,
+    iconDisabled: themeColors.iconDisabled,
+  }), [
+    themeColors.buttonBackground,
+    themeColors.buttonBackgroundSecondary,
+    themeColors.buttonBorder,
+    themeColors.buttonBorderSecondary,
+    themeColors.buttonIcon,
+    themeColors.buttonIconSecondary,
+    themeColors.buttonText,
+    themeColors.buttonTextSecondary,
+    themeColors.iconDanger,
+    themeColors.iconDisabled,
+    themeColors.iconSuccess,
+  ]);
 
   const productId = useMemo(
     () => extractId(product?.id || product?.['@id']),
@@ -410,7 +437,7 @@ const ProductSupplierRelationModal = ({
           </View>
 
           <TouchableOpacity onPress={onClose} style={styles.modalCloseButton} activeOpacity={0.7}>
-            <Icon name="close" size={18} color="#64748B" />
+            <Icon name="close" size={18} color={buttonPalette.buttonIconSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -432,7 +459,7 @@ const ProductSupplierRelationModal = ({
             {draft?.people ? (
               <View style={styles.selectedCard}>
                 <View style={styles.selectedCardIcon}>
-                  <Icon name="storefront" size={18} color={colors.primary} />
+                  <Icon name="storefront" size={18} color={buttonPalette.buttonIconSecondary} />
                 </View>
 
                 <View style={styles.selectedCardBody}>
@@ -450,7 +477,7 @@ const ProductSupplierRelationModal = ({
                   onPress={handleClearProvider}
                   style={styles.clearProviderButton}
                   activeOpacity={0.7}>
-                  <Icon name="close" size={16} color="#64748B" />
+                  <Icon name="close" size={16} color={buttonPalette.buttonIconSecondary} />
                 </TouchableOpacity>
               </View>
             ) : (
@@ -460,7 +487,7 @@ const ProductSupplierRelationModal = ({
             )}
 
             <View style={styles.searchWrap}>
-              <Icon name="search" size={18} color="#94A3B8" />
+              <Icon name="search" size={18} color={buttonPalette.buttonIconSecondary} />
               <TextInput
                 value={query}
                 onChangeText={setQuery}
@@ -470,7 +497,7 @@ const ProductSupplierRelationModal = ({
               />
               {query ? (
                 <TouchableOpacity onPress={() => setQuery('')} activeOpacity={0.7}>
-                  <Icon name="close" size={18} color="#94A3B8" />
+                  <Icon name="close" size={18} color={buttonPalette.buttonIconSecondary} />
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -478,7 +505,7 @@ const ProductSupplierRelationModal = ({
             <View style={styles.providersList}>
               {isLoadingProviders ? (
                 <View style={styles.providersLoading}>
-                  <ActivityIndicator color={colors.primary} />
+                  <ActivityIndicator color={buttonPalette.buttonIcon} />
                   <Text style={styles.providersLoadingText}>Buscando fornecedores...</Text>
                 </View>
               ) : providers.length === 0 ? (
@@ -489,11 +516,17 @@ const ProductSupplierRelationModal = ({
                   </Text>
 
                   <TouchableOpacity
-                    style={styles.providersEmptyButton}
+                    style={[
+                      styles.providersEmptyButton,
+                      {
+                        backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                        borderColor: buttonPalette.buttonBorderSecondary,
+                      },
+                    ]}
                     onPress={openProvidersIndex}
                     activeOpacity={0.8}>
-                    <Icon name="open-in-new" size={16} color={colors.primary} />
-                    <Text style={styles.providersEmptyButtonText}>Abrir fornecedores</Text>
+                    <Icon name="open-in-new" size={16} color={buttonPalette.buttonIconSecondary} />
+                    <Text style={[styles.providersEmptyButtonText, { color: buttonPalette.buttonTextSecondary }]}>Abrir fornecedores</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -512,7 +545,7 @@ const ProductSupplierRelationModal = ({
                           <Icon
                             name={isSelected ? 'check-circle' : 'storefront'}
                             size={18}
-                            color={isSelected ? '#15803D' : colors.primary}
+                            color={isSelected ? buttonPalette.iconSuccess : buttonPalette.buttonIconSecondary}
                           />
                         </View>
 
@@ -552,10 +585,29 @@ const ProductSupplierRelationModal = ({
                 return (
                   <TouchableOpacity
                     key={option.value}
-                    style={[styles.roleButton, isActive && styles.roleButtonActive]}
+                    style={[
+                      styles.roleButton,
+                      isActive && styles.roleButtonActive,
+                      {
+                        backgroundColor: isActive
+                          ? buttonPalette.buttonBackgroundSecondary
+                          : buttonPalette.buttonBackgroundSecondary,
+                        borderColor: isActive
+                          ? buttonPalette.buttonBorderSecondary
+                          : buttonPalette.buttonBorderSecondary,
+                      },
+                    ]}
                     onPress={() => handleChange('role', option.value)}
                     activeOpacity={0.8}>
-                    <Text style={[styles.roleButtonText, isActive && styles.roleButtonTextActive]}>
+                    <Text
+                      style={[
+                        styles.roleButtonText,
+                        isActive && styles.roleButtonTextActive,
+                        isActive
+                          ? { color: buttonPalette.buttonTextSecondary }
+                          : { color: themeColors.textSecondary },
+                      ]}
+                    >
                       {option.label}
                     </Text>
                   </TouchableOpacity>
@@ -618,22 +670,36 @@ const ProductSupplierRelationModal = ({
 
         <View style={styles.modalFooter}>
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={[
+              styles.secondaryButton,
+              {
+                backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                borderColor: buttonPalette.buttonBorderSecondary,
+              },
+            ]}
             onPress={onClose}
             activeOpacity={0.8}
             disabled={isSaving}>
-            <Text style={styles.secondaryButtonText}>Cancelar</Text>
+            <Text style={[styles.secondaryButtonText, { color: buttonPalette.buttonTextSecondary }]}>Cancelar</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.primaryButton, isSaving && styles.buttonDisabled]}
+            style={[
+              styles.primaryButton,
+              {
+                backgroundColor: buttonPalette.buttonBackground,
+                borderColor: buttonPalette.buttonBorder,
+                borderWidth: 1,
+              },
+              isSaving && styles.buttonDisabled,
+            ]}
             onPress={handleSave}
             activeOpacity={0.8}
             disabled={isSaving}>
             {isSaving ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <ActivityIndicator color={buttonPalette.buttonIcon} size="small" />
             ) : (
-              <Text style={styles.primaryButtonText}>
+              <Text style={[styles.primaryButtonText, { color: buttonPalette.buttonText }]}>
                 {editingRelationId ? 'Salvar alteracoes' : 'Vincular fornecedor'}
               </Text>
             )}
