@@ -1128,9 +1128,14 @@ const CustomizeScreen = () => {
     [groupSummaries],
   );
 
+  /*
+   * @agents Shop customization can enter through a refreshed/deep-linked page.
+   * Keep the action enabled after option validation; addHandle owns cart
+   * rehydration before persisting the customized order product.
+   */
   const canSubmitCustomization =
     !!activeProductIri &&
-    (isPdvCustomizationFlow || !!activeOrderIri) &&
+    (isPdvCustomizationFlow || !!activeOrderIri || !isEditingExistingOrderProduct) &&
     !isLoadingProductGroups &&
     invalidGroupSummaries.length === 0;
   const productCoverUrl = useMemo(
@@ -1382,6 +1387,30 @@ const CustomizeScreen = () => {
       }
     }
 
+    if (!targetOrderIri && !isPdvCustomizationFlow) {
+      try {
+        /*
+         * @agents Shop customization can be opened after a browser refresh or
+         * direct URL. Rehydrate the active cart through the store before
+         * rejecting the save, so custom products keep the same cart contract as
+         * simple quantity controls.
+         */
+        const ensuredCart = await cartActions.discoveryCart({
+          provider: defaultCompany?.id,
+          client: currentCompany?.id || defaultCompany?.id,
+        });
+        const ensuredCartId = normalizeEntityId(
+          ensuredCart?.id || ensuredCart?.['@id'],
+        );
+        targetOrderId = ensuredCartId || targetOrderId;
+        targetOrderIri =
+          ensuredCart?.['@id'] ||
+          (ensuredCartId ? `/orders/${ensuredCartId}` : null);
+      } catch {
+        targetOrderIri = null;
+      }
+    }
+
     if (!targetOrderIri) {
       const message =
         'Nao foi possivel identificar produto ou carrinho para adicionar.';
@@ -1486,6 +1515,7 @@ const CustomizeScreen = () => {
     return (
       <TouchableOpacity
         key={`${group.id}-${index}`}
+        accessibilityLabel={`Selecionar ${option.label}`}
         onPress={() => handleToggleOption(groupId, option)}
         style={customizeOptionTouchableStyle({
           palette,
@@ -1640,6 +1670,7 @@ const CustomizeScreen = () => {
           <Text style={customizeSummaryLabelStyle({palette})}>Quantidade</Text>
           <View style={customizeQuantityStepperStyle}>
             <TouchableOpacity
+              accessibilityLabel={`Diminuir quantidade de ${activeProduct?.product || 'produto personalizado'}`}
               onPress={() => {
                 quantityTouchedRef.current = true;
                 setItemQuantity(current =>
@@ -1664,6 +1695,7 @@ const CustomizeScreen = () => {
               </Text>
             </View>
             <TouchableOpacity
+              accessibilityLabel={`Aumentar quantidade de ${activeProduct?.product || 'produto personalizado'}`}
               onPress={() => {
                 quantityTouchedRef.current = true;
                 setItemQuantity(current => resolvePositiveQuantity(current) + 1);
@@ -1687,6 +1719,8 @@ const CustomizeScreen = () => {
 
     return (
       <TouchableOpacity
+        accessibilityLabel={`${submitLabel} ${activeProduct?.product || 'produto personalizado'}`}
+        accessibilityRole="button"
         onPress={addHandle}
         disabled={disabled}
         style={customizeSubmitButtonStyle({

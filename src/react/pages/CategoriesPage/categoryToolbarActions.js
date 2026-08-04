@@ -1,6 +1,7 @@
 const t = (type, key) => global.t?.t?.('categories', type, key)
 
 export const buildCategoryToolbarActions = ({
+  buttonPalette,
   canUseCompany,
   hasActivePlatforms,
   isDownloadingCatalog,
@@ -11,10 +12,23 @@ export const buildCategoryToolbarActions = ({
   onOpenIntegrations,
   onOpenMenuModelPicker,
   onSyncAllEligible,
-}) => [
+}) => {
+  const primaryButtonStyle = {
+    backgroundColor: buttonPalette?.buttonBackground,
+    borderColor: buttonPalette?.buttonBorder,
+  }
+  const primaryLabelStyle = {
+    color: buttonPalette?.buttonText,
+  }
+  const primaryIconColor = buttonPalette?.buttonIcon || buttonPalette?.buttonText
+
+  return [
   {
     key: 'all-products',
     icon: 'package',
+    color: primaryIconColor,
+    style: primaryButtonStyle,
+    labelStyle: primaryLabelStyle,
     label: t('button', 'allProducts'),
     disabled: !canUseCompany,
     onPress: onOpenAllProducts,
@@ -22,6 +36,9 @@ export const buildCategoryToolbarActions = ({
   {
     key: 'menu-model',
     icon: 'file-text',
+    color: primaryIconColor,
+    style: primaryButtonStyle,
+    labelStyle: primaryLabelStyle,
     label: isLoadingMenuModels
       ? t('label', 'loadingModels')
       : t('button', 'menuModel'),
@@ -31,12 +48,18 @@ export const buildCategoryToolbarActions = ({
   {
     key: 'integrations',
     icon: 'refresh-cw',
+    color: primaryIconColor,
+    style: primaryButtonStyle,
+    labelStyle: primaryLabelStyle,
     label: t('button', 'integrations'),
     onPress: onOpenIntegrations,
   },
   {
     key: 'sync-eligible',
     icon: 'cloud',
+    color: primaryIconColor,
+    style: primaryButtonStyle,
+    labelStyle: primaryLabelStyle,
     label: marketplaceSyncingKey === 'all'
       ? t('label', 'syncing')
       : t('button', 'syncEligible'),
@@ -46,6 +69,9 @@ export const buildCategoryToolbarActions = ({
   {
     key: 'download-menu',
     icon: 'download-cloud',
+    color: primaryIconColor,
+    style: primaryButtonStyle,
+    labelStyle: primaryLabelStyle,
     label: isDownloadingCatalog
       ? t('label', 'downloading')
       : t('button', 'downloadMenu'),
@@ -53,3 +79,4 @@ export const buildCategoryToolbarActions = ({
     onPress: onDownloadCatalog,
   },
 ]
+}

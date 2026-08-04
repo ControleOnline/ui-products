@@ -122,6 +122,19 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     ),
     [currentCompany?.id, currentCompany?.theme?.colors, themeColors],
   );
+  const buttonPalette = useMemo(() => {
+    const mergedThemeColors = {
+      ...themeColors,
+      ...(currentCompany?.theme?.colors || {}),
+    };
+
+    return {
+      buttonBackground: mergedThemeColors.buttonBackground,
+      buttonBorder: mergedThemeColors.buttonBorder,
+      buttonText: mergedThemeColors.buttonText,
+      buttonIcon: mergedThemeColors.buttonIcon || mergedThemeColors.buttonText,
+    };
+  }, [currentCompany?.theme?.colors, themeColors]);
 
   const categoryId = useMemo(
     () => resolveRouteCategoryId(routeParams.categoryId || routeParams.category),
@@ -267,10 +280,22 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   }, [context, interactionMode, navigation, routeParams]);
 
   const toolbarActions = useMemo(() => {
+    const primaryActionStyle = {
+      backgroundColor: buttonPalette.buttonBackground,
+      borderColor: buttonPalette.buttonBorder,
+    };
+    const primaryActionLabelStyle = {
+      color: buttonPalette.buttonText,
+    };
+    const primaryActionIconColor = buttonPalette.buttonIcon;
+
     const actions = [
       {
         key: 'products-categories',
         icon: 'grid',
+        color: primaryActionIconColor,
+        style: primaryActionStyle,
+        labelStyle: primaryActionLabelStyle,
         label: global.t?.t?.('products', 'button', 'categories') || 'Categorias',
         onPress: handleOpenCategories,
       },
@@ -280,13 +305,16 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       actions.unshift({
         key: 'products-all',
         icon: 'layers',
+        color: primaryActionIconColor,
+        style: primaryActionStyle,
+        labelStyle: primaryActionLabelStyle,
         label: global.t?.t?.('products', 'button', 'allProducts') || 'Todos os produtos',
         onPress: handleShowAllProducts,
       });
     }
 
     return actions;
-  }, [handleOpenCategories, handleShowAllProducts, isAllProducts]);
+  }, [buttonPalette.buttonBackground, buttonPalette.buttonBorder, buttonPalette.buttonIcon, buttonPalette.buttonText, handleOpenCategories, handleShowAllProducts, isAllProducts]);
 
   const renderProductCard = useCallback(
     ({ item }) => {
@@ -347,6 +375,14 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     ? {
         key: 'export-csv',
         icon: 'download',
+        color: buttonPalette.buttonIcon,
+        style: {
+          backgroundColor: buttonPalette.buttonBackground,
+          borderColor: buttonPalette.buttonBorder,
+        },
+        labelStyle: {
+          color: buttonPalette.buttonText,
+        },
         label: global.t?.t?.('products', 'button', 'exportCsv') || 'Exportar CSV',
         onPress: exportCatalog,
       }
@@ -364,6 +400,16 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           cardListProps={cardListProps}
           compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
           defaultColor="$primary"
+          importAction={isManager ? {
+            color: buttonPalette.buttonIcon,
+            style: {
+              backgroundColor: buttonPalette.buttonBackground,
+              borderColor: buttonPalette.buttonBorder,
+            },
+            labelStyle: {
+              color: buttonPalette.buttonText,
+            },
+          } : null}
           exportAction={exportAction}
           initialViewMode="cards"
           onAdd={handleAddProduct}

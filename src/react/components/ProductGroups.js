@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, Switch, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import ProductGroupProducts from './ProductGroupProducts';
@@ -179,7 +178,7 @@ const GroupTabSkeleton = () => (
 );
 
 /* ─── SelectField ─── */
-const SelectField = ({ label, value, options, onSelect, brandColors }) => {
+const SelectField = ({ label, value, options, onSelect, buttonPalette }) => {
   const [open, setOpen] = useState(false);
   const selected = options.find(o => o.value === value);
   return (
@@ -207,10 +206,10 @@ const SelectField = ({ label, value, options, onSelect, brandColors }) => {
                   onPress={() => { onSelect(opt.value); setOpen(false); }}
                   activeOpacity={0.7}
                 >
-                  <Text style={[styles.pickerOptionText, active && { color: brandColors?.primary, fontWeight: '700' }]}>
+                  <Text style={[styles.pickerOptionText, active && { color: buttonPalette.buttonTextSecondary, fontWeight: '700' }]}>
                     {opt.label}
                   </Text>
-                  {active && <MaterialCommunityIcons name="check-circle" size={18} color={brandColors?.primary} />}
+                  {active && <MaterialCommunityIcons name="check-circle" size={18} color={buttonPalette.buttonIconSecondary} />}
                 </TouchableOpacity>
               );
             })}
@@ -224,7 +223,7 @@ const SelectField = ({ label, value, options, onSelect, brandColors }) => {
 /* ─── Modal de edição do grupo ─── */
 const GroupEditModal = ({
   visible, group, draft, onClose, onSave,
-  saving, error, fieldErrors, onChangeDraft, brandColors,
+  saving, error, fieldErrors, onChangeDraft, buttonPalette, switchPalette,
 }) => {
   if (!draft) return null;
 
@@ -277,8 +276,9 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.required)}
                   onValueChange={v => onChangeDraft('required', v)}
-                  trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
-                  thumbColor="#fff"
+                  trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                  thumbColor={Boolean(draft.required) ? switchPalette.onThumb : switchPalette.offThumb}
+                  ios_backgroundColor={switchPalette.offTrack}
                 />
               </View>
             </View>
@@ -291,8 +291,9 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.showInDisplay)}
                   onValueChange={v => onChangeDraft('showInDisplay', v)}
-                  trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
-                  thumbColor="#fff"
+                  trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                  thumbColor={Boolean(draft.showInDisplay) ? switchPalette.onThumb : switchPalette.offThumb}
+                  ios_backgroundColor={switchPalette.offTrack}
                 />
               </View>
             </View>
@@ -304,8 +305,9 @@ const GroupEditModal = ({
                 <Switch
                   value={Boolean(draft.showInPrint)}
                   onValueChange={v => onChangeDraft('showInPrint', v)}
-                  trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
-                  thumbColor="#fff"
+                  trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                  thumbColor={Boolean(draft.showInPrint) ? switchPalette.onThumb : switchPalette.offThumb}
+                  ios_backgroundColor={switchPalette.offTrack}
                 />
               </View>
             </View>
@@ -315,7 +317,7 @@ const GroupEditModal = ({
               value={draft.customizationType}
               options={CUSTOMIZATION_TYPE_OPTIONS}
               onSelect={value => onChangeDraft('customizationType', value)}
-              brandColors={brandColors}
+              buttonPalette={buttonPalette}
             />
 
             <SelectField
@@ -323,7 +325,7 @@ const GroupEditModal = ({
               value={draft.unitQuantityMode}
               options={UNIT_QUANTITY_OPTIONS}
               onSelect={value => onChangeDraft('unitQuantityMode', value)}
-              brandColors={brandColors}
+              buttonPalette={buttonPalette}
             />
 
             {/* Mínimo / Máximo */}
@@ -382,7 +384,7 @@ const GroupEditModal = ({
                   value={draft.priceCalculation || 'sum'}
                   options={PRICE_CALCULATION_OPTIONS}
                   onSelect={v => onChangeDraft('priceCalculation', v)}
-                  brandColors={brandColors}
+                  buttonPalette={buttonPalette}
                 />
               </View>
             </View>
@@ -390,16 +392,33 @@ const GroupEditModal = ({
         </ScrollView>
 
         <View style={styles.modalFooter}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <Text style={styles.cancelBtnText}>Cancelar</Text>
+          <TouchableOpacity
+            style={[
+              styles.cancelBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                borderColor: buttonPalette.buttonBorderSecondary,
+              },
+            ]}
+            onPress={onClose}
+          >
+            <Text style={[styles.cancelBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cancelar</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.saveBtn, { backgroundColor: brandColors?.primary }, saving && { opacity: 0.6 }]}
+            style={[
+              styles.saveBtn,
+              {
+                backgroundColor: buttonPalette.buttonBackground,
+                borderColor: buttonPalette.buttonBorder,
+                borderWidth: 1,
+              },
+              saving && { opacity: 0.6 },
+            ]}
             onPress={onSave}
             disabled={saving}
           >
-            <MaterialCommunityIcons name="content-save-outline" size={16} color="#fff" />
-            <Text style={styles.saveBtnText}>{saving ? 'Salvando...' : 'Salvar'}</Text>
+            <MaterialCommunityIcons name="content-save-outline" size={16} color={buttonPalette.buttonIcon} />
+            <Text style={[styles.saveBtnText, { color: buttonPalette.buttonText }]}>{saving ? 'Salvando...' : 'Salvar'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -409,7 +428,7 @@ const GroupEditModal = ({
 
 const GroupImportModal = ({
   visible, groups, loading, importingId, error,
-  onClose, onImport, brandColors,
+  onClose, onImport, buttonPalette,
 }) => {
   const [search, setSearch] = useState('');
   const normalizedSearch = String(search || '').trim().toLowerCase();
@@ -513,9 +532,9 @@ const GroupImportModal = ({
                     </View>
                   </View>
                   {importing ? (
-                    <ActivityIndicator size="small" color={brandColors?.primary} />
+                    <ActivityIndicator size="small" color={buttonPalette.buttonIconSecondary} />
                   ) : (
-                    <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary} />
+                    <MaterialCommunityIcons name="tray-arrow-down" size={20} color={buttonPalette.buttonIconSecondary} />
                   )}
                 </TouchableOpacity>
               );
@@ -532,11 +551,48 @@ const ProductGroups = ({ ProductId }) => {
   const productGroupStore = useStore('product_group');
   const productGroupParentStore = useStore('product_group_parent');
   const peopleStore = useStore('people');
+  const themeStore = useStore('theme');
 
   const { actions } = productGroupStore;
   const groupParentActions = productGroupParentStore.actions;
   const { currentCompany } = peopleStore.getters;
-  const brandColors = useMemo(() => resolveThemePalette(), []);
+  const themeColors = themeStore?.getters?.colors || {};
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+    buttonBackgroundSecondary: themeColors.buttonBackgroundSecondary,
+    buttonBorderSecondary: themeColors.buttonBorderSecondary,
+    buttonTextSecondary: themeColors.buttonTextSecondary,
+    buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
+    iconDanger: themeColors.iconDanger,
+  }), [
+    themeColors.buttonBackground,
+    themeColors.buttonBackgroundSecondary,
+    themeColors.buttonBorder,
+    themeColors.buttonBorderSecondary,
+    themeColors.buttonIcon,
+    themeColors.buttonIconSecondary,
+    themeColors.buttonText,
+    themeColors.buttonTextSecondary,
+    themeColors.iconDanger,
+  ]);
+  const switchPalette = useMemo(() => ({
+    onTrack: themeColors.switchOnTrack,
+    offTrack: themeColors.switchOffTrack,
+    onThumb: themeColors.switchOnThumb,
+    offThumb: themeColors.switchOffThumb,
+    disabledTrack: themeColors.switchDisabledTrack,
+    disabledThumb: themeColors.switchDisabledThumb,
+  }), [
+    themeColors.switchDisabledThumb,
+    themeColors.switchDisabledTrack,
+    themeColors.switchOffThumb,
+    themeColors.switchOffTrack,
+    themeColors.switchOnThumb,
+    themeColors.switchOnTrack,
+  ]);
 
   const [groups, setGroups] = useState([]);
   const [loadingGroups, setLoadingGroups] = useState(true);
@@ -920,18 +976,32 @@ const ProductGroups = ({ ProductId }) => {
                 </View>
                 <View style={styles.cardActions}>
                   <TouchableOpacity
-                    style={styles.actionBtn}
+                    style={[
+                      styles.actionBtn,
+                      {
+                        backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                        borderColor: buttonPalette.buttonBorderSecondary,
+                        borderWidth: 1,
+                      },
+                    ]}
                     onPress={() => openEditModal(group)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <MaterialCommunityIcons name="pencil-outline" size={16} color="#64748B" />
+                    <MaterialCommunityIcons name="pencil-outline" size={16} color={buttonPalette.buttonIconSecondary} />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: '#FFF1F1' }]}
+                    style={[
+                      styles.actionBtn,
+                      {
+                        backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                        borderColor: buttonPalette.buttonBorderSecondary,
+                        borderWidth: 1,
+                      },
+                    ]}
                     onPress={() => setConfirmDeleteGroup(group)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <MaterialCommunityIcons name="trash-can-outline" size={16} color="#c10015" />
+                    <MaterialCommunityIcons name="trash-can-outline" size={16} color={buttonPalette.iconDanger} />
                   </TouchableOpacity>
                   <MaterialCommunityIcons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -950,7 +1020,7 @@ const ProductGroups = ({ ProductId }) => {
                     products={group.products}
                     productGroup={group['@id'] || group.id}
                     ProductId={ProductId}
-                    brandColors={brandColors}
+                    brandColors={{ primary: buttonPalette.buttonBackground }}
                   />
                 </View>
               )}
@@ -963,20 +1033,33 @@ const ProductGroups = ({ ProductId }) => {
         <View style={styles.bottomBar}>
           <View style={styles.bottomBarRow}>
             <TouchableOpacity
-              style={styles.importGroupBtn}
+              style={[
+                styles.importGroupBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                  borderColor: buttonPalette.buttonBorderSecondary,
+                },
+              ]}
               onPress={openImportModal}
               activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name="tray-arrow-down" size={20} color={brandColors?.primary} />
-              <Text style={[styles.importGroupBtnText, { color: brandColors?.primary }]}>Importar</Text>
+              <MaterialCommunityIcons name="tray-arrow-down" size={20} color={buttonPalette.buttonIconSecondary} />
+              <Text style={[styles.importGroupBtnText, { color: buttonPalette.buttonTextSecondary }]}>Importar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.addGroupBtn, { backgroundColor: brandColors?.primary }]}
+              style={[
+                styles.addGroupBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackground,
+                  borderColor: buttonPalette.buttonBorder,
+                  borderWidth: 1,
+                },
+              ]}
               onPress={openCreateModal}
               activeOpacity={0.85}
             >
-              <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-              <Text style={styles.addGroupBtnText}>Adicionar Grupo</Text>
+              <MaterialCommunityIcons name="plus" size={20} color={buttonPalette.buttonIcon} />
+              <Text style={[styles.addGroupBtnText, { color: buttonPalette.buttonText }]}>Adicionar Grupo</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -992,7 +1075,8 @@ const ProductGroups = ({ ProductId }) => {
         error={modalError}
         fieldErrors={fieldErrors}
         onChangeDraft={handleChangeDraft}
-        brandColors={brandColors}
+        buttonPalette={buttonPalette}
+        switchPalette={switchPalette}
       />
       <GroupImportModal
         visible={importModalVisible}
@@ -1002,7 +1086,7 @@ const ProductGroups = ({ ProductId }) => {
         error={importError}
         onClose={() => setImportModalVisible(false)}
         onImport={handleImportGroup}
-        brandColors={brandColors}
+        buttonPalette={buttonPalette}
       />
       {/* Modal de confirmação de exclusão */}
       <AnimatedModal
@@ -1022,15 +1106,32 @@ const ProductGroups = ({ ProductId }) => {
             O grupo <Text style={inlineStyle_606_26}>{confirmDeleteGroup?.productGroup || ''}</Text> será desvinculado deste produto. Se for o único vínculo ativo, o grupo inteiro será excluído.
           </Text>
           <View style={styles.confirmFooter}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmDeleteGroup(null)}>
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
+            <TouchableOpacity
+              style={[
+                styles.cancelBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                  borderColor: buttonPalette.buttonBorderSecondary,
+                },
+              ]}
+              onPress={() => setConfirmDeleteGroup(null)}
+            >
+              <Text style={[styles.cancelBtnText, { color: buttonPalette.buttonTextSecondary }]}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.deleteBtn, removing && { opacity: 0.6 }]}
+              style={[
+                styles.deleteBtn,
+                {
+                  backgroundColor: buttonPalette.buttonBackground,
+                  borderColor: buttonPalette.buttonBorder,
+                  borderWidth: 1,
+                },
+                removing && { opacity: 0.6 },
+              ]}
               onPress={handleConfirmDelete}
               disabled={removing}
             >
-              <Text style={styles.deleteBtnText}>{removing ? 'Excluindo...' : 'Excluir'}</Text>
+              <Text style={[styles.deleteBtnText, { color: buttonPalette.buttonText }]}>{removing ? 'Excluindo...' : 'Excluir'}</Text>
             </TouchableOpacity>
           </View>
         </View>

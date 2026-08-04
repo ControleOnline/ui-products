@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Switch } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '@store';
@@ -274,7 +274,7 @@ const ProductSearchModal = ({
 /* ─── Modal de formulário add/editar item ─── */
 const ItemFormModal = ({
   visible, title, draft, onClose, onSave, saving, error,
-  fieldErrors, onChangeDraft, brandColors,
+  fieldErrors, onChangeDraft, brandColors, switchPalette,
 }) => {
   if (!draft) return null;
 
@@ -369,8 +369,9 @@ const ItemFormModal = ({
               <Switch
                 value={draft.showInParentQueue !== false}
                 onValueChange={value => onChangeDraft('showInParentQueue', value)}
-                trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
-                thumbColor="#fff"
+                trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+                thumbColor={(draft.showInParentQueue !== false) ? switchPalette.onThumb : switchPalette.offThumb}
+                ios_backgroundColor={switchPalette.offTrack}
               />
             </View>
           </View>
@@ -402,6 +403,7 @@ const ItemCard = ({
   onToggleShowInParentQueue,
   toggling,
   brandColors,
+  switchPalette,
   productGroupIri,
   costSummary,
   parentProductId,
@@ -476,8 +478,11 @@ const ItemCard = ({
               value={showInParentQueue}
               disabled={toggling}
               onValueChange={value => onToggleShowInParentQueue(item, value)}
-              trackColor={{ false: '#E2E8F0', true: brandColors?.primary }}
-              thumbColor="#fff"
+              trackColor={{ false: switchPalette.offTrack, true: switchPalette.onTrack }}
+              thumbColor={toggling
+                ? switchPalette.disabledThumb
+                : (showInParentQueue ? switchPalette.onThumb : switchPalette.offThumb)}
+              ios_backgroundColor={switchPalette.offTrack}
             />
             <TouchableOpacity
               style={styles.itemActionBtn}
@@ -513,8 +518,25 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
   const productGroupProductStore = useStore('product_group_product');
   const productsStore = useStore('products');
   const peopleStore = useStore('people');
+  const themeStore = useStore('theme');
 
   const { currentCompany } = peopleStore.getters;
+  const themeColors = themeStore?.getters?.colors || {};
+  const switchPalette = useMemo(() => ({
+    onTrack: themeColors.switchOnTrack,
+    offTrack: themeColors.switchOffTrack,
+    onThumb: themeColors.switchOnThumb,
+    offThumb: themeColors.switchOffThumb,
+    disabledTrack: themeColors.switchDisabledTrack,
+    disabledThumb: themeColors.switchDisabledThumb,
+  }), [
+    themeColors.switchDisabledThumb,
+    themeColors.switchDisabledTrack,
+    themeColors.switchOffThumb,
+    themeColors.switchOffTrack,
+    themeColors.switchOnThumb,
+    themeColors.switchOnTrack,
+  ]);
 
   const productGroupIri = toProductGroupIri(productGroup);
   const productGroupId = String(productGroupIri || '').replace(/\D/g, '');
@@ -970,6 +992,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
             onToggleShowInParentQueue={handleToggleShowInParentQueue}
             toggling={!!itemId && itemId === togglingQueueItemId}
             brandColors={brandColors}
+            switchPalette={switchPalette}
             productGroupIri={productGroupIri}
             costSummary={costByItemId[normalizeEntityId(item)]}
             parentProductId={ProductId}
@@ -1021,6 +1044,7 @@ const ProductGroupProducts = ({ productGroup, ProductId, brandColors }) => {
         fieldErrors={fieldErrors}
         onChangeDraft={handleChangeDraft}
         brandColors={brandColors}
+        switchPalette={switchPalette}
       />
       {/* Modal: confirmar exclusão */}
       <AnimatedModal

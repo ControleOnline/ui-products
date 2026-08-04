@@ -94,6 +94,26 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
     [themeColors, currentCompany?.id],
   );
 
+  const buttonPalette = useMemo(() => ({
+    buttonBackground: themeColors.buttonBackground,
+    buttonBorder: themeColors.buttonBorder,
+    buttonText: themeColors.buttonText,
+    buttonIcon: themeColors.buttonIcon || themeColors.buttonText,
+    buttonBackgroundSecondary: themeColors.buttonBackgroundSecondary,
+    buttonBorderSecondary: themeColors.buttonBorderSecondary,
+    buttonTextSecondary: themeColors.buttonTextSecondary,
+    buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
+  }), [
+    themeColors.buttonBackground,
+    themeColors.buttonBackgroundSecondary,
+    themeColors.buttonBorder,
+    themeColors.buttonBorderSecondary,
+    themeColors.buttonIcon,
+    themeColors.buttonIconSecondary,
+    themeColors.buttonText,
+    themeColors.buttonTextSecondary,
+  ]);
+
   const [piRows, setPiRows]           = useState(null);
   const [inventories, setInventories] = useState([]);
   const [invMap, setInvMap]           = useState({});
@@ -332,21 +352,35 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
                   <View style={styles.actionRow}>
                     {hasPi && (
                       <TouchableOpacity
-                        style={[styles.movBtn, { backgroundColor: brandColors.primary + '18' }]}
+                        style={[
+                          styles.movBtn,
+                          {
+                            backgroundColor: buttonPalette.buttonBackground,
+                            borderColor: buttonPalette.buttonBorder,
+                            borderWidth: 1,
+                          },
+                        ]}
                         onPress={() => openMovement(piRow)}
                         activeOpacity={0.75}
                       >
-                        <MaterialCommunityIcons name="swap-vertical" size={14} color={brandColors.primary} />
-                        <Text style={[styles.movBtnText, { color: brandColors.primary }]}>Movimentar</Text>
+                        <MaterialCommunityIcons name="swap-vertical" size={14} color={buttonPalette.buttonIcon} />
+                        <Text style={[styles.movBtnText, { color: buttonPalette.buttonText }]}>Movimentar</Text>
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
-                      style={styles.editBtn}
+                      style={[
+                        styles.editBtn,
+                        {
+                          backgroundColor: buttonPalette.buttonBackgroundSecondary,
+                          borderColor: buttonPalette.buttonBorderSecondary,
+                          borderWidth: 1,
+                        },
+                      ]}
                       onPress={() => openEdit({ inv, piRow })}
                       activeOpacity={0.75}
                     >
-                      <MaterialCommunityIcons name="pencil-outline" size={14} color="#64748B" />
-                      <Text style={styles.editBtnText}>Limites</Text>
+                      <MaterialCommunityIcons name="pencil-outline" size={14} color={buttonPalette.buttonIconSecondary} />
+                      <Text style={[styles.editBtnText, { color: buttonPalette.buttonTextSecondary }]}>Limites</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
