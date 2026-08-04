@@ -177,8 +177,12 @@ const ProductSupplierRelationModal = ({
     buttonTextSecondary: themeColors.buttonTextSecondary,
     buttonIconSecondary: themeColors.buttonIconSecondary || themeColors.buttonTextSecondary,
     iconDanger: themeColors.iconDanger,
+    iconBackground: themeColors.iconBackground,
+    badgeBackground: themeColors.badgeBackground,
+    iconColor: themeColors.iconColor,
     iconSuccess: themeColors.iconSuccess,
     iconDisabled: themeColors.iconDisabled,
+    iconWarning: themeColors.iconWarning,
   }), [
     themeColors.buttonBackground,
     themeColors.buttonBackgroundSecondary,
@@ -189,8 +193,12 @@ const ProductSupplierRelationModal = ({
     themeColors.buttonText,
     themeColors.buttonTextSecondary,
     themeColors.iconDanger,
+    themeColors.iconBackground,
+    themeColors.badgeBackground,
+    themeColors.iconColor,
     themeColors.iconDisabled,
     themeColors.iconSuccess,
+    themeColors.iconWarning,
   ]);
 
   const productId = useMemo(
@@ -436,8 +444,11 @@ const ProductSupplierRelationModal = ({
             </Text>
           </View>
 
-          <TouchableOpacity onPress={onClose} style={styles.modalCloseButton} activeOpacity={0.7}>
-            <Icon name="close" size={18} color={buttonPalette.buttonIconSecondary} />
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.modalCloseButton, { backgroundColor: buttonPalette.iconBackground }]}
+            activeOpacity={0.7}>
+            <Icon name="close" size={18} color={buttonPalette.iconColor} />
           </TouchableOpacity>
         </View>
 

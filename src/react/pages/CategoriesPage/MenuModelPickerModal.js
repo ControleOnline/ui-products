@@ -6,6 +6,7 @@ import { styles } from '../Categories.styles'
 
 const MenuModelPickerModal = ({
   brandColors,
+  buttonPalette,
   isLoading,
   models,
   selectedModel,
@@ -25,8 +26,20 @@ const MenuModelPickerModal = ({
           <Text style={styles.pickerModalTitle}>
             {global.t?.t?.('categories', 'title', 'selectMenuModel')}
           </Text>
-          <TouchableOpacity onPress={onClose} style={styles.pickerModalClose}>
-            <MaterialCommunityIcons name="close" size={20} color="#64748B" />
+          <TouchableOpacity
+            onPress={onClose}
+            style={[
+              styles.pickerModalClose,
+              {
+                backgroundColor: buttonPalette?.iconBackground,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name="close"
+              size={20}
+              color={buttonPalette?.modalCloseIcon || buttonPalette?.iconColor}
+            />
           </TouchableOpacity>
         </View>
 
@@ -47,7 +60,14 @@ const MenuModelPickerModal = ({
                   key={model?.['@id'] || model?.id}
                   style={[
                     styles.modelOption,
-                    isSelected && styles.modelOptionSelected,
+                    {
+                      backgroundColor: isSelected
+                        ? buttonPalette?.buttonBackground
+                        : buttonPalette?.buttonBackgroundSecondary,
+                      borderColor: isSelected
+                        ? buttonPalette?.buttonBorder
+                        : buttonPalette?.buttonBorderSecondary,
+                    },
                   ]}
                   activeOpacity={0.85}
                   onPress={() => onSelect?.(model?.['@id'] || '')}
@@ -56,20 +76,24 @@ const MenuModelPickerModal = ({
                     <Text
                       style={[
                         styles.modelOptionTitle,
-                        isSelected && styles.modelOptionTitleSelected,
+                        {
+                          color: isSelected
+                            ? buttonPalette?.buttonText
+                            : buttonPalette?.buttonTextSecondary,
+                        },
                       ]}
                       numberOfLines={1}
                     >
                       {model?.model}
                     </Text>
-                    <Text style={styles.modelOptionSubtitle}>
+                    <Text style={[styles.modelOptionSubtitle, { color: isSelected ? buttonPalette?.buttonText : buttonPalette?.buttonTextSecondary }] }>
                       {global.t?.t?.('categories', 'label', 'menuContext')}
                     </Text>
                   </View>
                   <MaterialCommunityIcons
                     name={isSelected ? 'check-circle' : 'radiobox-blank'}
                     size={22}
-                    color={isSelected ? brandColors.primary : '#CBD5E1'}
+                    color={isSelected ? buttonPalette?.buttonIcon : buttonPalette?.buttonIconSecondary}
                   />
                 </TouchableOpacity>
               )

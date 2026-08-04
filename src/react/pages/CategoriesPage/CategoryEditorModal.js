@@ -9,6 +9,7 @@ import { inlineStyle_692_8, styles } from '../Categories.styles'
 
 const CategoryEditorModal = ({
   brandColors,
+  buttonPalette,
   category,
   companyId,
   context,
@@ -28,8 +29,20 @@ const CategoryEditorModal = ({
     <View style={styles.modalContainer}>
       <View style={styles.modalHeader}>
         <Text style={styles.modalTitle}>{title}</Text>
-        <TouchableOpacity onPress={onClose} style={styles.headerCloseButton}>
-          <MaterialCommunityIcons name="close" size={18} color="#64748B" />
+        <TouchableOpacity
+          onPress={onClose}
+          style={[
+            styles.headerCloseButton,
+            {
+              backgroundColor: buttonPalette?.iconBackground,
+            },
+          ]}
+        >
+          <MaterialCommunityIcons
+            name="close"
+            size={18}
+            color={buttonPalette?.modalCloseIcon || buttonPalette?.iconColor}
+          />
         </TouchableOpacity>
       </View>
 
@@ -70,16 +83,32 @@ const CategoryEditorModal = ({
       </ScrollView>
 
       <View style={styles.modalFooter}>
-        <TouchableOpacity style={styles.modalCancelButton} onPress={onClose}>
-          <Text style={styles.modalCancelButtonText}>
+        <TouchableOpacity
+          style={[
+            styles.modalCancelButton,
+            {
+              backgroundColor: buttonPalette?.buttonBackgroundSecondary,
+              borderColor: buttonPalette?.buttonBorderSecondary,
+            },
+          ]}
+          onPress={onClose}
+        >
+          <Text style={[styles.modalCancelButtonText, { color: buttonPalette?.buttonTextSecondary }]}>
             {global.t?.t?.('categories', 'button', 'cancel')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.modalSaveButton, { backgroundColor: brandColors.primary }]}
+          style={[
+            styles.modalSaveButton,
+            {
+              backgroundColor: buttonPalette?.buttonBackground || brandColors.primary,
+              borderColor: buttonPalette?.buttonBorder,
+              borderWidth: 1,
+            },
+          ]}
           onPress={() => formRef.current?.submit()}
         >
-          <Text style={styles.modalSaveButtonText}>
+          <Text style={[styles.modalSaveButtonText, { color: buttonPalette?.buttonText }]}>
             {category
               ? global.t?.t?.('categories', 'button', 'save')
               : global.t?.t?.('categories', 'button', 'create')}

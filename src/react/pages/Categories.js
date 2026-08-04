@@ -89,6 +89,27 @@ const CategoriesPage = ({ route }) => {
     ),
     [currentCompany?.id, themeColors],
   )
+  const buttonPalette = useMemo(() => {
+    const mergedThemeColors = {
+      ...themeColors,
+      ...(currentCompany?.theme?.colors || {}),
+    }
+
+    return {
+      buttonBackground: mergedThemeColors.buttonBackground,
+      buttonBorder: mergedThemeColors.buttonBorder,
+      buttonText: mergedThemeColors.buttonText,
+      buttonIcon: mergedThemeColors.buttonIcon || mergedThemeColors.buttonText,
+      buttonBackgroundSecondary: mergedThemeColors.buttonBackgroundSecondary,
+      buttonBorderSecondary: mergedThemeColors.buttonBorderSecondary,
+      buttonTextSecondary: mergedThemeColors.buttonTextSecondary,
+      buttonIconSecondary:
+        mergedThemeColors.buttonIconSecondary || mergedThemeColors.buttonTextSecondary,
+      iconBackground: mergedThemeColors.iconBackground,
+      iconColor: mergedThemeColors.iconColor,
+      modalCloseIcon: mergedThemeColors.modalCloseIcon,
+    }
+  }, [currentCompany?.theme?.colors, themeColors])
   const operationalRouteParams = useMemo(() => {
     const params = route?.params || {}
 
@@ -385,6 +406,7 @@ const CategoriesPage = ({ route }) => {
   }, [categoryActions, context, interactionMode, navigation, operationalRouteParams])
 
   const toolbarActions = useMemo(() => isManagerApp ? buildCategoryToolbarActions({
+    buttonPalette,
     canUseCompany: Boolean(currentCompany?.id),
     hasActivePlatforms,
     isDownloadingCatalog,
@@ -397,6 +419,7 @@ const CategoriesPage = ({ route }) => {
     onSyncAllEligible: handleSyncAllEligible,
   }) : [], [
     currentCompany?.id,
+    buttonPalette,
     downloadCatalog,
     handleSyncAllEligible,
     hasActivePlatforms,
@@ -446,9 +469,27 @@ const CategoriesPage = ({ route }) => {
           cardListProps={tableCardProps}
           compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
           defaultColor="$primary"
+          importAction={isManagerApp ? {
+            color: buttonPalette.buttonIcon,
+            style: {
+              backgroundColor: buttonPalette.buttonBackground,
+              borderColor: buttonPalette.buttonBorder,
+            },
+            labelStyle: {
+              color: buttonPalette.buttonText,
+            },
+          } : null}
           exportAction={isManagerApp ? {
             key: 'export-csv',
             icon: 'download',
+            color: buttonPalette.buttonIcon,
+            style: {
+              backgroundColor: buttonPalette.buttonBackground,
+              borderColor: buttonPalette.buttonBorder,
+            },
+            labelStyle: {
+              color: buttonPalette.buttonText,
+            },
             label: isDownloadingNormalizedCatalog
               ? global.t?.t?.('categories', 'label', 'exporting')
               : global.t?.t?.('categories', 'button', 'exportCsv'),
@@ -478,6 +519,7 @@ const CategoriesPage = ({ route }) => {
       {isManagerApp ? (
         <MenuModelPickerModal
           brandColors={brandColors}
+          buttonPalette={buttonPalette}
           isLoading={isLoadingMenuModels}
           models={menuModels}
           selectedModel={selectedMenuModel}
@@ -492,6 +534,7 @@ const CategoriesPage = ({ route }) => {
 
       <CategoryEditorModal
         brandColors={brandColors}
+        buttonPalette={buttonPalette}
         category={selectedCategory}
         companyId={currentCompany?.id}
         context={context}
