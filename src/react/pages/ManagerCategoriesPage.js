@@ -1,186 +1,45 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, ScrollView, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useStore } from '@store';
+import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
 import { useMessage } from '@controleonline/ui-common/src/react/components/MessageService';
 import { resolveThemePalette, withOpacity } from '@controleonline/../../src/styles/branding';
 import { colors } from '@controleonline/../../src/styles/colors';
-import styles from './ManagerCategoriesPage.styles';
 import {
   humanizeCategoryContext,
   normalizeCategoryContext,
 } from '@controleonline/ui-common/src/react/utils/categoryContexts';
+import styles from './ManagerCategoriesPage.styles';
+import ManagerCategoryParentPicker from './ManagerCategoryParentPicker';
+import {
+  COLOR_PRESETS,
+  cardShadow,
+  normalizeEntityId,
+  buildCompanyIri,
+  buildCategoryIri,
+  sortContextValues,
+} from './managerCategoriesHelpers';
 
-const cardShadow = Platform.select({
-  ios: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 14,
-  },
-  android: { elevation: 3 },
-  web: { boxShadow: '0 4px 14px rgba(15,23,42,0.06)' },
-});
-
-const COLOR_PRESETS = [
-  '#c10015',
-  '#F97316',
-  '#EAB308',
-  '#10b981',
-  '#14B8A6',
-  '#0EA5E9',
-  '#6366F1',
-  '#8B5CF6',
-  '#EC4899',
-  '#64748B',
-  '#0F172A',
-];
-
-const normalizeEntityId = value => {
-  if (value == null) {
-    return '';
-  }
-
-  const rawValue =
-    typeof value === 'object'
-      ? value?.['@id'] || value?.id || value?.value || ''
-      : value;
-
-  return String(rawValue || '').replace(/\D+/g, '').trim();
-};
-
-const buildCompanyIri = companyId => {
-  const normalizedCompanyId = normalizeEntityId(companyId);
-  return normalizedCompanyId ? `/people/${normalizedCompanyId}` : '';
-};
-
-const buildCategoryIri = categoryId => {
-  const normalizedCategoryId = normalizeEntityId(categoryId);
-  return normalizedCategoryId ? `/categories/${normalizedCategoryId}` : '';
-};
-
-const sortContextValues = values =>
-  [...values].sort((left, right) =>
-    humanizeCategoryContext(left).localeCompare(humanizeCategoryContext(right), 'pt-BR', {
-      sensitivity: 'base',
-    }),
-  );
-
-const ParentPickerModal = ({
-  visible,
-  onClose,
-  categories,
-  selectedParentId,
-  onSelect,
-}) => {
-  const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    if (!visible) {
-      setSearch('');
-    }
-  }, [visible]);
-
-  const filteredCategories = useMemo(() => {
-    const term = String(search || '').trim().toLowerCase();
-
-    return (Array.isArray(categories) ? categories : []).filter(category => {
-      if (!term) {
-        return true;
-      }
-
-      return String(category?.name || '').toLowerCase().includes(term);
-    });
-  }, [categories, search]);
-
-  return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalBackdrop}>
-          <TouchableWithoutFeedback>
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Categoria pai</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                  <Icon name="x" size={18} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.searchBar}>
-                <Icon name="search" size={16} color="#94A3B8" />
-                <TextInput
-                  value={search}
-                  onChangeText={setSearch}
-                  style={styles.searchInput}
-                  placeholder="Buscar categoria pai..."
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-
-              <ScrollView style={styles.parentList} keyboardShouldPersistTaps="handled">
-                <TouchableOpacity
-                  style={styles.parentRow}
-                  onPress={() => {
-                    onSelect(null);
-                    onClose();
-                  }}>
-                  <View style={[styles.parentColorDot, { backgroundColor: '#CBD5E1' }]} />
-                  <Text style={[styles.parentRowText, !selectedParentId && styles.parentRowTextActive]}>
-                    Nenhuma
-                  </Text>
-                  {!selectedParentId ? <Icon name="check-circle" size={18} color="#10b981" /> : null}
-                </TouchableOpacity>
-
-                {filteredCategories.map(category => {
-                  const categoryId = normalizeEntityId(category?.id || category?.['@id']);
-                  const isActive = categoryId === normalizeEntityId(selectedParentId);
-
-                  return (
-                    <TouchableOpacity
-                      key={category?.['@id'] || categoryId || category?.name}
-                      style={styles.parentRow}
-                      onPress={() => {
-                        onSelect(categoryId);
-                        onClose();
-                      }}>
-                      <View
-                        style={[
-                          styles.parentColorDot,
-                          { backgroundColor: category?.color },
-                        ]}
-                      />
-                      <Text style={[styles.parentRowText, isActive && styles.parentRowTextActive]}>
-                        {category?.name || 'Categoria'}
-                      </Text>
-                      {isActive ? <Icon name="check-circle" size={18} color="#2563EB" /> : null}
-                    </TouchableOpacity>
-                  );
-                })}
-
-                {filteredCategories.length === 0 ? (
-                  <View style={styles.parentEmptyState}>
-                    <Text style={styles.parentEmptyText}>Nenhuma categoria encontrada</Text>
-                  </View>
-                ) : null}
-              </ScrollView>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
-  );
-};
-
-export default function ManagerCategoriesPage({ navigation, route }) {
+export default function ManagerCategoriesPage({ route }) {
   const categoriesStore = useStore('categories');
   const peopleStore = useStore('people');
   const themeStore = useStore('theme');
   const messageApi = useMessage() || {};
 
   const categoryActions = categoriesStore.actions;
-  const { items: storeCategories = [], isLoading } = categoriesStore.getters;
+  const { items: storeCategories = [], columns } = categoriesStore.getters;
   const { currentCompany } = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
 
@@ -193,7 +52,6 @@ export default function ManagerCategoriesPage({ navigation, route }) {
     [themeColors, currentCompany?.id],
   );
 
-  const [searchTerm, setSearchTerm] = useState('');
   const [selectedContext, setSelectedContext] = useState('all');
   const [formVisible, setFormVisible] = useState(false);
   const [parentPickerVisible, setParentPickerVisible] = useState(false);
@@ -217,17 +75,25 @@ export default function ManagerCategoriesPage({ navigation, route }) {
     [currentCompany?.id, currentCompany?.['@id']],
   );
 
+  const requestParams = useMemo(() => {
+    if (!currentCompanyIri) return {};
+    const params = {
+      company: currentCompanyIri,
+      'order[sortOrder]': 'ASC',
+      'order[name]': 'ASC',
+    };
+    if (selectedContext && selectedContext !== 'all') {
+      params.context = selectedContext;
+    }
+    return params;
+  }, [currentCompanyIri, selectedContext]);
+
   const loadCategories = useCallback(async () => {
     if (!currentCompanyIri) {
       return [];
     }
-
-    return categoryActions.getItems({
-      company: currentCompanyIri,
-      'order[sortOrder]': 'ASC',
-      'order[name]': 'ASC',
-    });
-  }, [categoryActions, currentCompanyIri]);
+    return categoryActions.getItems(requestParams);
+  }, [categoryActions, currentCompanyIri, requestParams]);
 
   useFocusEffect(
     useCallback(() => {
@@ -239,102 +105,37 @@ export default function ManagerCategoriesPage({ navigation, route }) {
     const contextsFromDatabase = safeCategories
       .map(category => normalizeCategoryContext(category?.context))
       .filter(Boolean);
-
     const routePresetContext = normalizeCategoryContext(route?.params?.presetContext);
     const currentFormContext = normalizeCategoryContext(formContext);
-
     return sortContextValues(
-      Array.from(new Set([...contextsFromDatabase, routePresetContext, currentFormContext].filter(Boolean))),
+      Array.from(
+        new Set(
+          [...contextsFromDatabase, routePresetContext, currentFormContext].filter(Boolean),
+        ),
+      ),
+      humanizeCategoryContext,
     );
-  }, [formContext, route?.params?.presetContext, safeCategories]);
-
-  const contextDisplayByValue = useMemo(() => {
-    const displayMap = {};
-
-    safeCategories.forEach(category => {
-      const normalizedContext = normalizeCategoryContext(category?.context);
-      if (!normalizedContext || displayMap[normalizedContext]) {
-        return;
-      }
-
-      displayMap[normalizedContext] = String(category?.context || '');
-    });
-
-    const presetContext = normalizeCategoryContext(route?.params?.presetContext);
-    if (presetContext && !displayMap[presetContext]) {
-      displayMap[presetContext] = String(route?.params?.presetContext || presetContext);
-    }
-
-    const currentContext = normalizeCategoryContext(formContext);
-    if (currentContext && !displayMap[currentContext]) {
-      displayMap[currentContext] = String(formContext || currentContext);
-    }
-
-    return displayMap;
-  }, [formContext, route?.params?.presetContext, safeCategories]);
-
-  const filteredContextOptions = useMemo(() => {
-    const normalizedSearch = String(searchTerm || '').trim().toLowerCase();
-    if (!normalizedSearch) {
-      return allContexts;
-    }
-
-    return allContexts.filter(contextValue => {
-      const normalizedContextValue = normalizeCategoryContext(contextValue).toLowerCase();
-      const humanizedContext = humanizeCategoryContext(contextValue).toLowerCase();
-
-      return (
-        normalizedContextValue.includes(normalizedSearch) ||
-        humanizedContext.includes(normalizedSearch)
-      );
-    });
-  }, [allContexts, searchTerm]);
-
-  const filteredCategories = useMemo(() => {
-    const normalizedSearch = String(searchTerm || '').trim().toLowerCase();
-
-    return safeCategories.filter(category => {
-      const categoryContext = normalizeCategoryContext(category?.context);
-      const matchesContext = selectedContext === 'all' || categoryContext === selectedContext;
-
-      if (!matchesContext) {
-        return false;
-      }
-
-      if (!normalizedSearch) {
-        return true;
-      }
-
-      const categoryName = String(category?.name || '').toLowerCase();
-      const rawContext = categoryContext.toLowerCase();
-      const friendlyContext = humanizeCategoryContext(categoryContext).toLowerCase();
-
-      return (
-        categoryName.includes(normalizedSearch) ||
-        rawContext.includes(normalizedSearch) ||
-        friendlyContext.includes(normalizedSearch)
-      );
-    });
-  }, [safeCategories, searchTerm, selectedContext]);
+  }, [safeCategories, route?.params?.presetContext, formContext]);
 
   const parentOptions = useMemo(() => {
     const currentContext = normalizeCategoryContext(formContext);
     const editingId = normalizeEntityId(editingCategory?.id || editingCategory?.['@id']);
-
     return safeCategories.filter(category => {
       const categoryId = normalizeEntityId(category?.id || category?.['@id']);
       if (editingId && categoryId === editingId) {
         return false;
       }
-
       return normalizeCategoryContext(category?.context) === currentContext;
     });
   }, [editingCategory?.['@id'], editingCategory?.id, formContext, safeCategories]);
 
   const selectedParent = useMemo(
     () =>
-      safeCategories.find(category => normalizeEntityId(category?.id || category?.['@id']) === normalizeEntityId(formParentId)) ||
-      null,
+      safeCategories.find(
+        category =>
+          normalizeEntityId(category?.id || category?.['@id']) ===
+          normalizeEntityId(formParentId),
+      ) || null,
     [formParentId, safeCategories],
   );
 
@@ -343,7 +144,6 @@ export default function ManagerCategoriesPage({ navigation, route }) {
       const normalizedPresetContext =
         normalizeCategoryContext(presetContext) ||
         (selectedContext !== 'all' ? selectedContext : '');
-
       setEditingCategory(null);
       setFormName('');
       setFormContext(normalizedPresetContext);
@@ -358,76 +158,35 @@ export default function ManagerCategoriesPage({ navigation, route }) {
 
   const openEditModal = useCallback(category => {
     setEditingCategory(category);
-    setFormName(String(category?.name || ''));
-    setFormContext(normalizeCategoryContext(category?.context));
+    setFormName(category?.name || '');
+    setFormContext(normalizeCategoryContext(category?.context) || '');
     setIsFormContextLocked(false);
     setFormColor(category?.color || COLOR_PRESETS[5]);
-    setFormIcon(String(category?.icon || ''));
-    setFormParentId(normalizeEntityId(category?.parent?.id || category?.parent?.['@id']));
+    setFormIcon(category?.icon || '');
+    setFormParentId(normalizeEntityId(category?.parent?.id || category?.parent) || null);
     setFormVisible(true);
   }, []);
 
   const closeFormModal = useCallback(() => {
     setFormVisible(false);
-    setEditingCategory(null);
-    setFormName('');
-    setFormContext('');
-    setIsFormContextLocked(false);
-    setFormColor(COLOR_PRESETS[5]);
-    setFormIcon('');
-    setFormParentId(null);
+    setParentPickerVisible(false);
   }, []);
-
-  useEffect(() => {
-    const actionKey = route?.params?.categoryAction;
-    if (!actionKey) {
-      return;
-    }
-
-    const presetContext = normalizeCategoryContext(route?.params?.presetContext);
-    if (presetContext) {
-      setSelectedContext(presetContext);
-    }
-
-    if (route?.params?.startNew) {
-      openCreateModal(presetContext, {
-        lockContext: Boolean(route?.params?.lockContext && presetContext),
-      });
-    }
-    navigation?.setParams?.({
-      categoryAction: undefined,
-      presetContext,
-      lockContext: undefined,
-      startNew: false,
-    });
-  }, [
-    route?.params?.lockContext,
-    navigation,
-    openCreateModal,
-    route?.params?.categoryAction,
-    route?.params?.presetContext,
-    route?.params?.startNew,
-  ]);
 
   const handleSaveCategory = useCallback(async () => {
     const normalizedName = String(formName || '').trim();
     const normalizedContext = normalizeCategoryContext(formContext);
-
     if (!normalizedName) {
       messageApi.showError?.('Informe o nome da categoria.');
       return;
     }
-
     if (!normalizedContext) {
       messageApi.showError?.('Informe o contexto da categoria.');
       return;
     }
-
     if (!currentCompanyIri) {
       messageApi.showError?.('Selecione uma empresa antes de salvar categorias.');
       return;
     }
-
     setIsSubmitting(true);
     try {
       await categoryActions.save({
@@ -439,7 +198,6 @@ export default function ManagerCategoriesPage({ navigation, route }) {
         company: currentCompanyIri,
         parent: buildCategoryIri(formParentId) || null,
       });
-
       await loadCategories();
       setSelectedContext(normalizedContext);
       closeFormModal();
@@ -473,7 +231,6 @@ export default function ManagerCategoriesPage({ navigation, route }) {
       setDeleteTarget(null);
       return;
     }
-
     setIsSubmitting(true);
     try {
       await categoryActions.remove(categoryId);
@@ -489,6 +246,58 @@ export default function ManagerCategoriesPage({ navigation, route }) {
     }
   }, [categoryActions, deleteTarget?.id, loadCategories, messageApi]);
 
+  const renderCategoryCard = useCallback(
+    ({ item: category }) => {
+      if (!category) return null;
+      const categoryId = normalizeEntityId(category?.id || category?.['@id']);
+      return (
+        <View>
+          <View style={styles.categoryCardTop}>
+            <View
+              style={[styles.colorDot, { backgroundColor: category?.color || '#CBD5E1' }]}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.categoryName}>{category?.name}</Text>
+              <View
+                style={[
+                  styles.contextBadge,
+                  { backgroundColor: withOpacity(palette.primary, 0.1) },
+                ]}>
+                <Text style={[styles.contextBadgeText, { color: palette.primary }]}>
+                  {humanizeCategoryContext(category?.context) ||
+                    String(category?.context || 'Sem contexto')}
+                </Text>
+              </View>
+            </View>
+          </View>
+          <View style={styles.categoryCardBottom}>
+            <Text style={styles.categoryMeta}>
+              {category?.icon ? `Icone: ${category.icon}` : 'Sem icone'}
+            </Text>
+            <View style={styles.cardActions}>
+              <TouchableOpacity
+                style={styles.cardActionButton}
+                onPress={() => openEditModal(category)}>
+                <Icon name="edit-2" size={16} color="#475569" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.cardActionButton, styles.cardActionDanger]}
+                onPress={() =>
+                  setDeleteTarget({
+                    id: categoryId,
+                    label: category?.name || 'Categoria',
+                  })
+                }>
+                <Icon name="trash-2" size={16} color="#DC2626" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    },
+    [openEditModal, palette.primary],
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]}>
       <View style={styles.header}>
@@ -500,35 +309,18 @@ export default function ManagerCategoriesPage({ navigation, route }) {
         </View>
         <TouchableOpacity
           style={[styles.addButton, { backgroundColor: palette.primary }]}
-          activeOpacity={0.88}
           onPress={() => openCreateModal()}>
           <Icon name="plus" size={16} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Nova categoria</Text>
+          <Text style={styles.addButtonText}>Nova</Text>
         </TouchableOpacity>
       </View>
 
       <View style={[styles.filterCard, cardShadow]}>
-        <View style={styles.searchBar}>
-          <Icon name="search" size={16} color="#94A3B8" />
-          <TextInput
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            style={styles.searchInput}
-            placeholder="Buscar categoria ou contexto..."
-            placeholderTextColor="#94A3B8"
-          />
-          {searchTerm ? (
-            <TouchableOpacity onPress={() => setSearchTerm('')}>
-              <Icon name="x" size={16} color="#94A3B8" />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <Text style={styles.filterLabel}>Contextos vindos do banco</Text>
+        <Text style={styles.filterLabel}>Contextos</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.contextRow}>
+          contentContainerStyle={styles.contextChipsRow}>
           <TouchableOpacity
             style={[
               styles.contextChip,
@@ -541,253 +333,164 @@ export default function ManagerCategoriesPage({ navigation, route }) {
             <Text
               style={[
                 styles.contextChipText,
-                selectedContext === 'all' && styles.contextChipTextActive,
+                selectedContext === 'all' && { color: '#FFFFFF' },
               ]}>
               Todos
             </Text>
           </TouchableOpacity>
-
-          {filteredContextOptions.map(contextValue => {
-            const isActive = selectedContext === contextValue;
-
-            return (
-              <TouchableOpacity
-                key={contextValue}
+          {allContexts.map(contextValue => (
+            <TouchableOpacity
+              key={contextValue}
+              style={[
+                styles.contextChip,
+                selectedContext === contextValue && {
+                  backgroundColor: palette.primary,
+                  borderColor: palette.primary,
+                },
+              ]}
+              onPress={() => setSelectedContext(contextValue)}>
+              <Text
                 style={[
-                  styles.contextChip,
-                  isActive && {
-                    backgroundColor: palette.primary,
-                    borderColor: palette.primary,
-                  },
-                ]}
-                onPress={() => setSelectedContext(contextValue)}>
-                <Text style={[styles.contextChipText, isActive && styles.contextChipTextActive]}>
-                  {contextDisplayByValue[contextValue] || contextValue}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                  styles.contextChipText,
+                  selectedContext === contextValue && { color: '#FFFFFF' },
+                ]}>
+                {humanizeCategoryContext(contextValue)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
 
-      {isLoading ? (
-        <View style={styles.centeredState}>
-          <ActivityIndicator size="large" color={palette.primary} />
-        </View>
-      ) : (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}>
-          {filteredCategories.length === 0 ? (
-            <View style={[styles.emptyCard, cardShadow]}>
-              <Icon name="tag" size={36} color="#CBD5E1" />
-              <Text style={styles.emptyTitle}>Nenhuma categoria encontrada</Text>
-              <Text style={styles.emptySubtitle}>
-                Ajuste o filtro ou crie uma nova categoria para este contexto.
-              </Text>
-            </View>
-          ) : null}
+      <View style={{ flex: 1, paddingHorizontal: 12 }}>
+        <DefaultTable
+          key={`manager-categories-${selectedContext}-${currentCompanyIri}`}
+          storeName="categories"
+          requestParams={requestParams}
+          columns={columns}
+          initialViewMode="cards"
+          forceCardsOnCompact
+          add
+          onAdd={() => openCreateModal()}
+          onEditRow={openEditModal}
+          onRowPress={openEditModal}
+          showRowActions={false}
+          renderCard={renderCategoryCard}
+          searchProps={{
+            compact: true,
+            placeholder: 'Buscar categoria ou contexto...',
+            searchKey: 'search',
+            storeName: 'categories',
+          }}
+          totalItemsLabel="categories"
+          visibleColumnsPreferenceKey={`manager-categories-${selectedContext}`}
+          accentColor={palette.primary}
+        />
+      </View>
 
-          {filteredCategories.map(category => {
-            const categoryId = normalizeEntityId(category?.id || category?.['@id']);
-
-            return (
-              <View key={category?.['@id'] || categoryId || category?.name} style={[styles.categoryCard, cardShadow]}>
-                <View style={styles.categoryCardTop}>
-                  <View style={[styles.categoryColorDot, { backgroundColor: category?.color }]} />
-                  <View style={styles.categoryInfo}>
-                    <Text style={styles.categoryName}>{category?.name || 'Categoria sem nome'}</Text>
-                    <Text style={styles.categoryMeta}>
-                      {category?.parent?.name
-                        ? `Pai: ${category.parent.name}`
-                        : 'Sem categoria pai'}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.contextBadge,
-                      { backgroundColor: withOpacity(palette.primary, 0.1) },
-                    ]}>
-                    <Text style={[styles.contextBadgeText, { color: palette.primary }]}>
-                      {String(category?.context || 'Sem contexto')}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.categoryCardBottom}>
-                  <Text style={styles.categoryMeta}>
-                    {category?.icon ? `Icone: ${category.icon}` : 'Sem icone'}
-                  </Text>
-
-                  <View style={styles.cardActions}>
-                    <TouchableOpacity
-                      style={styles.cardActionButton}
-                      onPress={() => openEditModal(category)}>
-                      <Icon name="edit-2" size={16} color="#475569" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.cardActionButton, styles.cardActionDanger]}
-                      onPress={() =>
-                        setDeleteTarget({
-                          id: categoryId,
-                          label: category?.name || 'Categoria',
-                        })
-                      }>
-                      <Icon name="trash-2" size={16} color="#DC2626" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      <Modal transparent visible={formVisible} animationType="fade" onRequestClose={closeFormModal}>
+      <Modal
+        transparent
+        visible={formVisible}
+        animationType="fade"
+        onRequestClose={closeFormModal}>
         <TouchableWithoutFeedback onPress={closeFormModal}>
           <View style={styles.modalBackdrop}>
             <TouchableWithoutFeedback>
               <View style={styles.modalSheet}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>
-                    {editingCategory?.id ? 'Editar categoria' : 'Nova categoria'}
+                    {editingCategory ? 'Editar categoria' : 'Nova categoria'}
                   </Text>
-                  <TouchableOpacity onPress={closeFormModal} style={styles.closeButton}>
+                  <TouchableOpacity onPress={closeFormModal}>
                     <Icon name="x" size={18} color="#64748B" />
                   </TouchableOpacity>
                 </View>
-
-                <ScrollView keyboardShouldPersistTaps="handled" style={styles.formBody}>
+                <ScrollView keyboardShouldPersistTaps="handled">
                   <View style={styles.formField}>
                     <Text style={styles.formLabel}>Nome *</Text>
                     <TextInput
                       style={styles.textInput}
                       value={formName}
                       onChangeText={setFormName}
-                      placeholder="Ex: Propostas comerciais"
+                      placeholder="Nome da categoria"
                       placeholderTextColor="#94A3B8"
-                      autoFocus
                     />
                   </View>
-
                   <View style={styles.formField}>
                     <Text style={styles.formLabel}>Contexto *</Text>
-                    <TextInput
-                      style={[styles.textInput, isFormContextLocked && styles.textInputDisabled]}
-                      value={formContext}
-                      onChangeText={setFormContext}
-                      placeholder="Ex: proposal-category"
-                      placeholderTextColor="#94A3B8"
-                      autoCapitalize="none"
-                      editable={!isFormContextLocked}
-                    />
                     {isFormContextLocked ? (
-                      <Text style={styles.lockedContextHint}>
-                        Contexto fixo para esta origem.
-                      </Text>
-                    ) : allContexts.length > 0 ? (
-                      <View style={styles.suggestionRow}>
-                        {allContexts.map(contextValue => {
-                          const isActive = normalizeCategoryContext(formContext) === contextValue;
-
-                          return (
-                            <TouchableOpacity
-                              key={`suggestion-${contextValue}`}
-                              style={[
-                                styles.suggestionChip,
-                                isActive && {
-                                  backgroundColor: withOpacity(palette.primary, 0.12),
-                                  borderColor: palette.primary,
-                                },
-                              ]}
-                              onPress={() => setFormContext(contextValue)}>
-                              <Text
-                                style={[
-                                  styles.suggestionChipText,
-                                  isActive && { color: palette.primary },
-                                ]}>
-                                {contextValue}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
+                      <View style={styles.lockedField}>
+                        <Text style={styles.lockedFieldText}>
+                          {humanizeCategoryContext(formContext) || formContext}
+                        </Text>
                       </View>
-                    ) : null}
-                  </View>
-
-                  <View style={styles.formField}>
-                    <Text style={styles.formLabel}>Categoria pai</Text>
-                    <TouchableOpacity
-                      style={styles.selectButton}
-                      onPress={() => setParentPickerVisible(true)}>
-                      <Text style={[styles.selectButtonText, !selectedParent && styles.placeholderText]}>
-                        {selectedParent?.name || 'Nenhuma'}
-                      </Text>
-                      <Icon name="chevron-down" size={18} color="#64748B" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={styles.formField}>
-                    <Text style={styles.formLabel}>Cor</Text>
-                    <View style={styles.colorPalette}>
-                      {COLOR_PRESETS.map(colorValue => {
-                        const isActive = String(formColor || '').toLowerCase() === colorValue.toLowerCase();
-
-                        return (
-                          <TouchableOpacity
-                            key={colorValue}
-                            style={[
-                              styles.colorSwatch,
-                              { backgroundColor: colorValue },
-                              isActive && styles.colorSwatchActive,
-                            ]}
-                            onPress={() => setFormColor(colorValue)}>
-                            {isActive ? <Icon name="check" size={14} color="#FFFFFF" /> : null}
-                          </TouchableOpacity>
-                        );
-                      })}
+                    ) : (
                       <TextInput
-                        style={styles.colorInput}
-                        value={formColor}
-                        onChangeText={setFormColor}
-                        placeholder="#2563EB"
+                        style={styles.textInput}
+                        value={formContext}
+                        onChangeText={setFormContext}
+                        placeholder="Ex: product, receiver..."
                         placeholderTextColor="#94A3B8"
                         autoCapitalize="none"
                       />
+                    )}
+                  </View>
+                  <View style={styles.formField}>
+                    <Text style={styles.formLabel}>Cor</Text>
+                    <View style={styles.colorRow}>
+                      {COLOR_PRESETS.map(color => (
+                        <TouchableOpacity
+                          key={color}
+                          onPress={() => setFormColor(color)}
+                          style={[
+                            styles.colorSwatch,
+                            { backgroundColor: color },
+                            formColor === color && styles.colorSwatchActive,
+                          ]}>
+                          {formColor === color ? (
+                            <Icon name="check" size={12} color="#fff" />
+                          ) : null}
+                        </TouchableOpacity>
+                      ))}
                     </View>
                   </View>
-
                   <View style={styles.formField}>
-                    <Text style={styles.formLabel}>Icone</Text>
+                    <Text style={styles.formLabel}>Ícone</Text>
                     <TextInput
                       style={styles.textInput}
                       value={formIcon}
                       onChangeText={setFormIcon}
-                      placeholder="Ex: tag, file-text, briefcase"
+                      placeholder="Ex: tag, shopping-cart"
                       placeholderTextColor="#94A3B8"
                       autoCapitalize="none"
                     />
                   </View>
+                  <View style={styles.formField}>
+                    <Text style={styles.formLabel}>Categoria pai</Text>
+                    <TouchableOpacity
+                      style={styles.textInput}
+                      onPress={() => setParentPickerVisible(true)}>
+                      <Text style={{ color: selectedParent ? '#0F172A' : '#94A3B8' }}>
+                        {selectedParent?.name || 'Nenhuma'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </ScrollView>
-
-                <View style={styles.modalFooter}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={closeFormModal}>
-                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                <View style={styles.formActions}>
+                  <TouchableOpacity style={styles.btnCancel} onPress={closeFormModal}>
+                    <Text style={styles.btnCancelText}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
-                      styles.saveButton,
+                      styles.btnSave,
                       { backgroundColor: palette.primary },
-                      isSubmitting && { opacity: 0.7 },
+                      isSubmitting && { opacity: 0.6 },
                     ]}
-                    disabled={isSubmitting}
-                    onPress={handleSaveCategory}>
+                    onPress={handleSaveCategory}
+                    disabled={isSubmitting}>
                     {isSubmitting ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
+                      <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={styles.saveButtonText}>
-                        {editingCategory?.id ? 'Salvar' : 'Criar'}
-                      </Text>
+                      <Text style={styles.btnSaveText}>Salvar</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -797,37 +500,41 @@ export default function ManagerCategoriesPage({ navigation, route }) {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <ParentPickerModal
+      <ManagerCategoryParentPicker
         visible={parentPickerVisible}
         onClose={() => setParentPickerVisible(false)}
         categories={parentOptions}
         selectedParentId={formParentId}
-        onSelect={setFormParentId}
+        onSelect={id => {
+          setFormParentId(id);
+          setParentPickerVisible(false);
+        }}
       />
 
-      <Modal transparent visible={!!deleteTarget} animationType="fade" onRequestClose={() => setDeleteTarget(null)}>
+      <Modal
+        transparent
+        visible={!!deleteTarget}
+        animationType="fade"
+        onRequestClose={() => setDeleteTarget(null)}>
         <TouchableWithoutFeedback onPress={() => setDeleteTarget(null)}>
           <View style={styles.modalBackdrop}>
             <TouchableWithoutFeedback>
-              <View style={styles.confirmSheet}>
-                <Text style={styles.modalTitle}>Excluir categoria</Text>
-                <Text style={styles.confirmText}>
-                  Deseja excluir <Text style={styles.confirmStrong}>{deleteTarget?.label}</Text>?
+              <View style={styles.modalSheet}>
+                <Text style={styles.modalTitle}>Confirmar exclusão</Text>
+                <Text style={styles.deleteMsg}>
+                  Deseja excluir <Text style={{ fontWeight: '700' }}>{deleteTarget?.label}</Text>?
                 </Text>
-
-                <View style={styles.modalFooter}>
-                  <TouchableOpacity style={styles.cancelButton} onPress={() => setDeleteTarget(null)}>
-                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                <View style={styles.formActions}>
+                  <TouchableOpacity
+                    style={styles.btnCancel}
+                    onPress={() => setDeleteTarget(null)}>
+                    <Text style={styles.btnCancelText}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.saveButton, { backgroundColor: '#DC2626' }]}
-                    disabled={isSubmitting}
-                    onPress={handleDeleteCategory}>
-                    {isSubmitting ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>Excluir</Text>
-                    )}
+                    style={[styles.btnSave, { backgroundColor: '#c10015' }]}
+                    onPress={handleDeleteCategory}
+                    disabled={isSubmitting}>
+                    <Text style={styles.btnSaveText}>Excluir</Text>
                   </TouchableOpacity>
                 </View>
               </View>
