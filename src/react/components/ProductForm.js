@@ -2,6 +2,10 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, ScrollView, TextInput, Text, TouchableOpacity, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStore } from '@store';
+import {
+  resolveInitialProviderId,
+  buildProductPeopleSupplierPayload,
+} from '../domain/productProviderLink';
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { useNavigation } from '@react-navigation/native';
@@ -316,6 +320,7 @@ const ProductForm = ({
   catalogContext,
   contextTypes,
   initialProductType,
+  initialProvider: propInitialProvider,
   onSavedProductId,
   onSaved,
 }) => {
@@ -330,6 +335,7 @@ const ProductForm = ({
   const categoriesStore = useStore('categories');
   const productCategoryStore = useStore('product_category');
   const peopleStore = useStore('people');
+  const productPeopleStore = useStore('product_people');
   const productUnitStore = useStore('product_unit');
   const queuesStore = useStore('queues');
   const inventoriesStore = useStore('inventories');
@@ -338,6 +344,11 @@ const ProductForm = ({
   const { actions: categoryActions, getters: categoryGetters } = categoriesStore;
   const { actions: productCategoryActions } = productCategoryStore;
   const { getters: peopleGetters } = peopleStore;
+  const { actions: productPeopleActions } = productPeopleStore;
+  const initialProviderId = resolveInitialProviderId(
+    propInitialProvider,
+    route?.params || {},
+  );
   const { getters: productUnitGetters } = productUnitStore;
   const { getters: queuesGetters } = queuesStore;
   const { getters: inventoriesGetters } = inventoriesStore;
@@ -761,12 +772,29 @@ const ProductForm = ({
       const data = await productActions.save(payload);
       if (data) {
         await syncProductCategories(data);
+        let providerLinkError = '';
+        if (!ProductId && initialProviderId) {
+          const linkPayload = buildProductPeopleSupplierPayload({
+            productData: data,
+            initialProviderId,
+          });
+          if (linkPayload && productPeopleActions?.save) {
+            try {
+              await productPeopleActions.save(linkPayload);
+            } catch (linkError) {
+              providerLinkError =
+                'Nao foi possivel vincular o fornecedor ao novo produto.';
+            }
+          }
+        }
         const refreshed = await productActions.get(data.id || ProductId);
         setProduct(normalizeProductForForm(refreshed || data));
         setActionStatus(
-          duplicateCandidate?.match && !ProductId
-            ? 'Ingrediente já existia. Cadastro existente atualizado.'
-            : entityLabels.saveSuccess,
+          providerLinkError
+            ? `Produto salvo, mas o fornecedor nao foi vinculado automaticamente. ${providerLinkError}`
+            : duplicateCandidate?.match && !ProductId
+              ? 'Ingrediente já existia. Cadastro existente atualizado.'
+              : entityLabels.saveSuccess,
         );
         if (onSaved) onSaved(refreshed || data);
         if (!propProductId) {

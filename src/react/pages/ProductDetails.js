@@ -357,6 +357,7 @@ const ProductDetails = ({ route, navigation }) => {
                 catalogContext={context}
                 contextTypes={contextTypes}
                 initialProductType={requestedProductType}
+                initialProvider={routeParams.initialProvider}
                 onSaved={() => {
                   loadProductSummary();
                   loadCostSummary();
