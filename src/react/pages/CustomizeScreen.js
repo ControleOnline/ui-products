@@ -1217,7 +1217,7 @@ const CustomizeScreen = () => {
   );
 
   const allSelectedNodeItems = useMemo(() => {
-    const selectedItems = [];
+    const collectedItems = [];
     const visitedNodeKeys = new Set([
       rootNodeKey,
       ...Object.keys(customizationNodesByKey),
@@ -1228,11 +1228,11 @@ const CustomizeScreen = () => {
       getNodeProductGroups(nodeKey).forEach(group => {
         getNodeGroupItems(nodeKey, group)
           .filter(item => item?.selected)
-          .forEach(item => selectedItems.push(item));
+          .forEach(item => collectedItems.push(item));
       });
     });
 
-    return selectedItems;
+    return collectedItems;
   }, [
     childNodeBySelectionKey,
     customizationNodesByKey,
@@ -1482,26 +1482,28 @@ const CustomizeScreen = () => {
   const handleToggleOption = async (groupId, option) => {
     const normalizedGroupId = String(groupId || '');
     const currentGroup = resolvedProductGroupsById[normalizedGroupId];
-    let willSelectOption = false;
+    const selectedGroup = resolveNodeGroupItemsFromSource(
+      activeNodeKey,
+      currentGroup,
+      selectedItemsByNode,
+    );
+    const optionId = option?.value?.['@id'];
+    const maximum = resolveEffectiveGroupMaximum(currentGroup);
+    const selectedCount = selectedGroup.filter(item => item?.selected).length;
+    const targetOption = selectedGroup.find(item => item['@id'] === optionId);
+    const willSelectOption = !targetOption?.selected;
+
+    if (willSelectOption && maximum !== null && selectedCount >= maximum) {
+      return;
+    }
 
     setSelectedItemsByNode(prev => {
-      const selectedGroup = resolveNodeGroupItemsFromSource(
+      const currentSelectedGroup = resolveNodeGroupItemsFromSource(
         activeNodeKey,
         currentGroup,
         prev,
       );
-      const optionId = option?.value?.['@id'];
-      const maximum = resolveEffectiveGroupMaximum(currentGroup);
-      const selectedCount = selectedGroup.filter(item => item?.selected).length;
-      const targetOption = selectedGroup.find(item => item['@id'] === optionId);
-      const isCurrentlySelected = !!targetOption?.selected;
-      willSelectOption = !isCurrentlySelected;
-
-      if (!isCurrentlySelected && maximum !== null && selectedCount >= maximum) {
-        return prev;
-      }
-
-      const updatedGroup = selectedGroup.map(item =>
+      const updatedGroup = currentSelectedGroup.map(item =>
         item['@id'] === optionId
           ? {...item, selected: !item.selected}
           : item,
@@ -2002,7 +2004,7 @@ const CustomizeScreen = () => {
     const disabled = isNestedCustomization
       ? false
       : isSavingCustomization || !canSubmitCustomization;
-    const label = isNestedCustomization ? 'CONCLUIR SUBITEM' : submitLabel;
+    const label = isNestedCustomization ? 'VOLTAR AO ITEM' : submitLabel;
 
     return (
       <TouchableOpacity

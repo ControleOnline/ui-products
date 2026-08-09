@@ -37,10 +37,10 @@ export const getEmbeddedOrderProductComponents = orderProduct => {
 };
 
 export const buildCustomizationNodeKey = (parentNodeKey, groupId, productId) =>
-  `${String(parentNodeKey || 'root')}::${String(groupId || 'group')}::${String(productId || 'product')}`;
+  `node::${String(parentNodeKey || 'root')}::${String(groupId || 'group')}::${String(productId || 'product')}`;
 
 export const buildCustomizationSelectionKey = (nodeKey, groupId, productId) =>
-  `${String(nodeKey || 'root')}::${String(groupId || 'group')}::${String(productId || 'product')}`;
+  `selection::${String(nodeKey || 'root')}::${String(groupId || 'group')}::${String(productId || 'product')}`;
 
 const roundCustomizationQuantity = value =>
   Number(parseCustomizeTreeNumber(value).toFixed(2));
@@ -104,6 +104,9 @@ export const buildExistingCustomizationTree = ({
       const localQuantity =
         resolveCustomizeTreeQuantity(component?.quantity) /
         resolveCustomizeTreeQuantity(parentQuantity);
+      const resolvedComponentQuantity = resolveCustomizeTreeQuantity(
+        component?.quantity,
+      );
 
       registerSelection(parentNodeKey, groupId, productId, localQuantity);
 
@@ -126,7 +129,7 @@ export const buildExistingCustomizationTree = ({
         parentNodeKey,
       };
 
-      visitNode(component, childNodeKey, component?.quantity);
+      visitNode(component, childNodeKey, resolvedComponentQuantity);
     });
   };
 
