@@ -56,8 +56,17 @@ import {
   customizeOptionImageWrapStyle,
   customizeOptionMetaStyle,
   customizeOptionNameStyle,
+  customizeOptionNestedGroupStyle,
+  customizeOptionNestedGroupTitleStyle,
+  customizeOptionNestedItemNameStyle,
+  customizeOptionNestedItemPriceStyle,
+  customizeOptionNestedItemRowStyle,
+  customizeOptionNestedSummaryStyle,
+  customizeOptionNestedTotalStyle,
+  customizeOptionPriceStackStyle,
   customizeOptionPlaceholderTextStyle,
   customizeOptionPriceStyle,
+  customizeOptionTrailingStyle,
   customizeOptionsStackStyle,
   customizeOptionTouchableStyle,
   customizeQuantityPillStyle,
@@ -96,6 +105,16 @@ import {
 } from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {resolveFileImageUrl} from '@controleonline/ui-common/src/react/utils/fileUrl';
+import NestedCustomizationModal from '../components/NestedCustomizationModal';
+import {nestedEditButtonStyle} from '../components/NestedCustomizationModal.styles';
+import {
+  buildUnitTreeFromOrderProductComponents,
+  calculateCustomizationTreePrice,
+  findUnitTreeNode,
+  resolveGroupMinimum,
+  serializeCustomizationTree,
+  summarizeCustomizationTree,
+} from '../domain/customizationTree';
 
 const normalizeEntityId = value => {
   const clean = String(value || '').replace(/\D/g, '');
@@ -307,6 +326,7 @@ const CustomizeScreen = () => {
   const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
   const [selectedItems, setSelectedItems] = useState({});
   const [optionProductsById, setOptionProductsById] = useState({});
+  const [nestedEditor, setNestedEditor] = useState(null);
 
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
@@ -511,6 +531,11 @@ const CustomizeScreen = () => {
       ? activeOrderProduct.orderProductComponents
       : [];
 
+    const existingUnitTree = buildUnitTreeFromOrderProductComponents(
+      components,
+      activeOrderProductQuantity,
+    );
+
     components.forEach(component => {
       const groupId = normalizeEntityId(
         component?.productGroup?.id ||
@@ -531,6 +556,8 @@ const CustomizeScreen = () => {
         mappedSelections[groupId] = {};
       }
 
+      const unitNode = findUnitTreeNode(existingUnitTree, groupId, productId);
+      const nestedTree = unitNode?.sub_products || [];
       mappedSelections[groupId][productId] = {
         selected: true,
         quantity: (() => {
@@ -546,6 +573,9 @@ const CustomizeScreen = () => {
 
           return componentQuantity;
         })(),
+        sub_products: nestedTree,
+        hasNestedGroups: nestedTree.length > 0 || undefined,
+        nestedState: nestedTree.length > 0 ? 'valid' : undefined,
       };
     });
 
@@ -1037,22 +1067,23 @@ const CustomizeScreen = () => {
 
         return [
           groupId,
-          groupProducts.map(item => ({
-            ...item,
-            selected: !!existingSelections[
-              normalizeEntityId(
-                item?.productChild?.id || item?.productChild?.['@id'],
-              )
-            ]?.selected,
-            quantity:
-              existingSelections[
-                normalizeEntityId(
-                  item?.productChild?.id || item?.productChild?.['@id'],
-                )
-              ]?.quantity ||
-              parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
-              1,
-          })),
+          groupProducts.map(item => {
+            const productId = normalizeEntityId(
+              item?.productChild?.id || item?.productChild?.['@id'],
+            );
+            const existingSelection = existingSelections[productId];
+            return {
+              ...item,
+              selected: !!existingSelection?.selected,
+              quantity:
+                existingSelection?.quantity ||
+                parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
+                1,
+              sub_products: existingSelection?.sub_products || [],
+              hasNestedGroups: existingSelection?.hasNestedGroups,
+              nestedState: existingSelection?.nestedState,
+            };
+          }),
         ];
       }),
     );
@@ -1072,10 +1103,20 @@ const CustomizeScreen = () => {
         const groupItems = Array.isArray(selectedItems[groupId])
           ? selectedItems[groupId]
           : [];
-        const selectedCount = groupItems.filter(item => item?.selected).length;
+        const selectedOptions = groupItems.filter(item => item?.selected);
+        const selectedCount = selectedOptions.length;
+        const hasInvalidDescendant = selectedOptions.some(item =>
+          ['checking', 'pending', 'invalid'].includes(item?.nestedState),
+        );
         const minimum = resolveEffectiveGroupMinimum(group);
         const maximum = resolveEffectiveGroupMaximum(group);
-        const extraPrice = calculateGroupExtraPrice(group, groupItems);
+        const extraPrice =
+          calculateGroupExtraPrice(group, groupItems) +
+          selectedOptions.reduce(
+            (sum, item) =>
+              sum + calculateCustomizationTreePrice(item?.sub_products),
+            0,
+          );
         let validationMessage = '';
 
         if (selectedCount < minimum) {
@@ -1088,6 +1129,8 @@ const CustomizeScreen = () => {
             maximum === 1
               ? 'Selecione no maximo 1 opcao.'
               : `Selecione no maximo ${maximum} opcoes.`;
+        } else if (hasInvalidDescendant) {
+          validationMessage = 'Conclua a personalizacao da opcao selecionada.';
         }
 
         let selectionRuleLabel = 'Sem limite de selecao.';
@@ -1113,6 +1156,7 @@ const CustomizeScreen = () => {
             group?.priceCalculation,
           ),
           isRequired: minimum > 0 || !!group?.required,
+          hasInvalidDescendant,
         };
       }),
     [resolvedProductGroups, selectedItems],
@@ -1286,8 +1330,68 @@ const CustomizeScreen = () => {
     );
   };
 
+  const updateNestedOption = useCallback((groupId, optionId, updater) => {
+    setSelectedItems(current => ({
+      ...current,
+      [groupId]: (current[groupId] || []).map(item =>
+        item['@id'] === optionId ? updater(item) : item,
+      ),
+    }));
+  }, []);
+
+  const inspectNestedOption = useCallback(async (groupId, option) => {
+    const optionId = option?.value?.['@id'] || option?.['@id'];
+    const relation = option?.value || option;
+    const baseProduct = relation?.productChild;
+    const productId = normalizeEntityId(baseProduct?.id || baseProduct?.['@id']);
+    if (!productId) {
+      return;
+    }
+
+    updateNestedOption(groupId, optionId, item => ({...item, nestedState: 'checking'}));
+    try {
+      const nestedGroups = await productGroupActionsRef.current.getItems({
+        product: productId,
+        'product.productType': 'component',
+      });
+      if (!Array.isArray(nestedGroups) || nestedGroups.length === 0) {
+        updateNestedOption(groupId, optionId, item => ({
+          ...item,
+          hasNestedGroups: false,
+          nestedState: 'valid',
+        }));
+        return;
+      }
+
+      updateNestedOption(groupId, optionId, item => ({
+        ...item,
+        hasNestedGroups: true,
+        nestedState:
+          item?.sub_products?.length > 0 ||
+          !nestedGroups.some(group => resolveGroupMinimum(group) > 0)
+            ? 'valid'
+            : 'pending',
+      }));
+      setNestedEditor({
+        groupId,
+        optionId,
+        groups: nestedGroups,
+        product: optionProductsById[productId]
+          ? {...baseProduct, ...optionProductsById[productId]}
+          : baseProduct,
+      });
+    } catch {
+      updateNestedOption(groupId, optionId, item => ({
+        ...item,
+        hasNestedGroups: true,
+        nestedState: 'invalid',
+      }));
+    }
+  }, [optionProductsById, updateNestedOption]);
+
   const handleToggleOption = (groupId, option) => {
     const normalizedGroupId = String(groupId || '');
+    const isCurrentlySelected = isSelected(normalizedGroupId, option?.value);
     setSelectedItems(prev => {
       const selectedGroup = Array.isArray(prev[normalizedGroupId])
         ? prev[normalizedGroupId]
@@ -1297,9 +1401,9 @@ const CustomizeScreen = () => {
       const maximum = resolveEffectiveGroupMaximum(currentGroup);
       const selectedCount = selectedGroup.filter(item => item?.selected).length;
       const targetOption = selectedGroup.find(item => item['@id'] === optionId);
-      const isCurrentlySelected = !!targetOption?.selected;
+      const targetIsCurrentlySelected = !!targetOption?.selected;
 
-      if (!isCurrentlySelected && maximum !== null && selectedCount >= maximum) {
+      if (!targetIsCurrentlySelected && maximum !== null && selectedCount >= maximum) {
         return prev;
       }
 
@@ -1314,23 +1418,26 @@ const CustomizeScreen = () => {
         [normalizedGroupId]: updatedGroup,
       };
     });
+
+    if (!isCurrentlySelected) {
+      inspectNestedOption(normalizedGroupId, option);
+    }
   };
 
-  const getSubproducts = () => {
-    const subProducts = [];
-    Object.entries(selectedItems).forEach(([groupId, groupItems]) => {
-      groupItems.forEach(item => {
-        if (item.selected) {
-          const selectedQuantity = resolvePositiveQuantity(item.quantity || 1);
-          subProducts.push({
-            product: item.productChild['@id'].replace(/\D/g, ''),
-            productGroup: parseInt(groupId),
-            quantity: Number((selectedQuantity * resolvedItemQuantity).toFixed(2)),
-          });
-        }
-      });
-    });
-    return subProducts;
+  const getSubproducts = () =>
+    serializeCustomizationTree(selectedItems, resolvedItemQuantity);
+
+  const saveNestedCustomization = unitTree => {
+    if (!nestedEditor) {
+      return;
+    }
+    updateNestedOption(nestedEditor.groupId, nestedEditor.optionId, item => ({
+      ...item,
+      sub_products: unitTree,
+      hasNestedGroups: true,
+      nestedState: 'valid',
+    }));
+    setNestedEditor(null);
   };
 
   const addHandle = async () => {
@@ -1511,6 +1618,53 @@ const CustomizeScreen = () => {
       optionProduct?.productUnit?.unit ||
       optionProduct?.productUnity?.unit ||
       '';
+    const selectedOptionState = (selectedItems[groupId] || []).find(
+      item => item?.['@id'] === option?.value?.['@id'],
+    );
+    const hasNestedCustomization =
+      isOptionSelected && selectedOptionState?.hasNestedGroups;
+    const nestedCustomizationPending =
+      isOptionSelected &&
+      ['checking', 'pending', 'invalid'].includes(selectedOptionState?.nestedState);
+    const nestedSummaryGroups = isOptionSelected
+      ? summarizeCustomizationTree(selectedOptionState?.sub_products)
+      : [];
+    const nestedAdditionalPrice = isOptionSelected
+      ? calculateCustomizationTreePrice(selectedOptionState?.sub_products)
+      : 0;
+
+    const renderNestedSummaryGroups = (groups, depth = 0) =>
+      groups.map(nestedGroup => (
+        <View
+          key={`${option.value?.['@id']}-${depth}-${nestedGroup.groupId}`}
+          style={[
+            customizeOptionNestedGroupStyle,
+            depth > 0 ? {marginLeft: Math.min(depth, 3) * 8} : null,
+          ]}>
+          <Text
+            style={customizeOptionNestedGroupTitleStyle({palette})}
+            numberOfLines={1}>
+            {nestedGroup.groupName}
+          </Text>
+          {nestedGroup.items.map(nestedItem => (
+            <View key={`${nestedGroup.groupId}-${nestedItem.productId}`}>
+              <View style={customizeOptionNestedItemRowStyle}>
+                <Text
+                  style={customizeOptionNestedItemNameStyle({palette})}
+                  numberOfLines={1}>
+                  {nestedItem.productName}
+                </Text>
+                {nestedItem.price > 0 ? (
+                  <Text style={customizeOptionNestedItemPriceStyle({palette})}>
+                    +{Formatter.formatMoney(nestedItem.price, 'R$', 'pt-br')}
+                  </Text>
+                ) : null}
+              </View>
+              {renderNestedSummaryGroups(nestedItem.groups, depth + 1)}
+            </View>
+          ))}
+        </View>
+      ));
 
     return (
       <TouchableOpacity
@@ -1553,16 +1707,46 @@ const CustomizeScreen = () => {
           <Text style={customizeOptionMetaStyle({palette})} numberOfLines={1}>
             Adiciona {optionQuantityLabel}
             {optionUnitLabel ? ` ${optionUnitLabel}` : ''}
+            {nestedCustomizationPending ? ' • personalizacao pendente' : ''}
+            {hasNestedCustomization && !nestedCustomizationPending
+              ? ' • personalizado'
+              : ''}
           </Text>
+          {nestedSummaryGroups.length > 0 ? (
+            <View style={customizeOptionNestedSummaryStyle({palette})}>
+              {renderNestedSummaryGroups(nestedSummaryGroups)}
+            </View>
+          ) : null}
         </View>
-        <Text
-          style={customizeOptionPriceStyle({
-            palette,
-            selected: isOptionSelected,
-          })}>
-          {optionPrice > 0 ? '+' : ''}
-          {Formatter.formatMoney(optionPrice, 'R$', 'pt-br')}
-        </Text>
+        <View style={customizeOptionTrailingStyle}>
+          {hasNestedCustomization ? (
+            <TouchableOpacity
+              accessibilityLabel={`Personalizar ${option.label}`}
+              onPress={() => inspectNestedOption(groupId, option)}
+              style={nestedEditButtonStyle(palette)}>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={24}
+                color={palette.primary}
+              />
+            </TouchableOpacity>
+          ) : null}
+          <View style={customizeOptionPriceStackStyle}>
+            <Text
+              style={customizeOptionPriceStyle({
+                palette,
+                selected: isOptionSelected,
+              })}>
+              {optionPrice > 0 ? '+' : ''}
+              {Formatter.formatMoney(optionPrice, 'R$', 'pt-br')}
+            </Text>
+            {nestedAdditionalPrice > 0 ? (
+              <Text style={customizeOptionNestedTotalStyle({palette})}>
+                +{Formatter.formatMoney(nestedAdditionalPrice, 'R$', 'pt-br')} adicionais
+              </Text>
+            ) : null}
+          </View>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -1856,6 +2040,23 @@ const CustomizeScreen = () => {
           )}
         </View>
       </View>
+      {nestedEditor ? (
+        <NestedCustomizationModal
+          initialTree={
+            (selectedItems[nestedEditor.groupId] || []).find(
+              item => item?.['@id'] === nestedEditor.optionId,
+            )?.sub_products || []
+          }
+          onCancel={() => setNestedEditor(null)}
+          onSave={saveNestedCustomization}
+          palette={palette}
+          preloadedGroups={nestedEditor.groups}
+          product={nestedEditor.product}
+          productGroupActions={productGroupActions}
+          productGroupProductActions={productGroupProductActions}
+          visible
+        />
+      ) : null}
     </View>
   );
 };

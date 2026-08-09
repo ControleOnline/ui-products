@@ -370,11 +370,74 @@ export const customizeOptionMetaStyle = ({palette}) => ({
   marginTop: 3,
 });
 
+export const customizeOptionNestedSummaryStyle = ({palette}) => ({
+  marginTop: 7,
+  paddingLeft: 8,
+  borderLeftWidth: 1,
+  borderLeftColor: palette.primaryBorder,
+});
+
+export const customizeOptionNestedGroupStyle = {
+  marginTop: 3,
+};
+
+export const customizeOptionNestedGroupTitleStyle = ({palette}) => ({
+  color: palette.muted,
+  fontSize: 9,
+  lineHeight: 12,
+  fontWeight: '800',
+  letterSpacing: 0.25,
+  textTransform: 'uppercase',
+});
+
+export const customizeOptionNestedItemRowStyle = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+  marginTop: 1,
+};
+
+export const customizeOptionNestedItemNameStyle = ({palette}) => ({
+  flex: 1,
+  minWidth: 0,
+  color: palette.text,
+  fontSize: 11,
+  lineHeight: 14,
+  fontWeight: '600',
+});
+
+export const customizeOptionNestedItemPriceStyle = ({palette}) => ({
+  color: palette.primary,
+  fontSize: 10,
+  lineHeight: 13,
+  fontWeight: '800',
+});
+
+export const customizeOptionTrailingStyle = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+};
+
+export const customizeOptionPriceStackStyle = {
+  alignItems: 'flex-end',
+  gap: 2,
+};
+
 export const customizeOptionPriceStyle = ({palette, selected}) => ({
   color: selected ? palette.primary : palette.muted,
   fontSize: 13,
   fontWeight: '900',
   marginLeft: 8,
+});
+
+export const customizeOptionNestedTotalStyle = ({palette}) => ({
+  color: palette.primary,
+  fontSize: 10,
+  lineHeight: 13,
+  fontWeight: '800',
+  textAlign: 'right',
 });
 
 export const customizeSummaryColumnStyle = ({palette, isLargeScreen}) => ({
