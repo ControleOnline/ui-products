@@ -7,7 +7,7 @@
   "main": "src/react/index.js",
   "scripts": {
     "test": "npm run test:service-units",
-    "test:service-units": "node --test src/tests/react/domain/serviceUnitOptions.test.mjs",
+    "test:service-units": "node --test src/tests/react/domain/serviceUnitOptions.test.mjs src/tests/react/domain/customizeTree.test.mjs",
     "test:coverage": "c8 --reporter=clover --report-dir coverage npm test"
   },
   "devDependencies": {

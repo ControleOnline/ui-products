@@ -96,21 +96,15 @@ import {
 } from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {resolveFileImageUrl} from '@controleonline/ui-common/src/react/utils/fileUrl';
-
-const normalizeEntityId = value => {
-  const clean = String(value || '').replace(/\D/g, '');
-  return clean || null;
-};
-
-const parseNumericValue = value => {
-  const parsedValue = parseFloat(String(value ?? '').replace(',', '.'));
-  return Number.isFinite(parsedValue) ? parsedValue : 0;
-};
-
-const resolvePositiveQuantity = value => {
-  const quantity = parseNumericValue(value);
-  return quantity > 0 ? quantity : 1;
-};
+import {
+  buildCustomizationNodeKey,
+  buildCustomizationSelectionKey,
+  buildExistingCustomizationTree,
+  buildRecursiveSubProducts,
+  normalizeCustomizeTreeId as normalizeEntityId,
+  parseCustomizeTreeNumber as parseNumericValue,
+  resolveCustomizeTreeQuantity as resolvePositiveQuantity,
+} from '../domain/customizeTree';
 
 const parseNullableInteger = value => {
   if (value === null || value === undefined || String(value).trim() === '') {
@@ -302,10 +296,13 @@ const CustomizeScreen = () => {
   } = route.params || {};
   const isPdvCustomizationFlow =
     String(interactionMode || '').trim().toLowerCase() === 'pdv';
-  const [fetchedProductGroups, setFetchedProductGroups] = useState([]);
-  const [isLoadingProductGroups, setIsLoadingProductGroups] = useState(false);
+  const [productGroupsByProductId, setProductGroupsByProductId] = useState({});
+  const [loadingProductGroupsByProductId, setLoadingProductGroupsByProductId] = useState({});
   const [groupProductsByGroup, setGroupProductsByGroup] = useState({});
-  const [selectedItems, setSelectedItems] = useState({});
+  const [selectedItemsByNode, setSelectedItemsByNode] = useState({});
+  const [customizationNodesByKey, setCustomizationNodesByKey] = useState({});
+  const [childNodeBySelectionKey, setChildNodeBySelectionKey] = useState({});
+  const [nodeStack, setNodeStack] = useState([]);
   const [optionProductsById, setOptionProductsById] = useState({});
 
   const ordersStore = useStore('orders');
@@ -351,6 +348,7 @@ const CustomizeScreen = () => {
   const productsActionsRef = useRef(productsActions);
   const orderProductsActionsRef = useRef(orderProductsActions);
   const productGroupProductActionsRef = useRef(productGroupProductActions);
+  const loadedProductGroupsRef = useRef({});
   const loadedGroupProductsRef = useRef({});
   const loadedOptionProductsRef = useRef({});
   const quantityTouchedRef = useRef(false);
@@ -505,99 +503,49 @@ const CustomizeScreen = () => {
     return cart?.id ? `/orders/${cart.id}` : null;
   }, [activeOrderProduct, cart, order]);
 
-  const existingSelectionsByGroup = useMemo(() => {
-    const mappedSelections = {};
-    const components = Array.isArray(activeOrderProduct?.orderProductComponents)
-      ? activeOrderProduct.orderProductComponents
-      : [];
+  const rootNodeKey = useMemo(
+    () => `root:${activeOrderProductId || activeProductId || 'product'}`,
+    [activeOrderProductId, activeProductId],
+  );
 
-    components.forEach(component => {
-      const groupId = normalizeEntityId(
-        component?.productGroup?.id ||
-        component?.productGroup?.['@id'] ||
-        component?.productGroup,
-      );
-      const productId = normalizeEntityId(
-        component?.product?.id ||
-        component?.product?.['@id'] ||
-        component?.product,
-      );
+  const existingCustomizationTree = useMemo(
+    () =>
+      buildExistingCustomizationTree({
+        orderProduct: activeOrderProduct,
+        rootNodeKey,
+        rootQuantity: activeOrderProductQuantity,
+      }),
+    [activeOrderProduct, activeOrderProductQuantity, rootNodeKey],
+  );
 
-      if (!groupId || !productId) {
-        return;
-      }
-
-      if (!mappedSelections[groupId]) {
-        mappedSelections[groupId] = {};
-      }
-
-      mappedSelections[groupId][productId] = {
-        selected: true,
-        quantity: (() => {
-          const componentQuantity = resolvePositiveQuantity(
-            component?.quantity || 1,
-          );
-
-          if (activeOrderProductQuantity > 1) {
-            const normalizedQuantity =
-              componentQuantity / activeOrderProductQuantity;
-            return normalizedQuantity > 0 ? normalizedQuantity : 1;
-          }
-
-          return componentQuantity;
-        })(),
-      };
-    });
-
-    return mappedSelections;
-  }, [activeOrderProduct, activeOrderProductQuantity]);
-
-  const orderProductGroupsById = useMemo(() => {
-    const mappedGroups = {};
-    const components = Array.isArray(activeOrderProduct?.orderProductComponents)
-      ? activeOrderProduct.orderProductComponents
-      : [];
-
-    components.forEach(component => {
-      const groupId = normalizeEntityId(
-        component?.productGroup?.id ||
-        component?.productGroup?.['@id'] ||
-        component?.productGroup,
-      );
-
-      if (!groupId || !component?.productGroup || mappedGroups[groupId]) {
-        return;
-      }
-
-      mappedGroups[groupId] = component.productGroup;
-    });
-
-    return mappedGroups;
-  }, [activeOrderProduct]);
+  const activeNodeKey = nodeStack[nodeStack.length - 1] || rootNodeKey;
+  const activeNode =
+    activeNodeKey === rootNodeKey
+      ? {
+          nodeKey: rootNodeKey,
+          product: activeProduct,
+          productId: activeProductId,
+          parentNodeKey: null,
+        }
+      : customizationNodesByKey[activeNodeKey] ||
+        existingCustomizationTree.nodeProductsByKey[activeNodeKey] ||
+        null;
+  const activeDisplayedProduct =
+    activeNodeKey === rootNodeKey ? activeProduct : activeNode?.product || null;
+  const activeDisplayedProductId = useMemo(
+    () =>
+      normalizeEntityId(
+        activeDisplayedProduct?.id || activeDisplayedProduct?.['@id'],
+      ) || activeNode?.productId || null,
+    [activeDisplayedProduct, activeNode?.productId],
+  );
 
   const resolvedProductGroups = useMemo(() => {
-    const mappedGroups = {};
+    const groups = Array.isArray(productGroupsByProductId[activeDisplayedProductId])
+      ? productGroupsByProductId[activeDisplayedProductId]
+      : [];
 
-    ;(Array.isArray(fetchedProductGroups) ? fetchedProductGroups : []).forEach(group => {
-      const groupId = normalizeEntityId(group?.id || group?.['@id']);
-
-      if (!groupId) {
-        return;
-      }
-
-      mappedGroups[groupId] = {
-        ...group,
-        ...(orderProductGroupsById[groupId] || {}),
-      };
-    });
-
-    Object.entries(orderProductGroupsById).forEach(([groupId, group]) => {
-      if (!mappedGroups[groupId]) {
-        mappedGroups[groupId] = group;
-      }
-    });
-
-    return Object.values(mappedGroups).sort((leftGroup, rightGroup) => {
+    return [...groups].sort((leftGroup, rightGroup) => {
       const leftOrder = parseNumericValue(leftGroup?.groupOrder);
       const rightOrder = parseNumericValue(rightGroup?.groupOrder);
 
@@ -610,7 +558,7 @@ const CustomizeScreen = () => {
         parseNumericValue(normalizeEntityId(rightGroup?.id))
       );
     });
-  }, [fetchedProductGroups, orderProductGroupsById]);
+  }, [activeDisplayedProductId, productGroupsByProductId]);
 
   const resolvedProductGroupsById = useMemo(
     () =>
@@ -666,43 +614,66 @@ const CustomizeScreen = () => {
     productGroupProductActionsRef.current = productGroupProductActions;
   }, [productGroupProductActions]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
+  const ensureProductGroupsLoaded = useCallback(
+    async productId => {
+      const normalizedProductId = normalizeEntityId(productId);
 
-      if (!activeProductId) {
-        setFetchedProductGroups([]);
-        setIsLoadingProductGroups(false);
-        return undefined;
+      if (!normalizedProductId) {
+        return [];
       }
 
-      setFetchedProductGroups([]);
-      setIsLoadingProductGroups(true);
+      if (loadedProductGroupsRef.current[normalizedProductId] === 'loaded') {
+        return Array.isArray(productGroupsByProductId[normalizedProductId])
+          ? productGroupsByProductId[normalizedProductId]
+          : [];
+      }
 
-      productGroupActionsRef.current
-        .getItems({
-          product: activeProductId,
+      if (loadedProductGroupsRef.current[normalizedProductId] === 'loading') {
+        return [];
+      }
+
+      loadedProductGroupsRef.current[normalizedProductId] = 'loading';
+      setLoadingProductGroupsByProductId(prev => ({
+        ...prev,
+        [normalizedProductId]: true,
+      }));
+
+      try {
+        const items = await productGroupActionsRef.current.getItems({
+          product: normalizedProductId,
           'product.productType': 'component',
-        })
-        .then(items => {
-          if (!isActive) {
-            return;
-          }
-
-          setFetchedProductGroups(Array.isArray(items) ? items : []);
-          setIsLoadingProductGroups(false);
-        })
-        .catch(() => {
-          if (isActive) {
-            setFetchedProductGroups([]);
-            setIsLoadingProductGroups(false);
-          }
         });
+        const nextItems = Array.isArray(items) ? items : [];
 
-      return () => {
-        isActive = false;
-      };
-    }, [activeProductId]),
+        loadedProductGroupsRef.current[normalizedProductId] = 'loaded';
+        setProductGroupsByProductId(prev => ({
+          ...prev,
+          [normalizedProductId]: nextItems,
+        }));
+        setLoadingProductGroupsByProductId(prev => ({
+          ...prev,
+          [normalizedProductId]: false,
+        }));
+
+        return nextItems;
+      } catch {
+        delete loadedProductGroupsRef.current[normalizedProductId];
+        setLoadingProductGroupsByProductId(prev => ({
+          ...prev,
+          [normalizedProductId]: false,
+        }));
+        return [];
+      }
+    },
+    [productGroupsByProductId],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (activeProductId) {
+        ensureProductGroupsLoaded(activeProductId).catch(() => null);
+      }
+    }, [activeProductId, ensureProductGroupsLoaded]),
   );
 
   useEffect(() => {
@@ -717,8 +688,65 @@ const CustomizeScreen = () => {
   }, [activeOrderProductQuantity]);
 
   useEffect(() => {
-    setSelectedItems({});
-  }, [activeOrderProductId, activeProductId]);
+    setSelectedItemsByNode({});
+    setCustomizationNodesByKey(
+      Object.fromEntries(
+        Object.entries(existingCustomizationTree.nodeProductsByKey).map(
+          ([nodeKey, node]) => [
+            nodeKey,
+            {
+              ...node,
+              ...(nodeKey === rootNodeKey
+                ? {
+                    nodeKey: rootNodeKey,
+                    product:
+                      activeProduct ||
+                      existingCustomizationTree.nodeProductsByKey[rootNodeKey]
+                        ?.product ||
+                      null,
+                    productId: activeProductId,
+                    parentNodeKey: null,
+                  }
+                : {}),
+            },
+          ],
+        ),
+      ),
+    );
+    setChildNodeBySelectionKey(existingCustomizationTree.childNodeBySelectionKey);
+    setNodeStack([rootNodeKey]);
+  }, [
+    activeOrderProductId,
+    activeProductId,
+    existingCustomizationTree.childNodeBySelectionKey,
+    existingCustomizationTree.nodeProductsByKey,
+    rootNodeKey,
+  ]);
+
+  useEffect(() => {
+    if (!activeProduct) {
+      return;
+    }
+
+    setCustomizationNodesByKey(prev => ({
+      ...prev,
+      [rootNodeKey]: {
+        ...(prev[rootNodeKey] || {}),
+        nodeKey: rootNodeKey,
+        product: activeProduct,
+        productId: activeProductId,
+        parentNodeKey: null,
+      },
+    }));
+  }, [activeProduct, activeProductId, rootNodeKey]);
+
+  useEffect(() => {
+    Object.values(customizationNodesByKey).forEach(node => {
+      if (node?.nodeKey !== rootNodeKey && node?.productId) {
+        ensureProductGroupsLoaded(node.productId).catch(() => null);
+      }
+    });
+  }, [customizationNodesByKey, ensureProductGroupsLoaded, rootNodeKey]);
 
   useEffect(() => {
     setGroupProductsByGroup({});
@@ -943,7 +971,7 @@ const CustomizeScreen = () => {
       .filter(({id}) => !!id);
 
     const pendingGroups = currentGroups.filter(({id}) => {
-      const cacheKey = `${activeProductId || 'none'}:${id}`;
+      const cacheKey = `${activeDisplayedProductId || 'none'}:${id}`;
       return !loadedGroupProductsRef.current[cacheKey];
     });
 
@@ -960,7 +988,8 @@ const CustomizeScreen = () => {
     }
 
     pendingGroups.forEach(({id}) => {
-      loadedGroupProductsRef.current[`${activeProductId || 'none'}:${id}`] = 'loading';
+      loadedGroupProductsRef.current[`${activeDisplayedProductId || 'none'}:${id}`] =
+        'loading';
     });
 
     Promise.all(
@@ -979,7 +1008,8 @@ const CustomizeScreen = () => {
         }
 
         entries.forEach(([id]) => {
-          loadedGroupProductsRef.current[`${activeProductId || 'none'}:${id}`] = 'loaded';
+          loadedGroupProductsRef.current[`${activeDisplayedProductId || 'none'}:${id}`] =
+            'loaded';
         });
 
         setGroupProductsByGroup(prev => {
@@ -996,7 +1026,9 @@ const CustomizeScreen = () => {
       })
       .catch(() => {
         pendingGroups.forEach(({id}) => {
-          delete loadedGroupProductsRef.current[`${activeProductId || 'none'}:${id}`];
+          delete loadedGroupProductsRef.current[
+            `${activeDisplayedProductId || 'none'}:${id}`
+          ];
         });
 
         if (!isActive) {
@@ -1013,109 +1045,129 @@ const CustomizeScreen = () => {
     return () => {
       isActive = false;
       pendingGroups.forEach(({id}) => {
-        const cacheKey = `${activeProductId || 'none'}:${id}`;
+        const cacheKey = `${activeDisplayedProductId || 'none'}:${id}`;
         if (loadedGroupProductsRef.current[cacheKey] === 'loading') {
           delete loadedGroupProductsRef.current[cacheKey];
         }
       });
     };
-  }, [activeProductId, resolvedProductGroupIdsKey, resolvedProductGroups]);
+  }, [activeDisplayedProductId, resolvedProductGroupIdsKey, resolvedProductGroups]);
 
-  useEffect(() => {
-    if (!Array.isArray(resolvedProductGroups) || resolvedProductGroups.length === 0) {
-      setSelectedItems({});
-      return;
-    }
+  const getNodeProductGroups = useCallback(
+    nodeKey => {
+      const nodeProductId =
+        nodeKey === rootNodeKey
+          ? activeProductId
+          : customizationNodesByKey[nodeKey]?.productId ||
+            existingCustomizationTree.nodeProductsByKey[nodeKey]?.productId;
 
-    const nextSelectedItems = Object.fromEntries(
-      resolvedProductGroups.map(group => {
-        const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
-        const existingSelections = existingSelectionsByGroup[groupId] || {};
-        const groupProducts = Array.isArray(groupProductsByGroup[groupId])
-          ? groupProductsByGroup[groupId]
-          : [];
+      return Array.isArray(productGroupsByProductId[nodeProductId])
+        ? productGroupsByProductId[nodeProductId]
+        : [];
+    },
+    [
+      activeProductId,
+      customizationNodesByKey,
+      existingCustomizationTree.nodeProductsByKey,
+      productGroupsByProductId,
+      rootNodeKey,
+    ],
+  );
 
-        return [
-          groupId,
-          groupProducts.map(item => ({
-            ...item,
-            selected: !!existingSelections[
-              normalizeEntityId(
-                item?.productChild?.id || item?.productChild?.['@id'],
-              )
-            ]?.selected,
-            quantity:
-              existingSelections[
-                normalizeEntityId(
-                  item?.productChild?.id || item?.productChild?.['@id'],
-                )
-              ]?.quantity ||
-              parseFloat(String(item?.quantity || 1).replace(',', '.')) ||
-              1,
-          })),
-        ];
-      }),
-    );
+  const resolveNodeGroupItemsFromSource = useCallback(
+    (nodeKey, group, sourceSelectedItemsByNode) => {
+      const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+      const storedGroupItems = sourceSelectedItemsByNode?.[nodeKey]?.[groupId];
 
-    setSelectedItems(nextSelectedItems);
-  }, [
-    existingSelectionsByGroup,
-    groupProductsByGroup,
-    resolvedProductGroupIdsKey,
-    resolvedProductGroups,
-  ]);
+      if (Array.isArray(storedGroupItems)) {
+        return storedGroupItems;
+      }
 
-  const groupSummaries = useMemo(
-    () =>
-      resolvedProductGroups.map(group => {
-        const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
-        const groupItems = Array.isArray(selectedItems[groupId])
-          ? selectedItems[groupId]
-          : [];
-        const selectedCount = groupItems.filter(item => item?.selected).length;
-        const minimum = resolveEffectiveGroupMinimum(group);
-        const maximum = resolveEffectiveGroupMaximum(group);
-        const extraPrice = calculateGroupExtraPrice(group, groupItems);
-        let validationMessage = '';
+      const existingSelections =
+        existingCustomizationTree.existingSelectionsByNode?.[nodeKey]?.[groupId] ||
+        {};
+      const groupProducts = Array.isArray(groupProductsByGroup[groupId])
+        ? groupProductsByGroup[groupId]
+        : [];
 
-        if (selectedCount < minimum) {
-          validationMessage =
-            minimum === 1
-              ? 'Selecione 1 opcao.'
-              : `Selecione pelo menos ${minimum} opcoes.`;
-        } else if (maximum !== null && selectedCount > maximum) {
-          validationMessage =
-            maximum === 1
-              ? 'Selecione no maximo 1 opcao.'
-              : `Selecione no maximo ${maximum} opcoes.`;
-        }
-
-        let selectionRuleLabel = 'Sem limite de selecao.';
-        if (minimum > 0 && maximum !== null) {
-          selectionRuleLabel = `Escolha de ${minimum} ate ${maximum} opcoes.`;
-        } else if (minimum > 0) {
-          selectionRuleLabel = `Escolha no minimo ${minimum} opcoes.`;
-        } else if (maximum !== null) {
-          selectionRuleLabel = `Escolha ate ${maximum} opcoes.`;
-        }
+      return groupProducts.map(item => {
+        const productId = normalizeEntityId(
+          item?.productChild?.id || item?.productChild?.['@id'],
+        );
 
         return {
-          groupId,
-          groupName: group?.productGroup || `Grupo ${groupId}`,
-          selectedCount,
-          minimum,
-          maximum,
-          extraPrice,
-          isValid: validationMessage === '',
-          validationMessage,
-          selectionRuleLabel,
-          priceCalculationLabel: resolvePriceCalculationLabel(
-            group?.priceCalculation,
-          ),
-          isRequired: minimum > 0 || !!group?.required,
+          ...item,
+          selected: !!existingSelections[productId]?.selected,
+          quantity:
+            existingSelections[productId]?.quantity ||
+            parseNumericValue(item?.quantity || 1) ||
+            1,
         };
-      }),
-    [resolvedProductGroups, selectedItems],
+      });
+    },
+    [existingCustomizationTree.existingSelectionsByNode, groupProductsByGroup],
+  );
+
+  const getNodeGroupItems = useCallback(
+    (nodeKey, group) =>
+      resolveNodeGroupItemsFromSource(nodeKey, group, selectedItemsByNode),
+    [resolveNodeGroupItemsFromSource, selectedItemsByNode],
+  );
+
+  const buildGroupSummary = useCallback(
+    (nodeKey, group) => {
+      const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+      const groupItems = getNodeGroupItems(nodeKey, group);
+      const selectedCount = groupItems.filter(item => item?.selected).length;
+      const minimum = resolveEffectiveGroupMinimum(group);
+      const maximum = resolveEffectiveGroupMaximum(group);
+      const extraPrice = calculateGroupExtraPrice(group, groupItems);
+      let validationMessage = '';
+
+      if (selectedCount < minimum) {
+        validationMessage =
+          minimum === 1
+            ? 'Selecione 1 opcao.'
+            : `Selecione pelo menos ${minimum} opcoes.`;
+      } else if (maximum !== null && selectedCount > maximum) {
+        validationMessage =
+          maximum === 1
+            ? 'Selecione no maximo 1 opcao.'
+            : `Selecione no maximo ${maximum} opcoes.`;
+      }
+
+      let selectionRuleLabel = 'Sem limite de selecao.';
+      if (minimum > 0 && maximum !== null) {
+        selectionRuleLabel = `Escolha de ${minimum} ate ${maximum} opcoes.`;
+      } else if (minimum > 0) {
+        selectionRuleLabel = `Escolha no minimo ${minimum} opcoes.`;
+      } else if (maximum !== null) {
+        selectionRuleLabel = `Escolha ate ${maximum} opcoes.`;
+      }
+
+      return {
+        nodeKey,
+        groupId,
+        groupName: group?.productGroup || `Grupo ${groupId}`,
+        selectedCount,
+        minimum,
+        maximum,
+        extraPrice,
+        isValid: validationMessage === '',
+        validationMessage,
+        selectionRuleLabel,
+        priceCalculationLabel: resolvePriceCalculationLabel(
+          group?.priceCalculation,
+        ),
+        isRequired: minimum > 0 || !!group?.required,
+      };
+    },
+    [getNodeGroupItems],
+  );
+
+  const groupSummaries = useMemo(
+    () => resolvedProductGroups.map(group => buildGroupSummary(activeNodeKey, group)),
+    [activeNodeKey, buildGroupSummary, resolvedProductGroups],
   );
 
   const groupSummariesById = useMemo(
@@ -1123,9 +1175,75 @@ const CustomizeScreen = () => {
     [groupSummaries],
   );
 
+  const allGroupSummaries = useMemo(() => {
+    const visitNode = nodeKey => {
+      const currentGroups = getNodeProductGroups(nodeKey);
+      const currentSummaries = currentGroups.map(group =>
+        buildGroupSummary(nodeKey, group),
+      );
+      const descendantSummaries = currentGroups.flatMap(group => {
+        const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
+
+        return getNodeGroupItems(nodeKey, group)
+          .filter(item => item?.selected)
+          .flatMap(item => {
+            const productId = normalizeEntityId(
+              item?.productChild?.id || item?.productChild?.['@id'],
+            );
+            const childNodeKey =
+              childNodeBySelectionKey[
+                buildCustomizationSelectionKey(nodeKey, groupId, productId)
+              ];
+
+            return childNodeKey ? visitNode(childNodeKey) : [];
+          });
+      });
+
+      return [...currentSummaries, ...descendantSummaries];
+    };
+
+    return visitNode(rootNodeKey);
+  }, [
+    buildGroupSummary,
+    childNodeBySelectionKey,
+    getNodeGroupItems,
+    getNodeProductGroups,
+    rootNodeKey,
+  ]);
+
   const invalidGroupSummaries = useMemo(
-    () => groupSummaries.filter(summary => !summary.isValid),
-    [groupSummaries],
+    () => allGroupSummaries.filter(summary => !summary.isValid),
+    [allGroupSummaries],
+  );
+
+  const allSelectedNodeItems = useMemo(() => {
+    const selectedItems = [];
+    const visitedNodeKeys = new Set([
+      rootNodeKey,
+      ...Object.keys(customizationNodesByKey),
+      ...Object.values(childNodeBySelectionKey),
+    ]);
+
+    visitedNodeKeys.forEach(nodeKey => {
+      getNodeProductGroups(nodeKey).forEach(group => {
+        getNodeGroupItems(nodeKey, group)
+          .filter(item => item?.selected)
+          .forEach(item => selectedItems.push(item));
+      });
+    });
+
+    return selectedItems;
+  }, [
+    childNodeBySelectionKey,
+    customizationNodesByKey,
+    getNodeGroupItems,
+    getNodeProductGroups,
+    rootNodeKey,
+  ]);
+
+  const isLoadingProductGroups = useMemo(
+    () => Object.values(loadingProductGroupsByProductId).some(Boolean),
+    [loadingProductGroupsByProductId],
   );
 
   /*
@@ -1139,17 +1257,17 @@ const CustomizeScreen = () => {
     !isLoadingProductGroups &&
     invalidGroupSummaries.length === 0;
   const productCoverUrl = useMemo(
-    () => buildCoverUrl(activeProduct),
-    [activeProduct],
+    () => buildCoverUrl(activeDisplayedProduct),
+    [activeDisplayedProduct],
   );
-  const selectedGroupsCount = groupSummaries.filter(
+  const selectedGroupsCount = allGroupSummaries.filter(
     summary => summary.selectedCount > 0,
   ).length;
-  const selectedOptionsCount = groupSummaries.reduce(
+  const selectedOptionsCount = allGroupSummaries.reduce(
     (sum, summary) => sum + (summary.selectedCount || 0),
     0,
   );
-  const complementsTotal = groupSummaries.reduce(
+  const complementsTotal = allGroupSummaries.reduce(
     (sum, summary) => sum + parseNumericValue(summary.extraPrice),
     0,
   );
@@ -1169,9 +1287,39 @@ const CustomizeScreen = () => {
       ? '1 selecao feita'
       : `${selectedOptionsCount} selecoes feitas`;
 
+  const getNodeProduct = useCallback(
+    nodeKey => {
+      if (nodeKey === rootNodeKey) {
+        return activeProduct;
+      }
+
+      return (
+        customizationNodesByKey[nodeKey]?.product ||
+        existingCustomizationTree.nodeProductsByKey[nodeKey]?.product ||
+        null
+      );
+    },
+    [
+      activeProduct,
+      customizationNodesByKey,
+      existingCustomizationTree.nodeProductsByKey,
+      rootNodeKey,
+    ],
+  );
+  const isNestedCustomization = activeNodeKey !== rootNodeKey;
+  const activeParentNodeKey = isNestedCustomization
+    ? nodeStack[nodeStack.length - 2] || rootNodeKey
+    : null;
+  const activeParentProduct = activeParentNodeKey
+    ? getNodeProduct(activeParentNodeKey)
+    : null;
+  const returnToParentCustomization = useCallback(() => {
+    setNodeStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
+  }, []);
+
   const getProcessedOptions = group => {
     const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
-    let options = getProductOptions(group);
+    let options = getProductOptions(group, activeNodeKey);
     const dedupedOptions = [];
     const dedupedOptionIndexByKey = {};
 
@@ -1185,7 +1333,7 @@ const CustomizeScreen = () => {
         return;
       }
 
-      if (isSelected(groupId, option.value)) {
+      if (isSelected(groupId, option.value, activeNodeKey)) {
         dedupedOptions[existingIndex] = option;
       }
     });
@@ -1196,14 +1344,16 @@ const CustomizeScreen = () => {
     const isMaxReached = maximum !== null && selectedCount >= maximum;
 
     if (isMaxReached) {
-      options = options.filter(option => isSelected(groupId, option.value));
+      options = options.filter(option =>
+        isSelected(groupId, option.value, activeNodeKey),
+      );
     }
 
     const now = timeNow();
     return options.map(option => ({
       ...option,
       disable:
-        isMaxSelected(group, option.value) ||
+        isMaxSelected(group, option.value, activeNodeKey) ||
         isOptionDisabledByRules(groupId, option.value, now),
     }));
   };
@@ -1228,10 +1378,13 @@ const CustomizeScreen = () => {
       String(v).replace(/\D/g, ''),
     );
     if (incompatibleIds.length > 0) {
-      const selectedIds = Object.values(selectedItems)
-        .flat()
-        .filter(item => item.selected)
-        .map(item => String(item?.productChild?.id || item?.productChild?.['@id'] || '').replace(/\D/g, ''))
+      const selectedIds = allSelectedNodeItems
+        .map(item =>
+          String(item?.productChild?.id || item?.productChild?.['@id'] || '').replace(
+            /\D/g,
+            '',
+          ),
+        )
         .filter(Boolean);
       if (incompatibleIds.some(id => selectedIds.includes(id))) return true;
     }
@@ -1239,10 +1392,7 @@ const CustomizeScreen = () => {
     // Substitution rule: if substituteFor is set and target is already selected, block this option
     const substituteFor = String(extra.substituteFor || '').replace(/\D/g, '');
     if (substituteFor) {
-      const targetSelected = Object.values(selectedItems)
-        .flat()
-        .filter(item => item.selected)
-        .some(item => {
+      const targetSelected = allSelectedNodeItems.some(item => {
           const id = String(item?.productChild?.id || item?.productChild?.['@id'] || '').replace(/\D/g, '');
           return id === substituteFor;
         });
@@ -1252,9 +1402,8 @@ const CustomizeScreen = () => {
     return false;
   };
 
-  const getProductOptions = group => {
-    const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
-    const groupItems = selectedItems[groupId] || [];
+  const getProductOptions = (group, nodeKey = activeNodeKey) => {
+    const groupItems = getNodeGroupItems(nodeKey, group);
     if (!Array.isArray(groupItems)) {
       return [];
     }
@@ -1264,40 +1413,89 @@ const CustomizeScreen = () => {
     }));
   };
 
-  const isSelected = (groupId, value) => {
+  const isSelected = (groupId, value, nodeKey = activeNodeKey) => {
     const normalizedGroupId = String(groupId || '');
     return (
-      selectedItems[normalizedGroupId]?.some(
+      getNodeGroupItems(nodeKey, resolvedProductGroupsById[normalizedGroupId]).some(
         item => item['@id'] === value['@id'] && item.selected,
       ) || false
     );
   };
 
-  const isMaxSelected = (group, product) => {
+  const isMaxSelected = (group, product, nodeKey = activeNodeKey) => {
     const maximum = resolveEffectiveGroupMaximum(group);
     if (maximum === null) {
       return false;
     }
     const groupId = String(normalizeEntityId(group?.id || group?.['@id']));
-    const selectedGroup = selectedItems[groupId] || [];
+    const selectedGroup = getNodeGroupItems(nodeKey, group);
     return (
       selectedGroup.filter(item => item.selected).length >= maximum &&
       !selectedGroup.some(p => p['@id'] === product['@id'] && p.selected)
     );
   };
 
-  const handleToggleOption = (groupId, option) => {
+  const openChildCustomization = async (groupId, option) => {
+    const optionProductId = normalizeEntityId(
+      option?.value?.productChild?.id || option?.value?.productChild?.['@id'],
+    );
+
+    if (!optionProductId) {
+      return;
+    }
+
+    const nestedGroups = await ensureProductGroupsLoaded(optionProductId);
+
+    if (nestedGroups.length === 0) {
+      return;
+    }
+
+    const selectionKey = buildCustomizationSelectionKey(
+      activeNodeKey,
+      String(groupId || ''),
+      optionProductId,
+    );
+    const childNodeKey =
+      childNodeBySelectionKey[selectionKey] ||
+      buildCustomizationNodeKey(activeNodeKey, groupId, optionProductId);
+
+    setCustomizationNodesByKey(prev => ({
+      ...prev,
+      [childNodeKey]: {
+        ...(prev[childNodeKey] || {}),
+        ...(existingCustomizationTree.nodeProductsByKey[childNodeKey] || {}),
+        nodeKey: childNodeKey,
+        product: optionProductsById[optionProductId] || option?.value?.productChild || null,
+        productId: optionProductId,
+        parentNodeKey: activeNodeKey,
+      },
+    }));
+    setChildNodeBySelectionKey(prev => ({
+      ...prev,
+      [selectionKey]: childNodeKey,
+    }));
+    setNodeStack(prev =>
+      prev[prev.length - 1] === childNodeKey ? prev : [...prev, childNodeKey],
+    );
+  };
+
+  const handleToggleOption = async (groupId, option) => {
     const normalizedGroupId = String(groupId || '');
-    setSelectedItems(prev => {
-      const selectedGroup = Array.isArray(prev[normalizedGroupId])
-        ? prev[normalizedGroupId]
-        : [];
+    const currentGroup = resolvedProductGroupsById[normalizedGroupId];
+    let willSelectOption = false;
+
+    setSelectedItemsByNode(prev => {
+      const selectedGroup = resolveNodeGroupItemsFromSource(
+        activeNodeKey,
+        currentGroup,
+        prev,
+      );
       const optionId = option?.value?.['@id'];
-      const currentGroup = resolvedProductGroupsById[normalizedGroupId];
       const maximum = resolveEffectiveGroupMaximum(currentGroup);
       const selectedCount = selectedGroup.filter(item => item?.selected).length;
       const targetOption = selectedGroup.find(item => item['@id'] === optionId);
       const isCurrentlySelected = !!targetOption?.selected;
+      willSelectOption = !isCurrentlySelected;
 
       if (!isCurrentlySelected && maximum !== null && selectedCount >= maximum) {
         return prev;
@@ -1311,26 +1509,47 @@ const CustomizeScreen = () => {
 
       return {
         ...prev,
-        [normalizedGroupId]: updatedGroup,
+        [activeNodeKey]: {
+          ...(prev[activeNodeKey] || {}),
+          [normalizedGroupId]: updatedGroup,
+        },
       };
     });
+
+    if (willSelectOption) {
+      await openChildCustomization(normalizedGroupId, option);
+    }
   };
 
   const getSubproducts = () => {
-    const subProducts = [];
-    Object.entries(selectedItems).forEach(([groupId, groupItems]) => {
-      groupItems.forEach(item => {
-        if (item.selected) {
-          const selectedQuantity = resolvePositiveQuantity(item.quantity || 1);
-          subProducts.push({
-            product: item.productChild['@id'].replace(/\D/g, ''),
-            productGroup: parseInt(groupId),
-            quantity: Number((selectedQuantity * resolvedItemQuantity).toFixed(2)),
-          });
-        }
-      });
+    const groupsByNode = {};
+    const visitedNodeKeys = new Set([
+      rootNodeKey,
+      ...Object.keys(customizationNodesByKey),
+      ...Object.values(childNodeBySelectionKey),
+    ]);
+
+    visitedNodeKeys.forEach(nodeKey => {
+      const nodeGroups = getNodeProductGroups(nodeKey);
+
+      if (nodeGroups.length === 0) {
+        return;
+      }
+
+      groupsByNode[nodeKey] = Object.fromEntries(
+        nodeGroups.map(group => [
+          String(normalizeEntityId(group?.id || group?.['@id'])),
+          getNodeGroupItems(nodeKey, group),
+        ]),
+      );
     });
-    return subProducts;
+
+    return buildRecursiveSubProducts({
+      rootNodeKey,
+      rootQuantity: resolvedItemQuantity,
+      childNodeBySelectionKey,
+      groupsByNode,
+    });
   };
 
   const addHandle = async () => {
@@ -1511,6 +1730,19 @@ const CustomizeScreen = () => {
       optionProduct?.productUnit?.unit ||
       optionProduct?.productUnity?.unit ||
       '';
+    const optionSelectionKey = buildCustomizationSelectionKey(
+      activeNodeKey,
+      groupId,
+      optionProductId,
+    );
+    const childNodeKey = childNodeBySelectionKey[optionSelectionKey] || null;
+    const childNodeSummaries = childNodeKey
+      ? allGroupSummaries.filter(summary => summary.nodeKey === childNodeKey)
+      : [];
+    const invalidChildGroupCount = childNodeSummaries.filter(
+      summary => !summary.isValid,
+    ).length;
+    const isLoadingChildGroups = !!loadingProductGroupsByProductId[optionProductId];
 
     return (
       <TouchableOpacity
@@ -1554,6 +1786,36 @@ const CustomizeScreen = () => {
             Adiciona {optionQuantityLabel}
             {optionUnitLabel ? ` ${optionUnitLabel}` : ''}
           </Text>
+          {isOptionSelected && (childNodeKey || isLoadingChildGroups) ? (
+            <TouchableOpacity
+              accessibilityLabel={`Configurar subitem ${option.label}`}
+              onPress={event => {
+                event?.stopPropagation?.();
+                openChildCustomization(groupId, option).catch(() => null);
+              }}
+              style={[
+                customizeChipStyle({palette}),
+                {
+                  marginTop: 8,
+                  alignSelf: 'flex-start',
+                  backgroundColor:
+                    invalidChildGroupCount > 0 ? palette.primarySoft : palette.panel,
+                },
+              ]}
+              activeOpacity={0.78}>
+              <Text
+                style={[
+                  customizeChipTextStyle({palette}),
+                  invalidChildGroupCount > 0 ? {color: palette.primary} : null,
+                ]}>
+                {isLoadingChildGroups
+                  ? 'Carregando grupos...'
+                  : invalidChildGroupCount > 0
+                    ? `Revisar ${invalidChildGroupCount} pendencia${invalidChildGroupCount === 1 ? '' : 's'}`
+                    : 'Configurar subitem'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
         <Text
           style={customizeOptionPriceStyle({
@@ -1618,7 +1880,7 @@ const CustomizeScreen = () => {
       <View style={customizeSummaryHeaderStyle}>
         <View>
           <Text style={customizeSummaryTitleStyle({palette})}>
-            Resumo do item
+            {isNestedCustomization ? 'Resumo do subitem' : 'Resumo do item'}
           </Text>
           <Text style={customizeSummaryKickerStyle({palette})}>
             {selectedOptionsLabel}
@@ -1627,18 +1889,40 @@ const CustomizeScreen = () => {
         <Text style={customizeSummaryKickerStyle({palette})}>total</Text>
       </View>
       <Text style={customizeSummaryTotalStyle({palette})}>
-        {Formatter.formatMoney(itemTotal, 'R$', 'pt-br')}
+        {Formatter.formatMoney(
+          isNestedCustomization
+            ? groupSummaries.reduce(
+                (sum, summary) => sum + parseNumericValue(summary.extraPrice),
+                0,
+              )
+            : itemTotal,
+          'R$',
+          'pt-br',
+        )}
       </Text>
       <View style={customizeSummaryLineStyle({palette})}>
-        <Text style={customizeSummaryLabelStyle({palette})}>Preco base</Text>
+        <Text style={customizeSummaryLabelStyle({palette})}>
+          {isNestedCustomization ? 'Item base' : 'Preco base'}
+        </Text>
         <Text style={customizeSummaryValueStyle({palette})}>
-          {Formatter.formatMoney(basePrice, 'R$', 'pt-br')}
+          {Formatter.formatMoney(
+            parseNumericValue(activeDisplayedProduct?.price),
+            'R$',
+            'pt-br',
+          )}
         </Text>
       </View>
       <View style={customizeSummaryLineStyle({palette})}>
         <Text style={customizeSummaryLabelStyle({palette})}>Complementos</Text>
         <Text style={customizeSummaryValueStyle({palette})}>
-          {Formatter.formatMoney(complementsTotal, 'R$', 'pt-br')}
+          {Formatter.formatMoney(
+            groupSummaries.reduce(
+              (sum, summary) => sum + parseNumericValue(summary.extraPrice),
+              0,
+            ),
+            'R$',
+            'pt-br',
+          )}
         </Text>
       </View>
       {!compact ? (
@@ -1665,7 +1949,7 @@ const CustomizeScreen = () => {
           ))}
         </View>
       ) : null}
-      {!isSingleItemCustomizationFlow ? (
+      {!isNestedCustomization && !isSingleItemCustomizationFlow ? (
         <View style={customizeQuantityRowStyle}>
           <Text style={customizeSummaryLabelStyle({palette})}>Quantidade</Text>
           <View style={customizeQuantityStepperStyle}>
@@ -1714,14 +1998,17 @@ const CustomizeScreen = () => {
     </View>
   );
 
-  const renderSubmitButton = () => {
-    const disabled = isSavingCustomization || !canSubmitCustomization;
+  const renderPrimaryButton = () => {
+    const disabled = isNestedCustomization
+      ? false
+      : isSavingCustomization || !canSubmitCustomization;
+    const label = isNestedCustomization ? 'CONCLUIR SUBITEM' : submitLabel;
 
     return (
       <TouchableOpacity
-        accessibilityLabel={`${submitLabel} ${activeProduct?.product || 'produto personalizado'}`}
+        accessibilityLabel={`${label} ${activeDisplayedProduct?.product || 'produto personalizado'}`}
         accessibilityRole="button"
-        onPress={addHandle}
+        onPress={isNestedCustomization ? returnToParentCustomization : addHandle}
         disabled={disabled}
         style={customizeSubmitButtonStyle({
           palette,
@@ -1733,7 +2020,7 @@ const CustomizeScreen = () => {
             palette,
             disabled,
           })}>
-          {submitLabel}
+          {label}
         </Text>
       </TouchableOpacity>
     );
@@ -1778,13 +2065,13 @@ const CustomizeScreen = () => {
               <View style={customizeHeaderStyle({isLargeScreen})}>
                 <View style={customizeHeaderContentStyle}>
                   <Text style={customizeEyebrowStyle({palette})}>
-                    Personalizacao
+                    {isNestedCustomization ? 'Subitem personalizavel' : 'Personalizacao'}
                   </Text>
                   <View style={customizeTitleRowStyle}>
                     <Text
                       style={customizeTitleStyle({palette, isLargeScreen})}
                       numberOfLines={3}>
-                      {activeProduct?.product || 'Produto'}
+                      {activeDisplayedProduct?.product || 'Produto'}
                     </Text>
                     <TouchableOpacity
                       onPress={closeCustomizeScreen}
@@ -1797,17 +2084,28 @@ const CustomizeScreen = () => {
                       />
                     </TouchableOpacity>
                   </View>
-                  {activeProduct?.description ? (
+                  {activeDisplayedProduct?.description ? (
                     <Text
                       style={customizeDescriptionStyle({
                         palette,
                         isLargeScreen,
                       })}
                       numberOfLines={3}>
-                      {activeProduct.description}
+                      {activeDisplayedProduct.description}
                     </Text>
                   ) : null}
                   <View style={customizeChipRowStyle}>
+                    {isNestedCustomization ? (
+                      <TouchableOpacity
+                        accessibilityLabel={`Voltar para ${activeParentProduct?.product || 'item anterior'}`}
+                        onPress={returnToParentCustomization}
+                        style={customizeChipStyle({palette})}
+                        activeOpacity={0.78}>
+                        <Text style={customizeChipTextStyle({palette})}>
+                          {`← ${activeParentProduct?.product || 'Voltar'}`}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
                     <View style={customizeChipStyle({palette})}>
                       <Text style={customizeChipTextStyle({palette})}>
                         {resolvedProductGroups.length} grupo
@@ -1823,7 +2121,7 @@ const CustomizeScreen = () => {
                   </View>
                 </View>
                 {renderProductImage({
-                  product: activeProduct,
+                  product: activeDisplayedProduct,
                   imageUrl: productCoverUrl,
                   wrapperStyle: customizeHeroImageWrapStyle({
                     palette,
@@ -1846,12 +2144,12 @@ const CustomizeScreen = () => {
             <View style={customizeSummaryColumnStyle({palette, isLargeScreen})}>
               {renderSummary()}
               <View style={customizeFooterStyle({palette, isLargeScreen})}>
-                {renderSubmitButton()}
+                {renderPrimaryButton()}
               </View>
             </View>
           ) : (
             <View style={customizeFooterFloatingStyle({palette})}>
-              {renderSubmitButton()}
+              {renderPrimaryButton()}
             </View>
           )}
         </View>
