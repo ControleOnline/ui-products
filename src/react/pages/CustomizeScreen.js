@@ -47,6 +47,8 @@ import {
   customizeHeroPlaceholderStyle,
   customizeHeroPlaceholderTextStyle,
   customizeMainColumnStyle,
+  customizeLoadNoticeStyle,
+  customizeLoadNoticeTextStyle,
   customizeModalStyle,
   customizeMobileSummaryWrapStyle,
   customizeOptionBodyStyle,
@@ -97,7 +99,8 @@ import {
   customizeTitleStyle,
   resolveCustomizePalette,
 } from './CustomizeScreen.styles';
-import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
+import {hydrateOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
+import {fetchCompleteOrderProductsFromStore} from '@controleonline/ui-orders/src/utils/orderProductsCollection';
 import {
   buildManagerPdvRouteParams,
   buildCheckoutRouteParams,
@@ -327,6 +330,8 @@ const CustomizeScreen = () => {
   const [selectedItems, setSelectedItems] = useState({});
   const [optionProductsById, setOptionProductsById] = useState({});
   const [nestedEditor, setNestedEditor] = useState(null);
+  const [existingOrderProductLoadState, setExistingOrderProductLoadState] =
+    useState('idle');
 
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
@@ -841,8 +846,24 @@ const CustomizeScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
+      let isActive = true;
+
       if (activeOrderProductId) {
-        orderProductsActionsRef.current.get(activeOrderProductId).catch(() => null);
+        setExistingOrderProductLoadState('loading');
+        orderProductsActionsRef.current
+          .get(activeOrderProductId)
+          .then(() => {
+            if (isActive) {
+              setExistingOrderProductLoadState('ready');
+            }
+          })
+          .catch(() => {
+            if (isActive) {
+              setExistingOrderProductLoadState('failed');
+            }
+          });
+      } else {
+        setExistingOrderProductLoadState('not-required');
       }
 
       if (
@@ -851,6 +872,10 @@ const CustomizeScreen = () => {
       ) {
         productsActionsRef.current.get(activeProductId).catch(() => null);
       }
+
+      return () => {
+        isActive = false;
+      };
     }, [
       activeOrderProductId,
       activeProductId,
@@ -917,8 +942,10 @@ const CustomizeScreen = () => {
       return [];
     }
 
-    const refreshedOrderProducts = await orderProductsActions.getItems({
-      'order.id': Number(activeOrderId),
+    const refreshedOrderProducts = await fetchCompleteOrderProductsFromStore({
+      actions: orderProductsActions,
+      getters: orderProductsGetters,
+      params: {'order.id': Number(activeOrderId)},
     });
 
     if (typeof ordersActions.syncOrderProducts === 'function') {
@@ -931,7 +958,7 @@ const CustomizeScreen = () => {
       normalizeEntityId(order?.id || order?.['@id']) === activeOrderId
     ) {
       ordersActions.setItem(
-        mergeOrderWithOrderProducts(order, refreshedOrderProducts),
+        hydrateOrderWithOrderProducts(order, refreshedOrderProducts),
       );
     }
 
@@ -941,7 +968,7 @@ const CustomizeScreen = () => {
       normalizeEntityId(cart?.id || cart?.['@id']) === activeOrderId
     ) {
       cartActions.setItem(
-        mergeOrderWithOrderProducts(cart, refreshedOrderProducts),
+        hydrateOrderWithOrderProducts(cart, refreshedOrderProducts),
       );
     }
 
@@ -952,6 +979,7 @@ const CustomizeScreen = () => {
     cartActions,
     order,
     orderProductsActions,
+    orderProductsGetters,
     ordersActions,
   ]);
 
@@ -1180,6 +1208,7 @@ const CustomizeScreen = () => {
   const canSubmitCustomization =
     !!activeProductIri &&
     (isPdvCustomizationFlow || !!activeOrderIri || !isEditingExistingOrderProduct) &&
+    (!isEditingExistingOrderProduct || existingOrderProductLoadState === 'ready') &&
     !isLoadingProductGroups &&
     invalidGroupSummaries.length === 0;
   const productCoverUrl = useMemo(
@@ -1203,11 +1232,18 @@ const CustomizeScreen = () => {
     ? 1
     : resolvePositiveQuantity(itemQuantity);
   const itemTotal = (basePrice + complementsTotal) * resolvedItemQuantity;
-  const submitLabel = isSavingCustomization
-    ? 'SALVANDO...'
-    : isEditingExistingOrderProduct
-      ? 'MODIFICAR'
-      : 'ADICIONAR';
+  let submitLabel = 'ADICIONAR';
+  if (isSavingCustomization) {
+    submitLabel = 'SALVANDO...';
+  } else if (isEditingExistingOrderProduct) {
+    if (existingOrderProductLoadState === 'loading') {
+      submitLabel = 'CARREGANDO...';
+    } else if (existingOrderProductLoadState === 'failed') {
+      submitLabel = 'INDISPONIVEL';
+    } else {
+      submitLabel = 'MODIFICAR';
+    }
+  }
   const selectedOptionsLabel =
     selectedOptionsCount === 1
       ? '1 selecao feita'
@@ -1441,6 +1477,20 @@ const CustomizeScreen = () => {
   };
 
   const addHandle = async () => {
+    if (
+      isEditingExistingOrderProduct &&
+      existingOrderProductLoadState !== 'ready'
+    ) {
+      const message =
+        'A personalizacao existente ainda nao foi carregada por completo. Nenhuma alteracao foi salva.';
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert(message);
+      } else {
+        Alert.alert('Atencao', message);
+      }
+      return;
+    }
+
     if (!activeProductIri) {
       const message =
         'Nao foi possivel identificar produto ou carrinho para adicionar.';
@@ -2021,9 +2071,24 @@ const CustomizeScreen = () => {
                   {renderSummary({compact: true})}
                 </View>
               ) : null}
-              <View style={customizeGroupsStackStyle}>
-                {resolvedProductGroups.map(group => renderGroup(group))}
-              </View>
+              {isEditingExistingOrderProduct && existingOrderProductLoadState !== 'ready' ? (
+                <View
+                  accessibilityRole="alert"
+                  style={customizeLoadNoticeStyle({
+                    palette,
+                    failed: existingOrderProductLoadState === 'failed',
+                  })}>
+                  <Text style={customizeLoadNoticeTextStyle({palette})}>
+                    {existingOrderProductLoadState === 'failed'
+                      ? 'Nao foi possivel carregar as escolhas existentes. Feche esta tela e tente novamente; nenhuma alteracao sera salva.'
+                      : 'Carregando as escolhas existentes...'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={customizeGroupsStackStyle}>
+                  {resolvedProductGroups.map(group => renderGroup(group))}
+                </View>
+              )}
             </ScrollView>
           </View>
           {isLargeScreen ? (

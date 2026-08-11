@@ -122,6 +122,22 @@ export const customizeMainColumnStyle = ({palette, isLargeScreen}) => ({
   borderRightColor: palette.border,
 });
 
+export const customizeLoadNoticeStyle = ({palette, failed = false}) => ({
+  paddingHorizontal: 16,
+  paddingVertical: 14,
+  borderWidth: 1,
+  borderRadius: 12,
+  borderColor: failed ? palette.danger : palette.primaryBorder,
+  backgroundColor: failed ? '#FFF7ED' : palette.primarySoft,
+});
+
+export const customizeLoadNoticeTextStyle = ({palette}) => ({
+  color: palette.text,
+  fontSize: 14,
+  lineHeight: 20,
+  fontWeight: '700',
+});
+
 export const customizeScrollStyle = {
   flex: 1,
 };
