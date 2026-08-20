@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Alert, SafeAreaView, useWindowDimensions, View } from 'react-native'
+import { SafeAreaView, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { useStore } from '@store'
 import { app_type } from '@appType'
@@ -8,15 +8,8 @@ import StateStore from '@controleonline/ui-common/src/react/components/StateStor
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable'
 import { colors } from '@controleonline/../../src/styles/colors'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
-import {
-  downloadMenuCatalog as downloadCompanyMenuCatalog,
-} from '@controleonline/ui-common/src/react/utils/menuCatalogDownload'
-import {
-  downloadNormalizedCatalog as downloadCompanyNormalizedCatalog,
-} from '@controleonline/ui-common/src/react/utils/normalizedCatalogDownload'
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
 import { writeCachedCategories } from '@controleonline/ui-products/src/react/utils/categoryCache'
-import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels'
 
 import { styles } from './Categories.styles'
 import CategoryCard from './CategoriesPage/CategoryCard'
@@ -27,27 +20,20 @@ import { buildCategoryToolbarActions } from './CategoriesPage/categoryToolbarAct
 import {
   normalizeCatalogContext,
   normalizeEntityId,
-  slugifyFileName,
 } from './CategoriesPage/categoryPageUtils'
-
-const DESKTOP_GRID_MIN_WIDTH = 960
-
-const useCategoryGridLayout = () => {
-  const { width } = useWindowDimensions()
-  const columns = width < 640 ? 2 : width < 960 ? 3 : width < 1280 ? 4 : 5
-  const isCompactMobile = width < 360
-  const gap = isCompactMobile ? 8 : 12
-  const containerWidth = Math.min(width || 0, 1600)
-  const cardWidth = (containerWidth - gap - (columns - 1) * gap) / columns
-
-  return {
-    cardWidth,
-    columns,
-    gap,
-    isCompactMobile,
-    isMobileCatalog: width < 640,
-  }
-}
+import { shouldRedirectEmptyCategoriesToProducts } from './CategoriesPage/pdvEmptyCategoriesRedirect'
+import {
+  navigateToAllProducts,
+  navigateToCategoryProducts,
+} from './CategoriesPage/categoryProductsNavigation'
+import { DESKTOP_GRID_MIN_WIDTH, useCategoryGridLayout } from './CategoriesPage/useCategoryGridLayout'
+import {
+  alertCatalogError,
+  alertCatalogMessage,
+  downloadMenuCatalogForCompany,
+  downloadNormalizedCatalogForCompany,
+  loadMenuModelsForCompany,
+} from './CategoriesPage/categoryCatalogDownloads'
 
 const CategoriesPage = ({ route }) => {
   const [isDownloadingCatalog, setIsDownloadingCatalog] = useState(false)
@@ -59,6 +45,7 @@ const CategoriesPage = ({ route }) => {
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
+  const emptyCategoriesRedirectedRef = useRef(false)
   const navigation = useNavigation()
   const { styles: orderStyles } = css()
   const { cardWidth, columns, gap, isCompactMobile, isMobileCatalog } = useCategoryGridLayout()
@@ -142,45 +129,20 @@ const CategoriesPage = ({ route }) => {
   } = useMarketplaceCatalogSync(isManagerApp ? currentCompany?.id : null)
 
   const loadMenuModels = useCallback(async () => {
-    if (!currentCompany?.id) {
-      setMenuModels([])
-      setSelectedMenuModel('')
-      return []
-    }
-
-    const currentCompanyId = normalizeEntityId(currentCompany.id)
     setIsLoadingMenuModels(true)
-
     try {
-      const response = await modelActions.getItems({ context: 'menu', people: currentCompanyId })
-      const availableModels = (Array.isArray(response) ? response : [])
-        .filter(model => {
-          const modelCompanyId = normalizeEntityId(model?.people || model?.company)
-          return !modelCompanyId || modelCompanyId === currentCompanyId
-        })
-        .sort((first, second) =>
-          String(first?.model || '').localeCompare(String(second?.model || ''), 'pt-BR', {
-            sensitivity: 'base',
-          }),
-        )
-
+      const availableModels = await loadMenuModelsForCompany({ currentCompany, modelActions })
       setMenuModels(availableModels)
       setSelectedMenuModel(current =>
         current && availableModels.some(model => model?.['@id'] === current)
           ? current
           : availableModels[0]?.['@id'] || '',
       )
-      modelActions.setError?.(null)
       return availableModels
-    } catch {
-      setMenuModels([])
-      setSelectedMenuModel('')
-      modelActions.setError?.(null)
-      return []
     } finally {
       setIsLoadingMenuModels(false)
     }
-  }, [currentCompany?.id, modelActions])
+  }, [currentCompany, modelActions])
 
   useFocusEffect(
     useCallback(() => {
@@ -241,23 +203,13 @@ const CategoriesPage = ({ route }) => {
   }, [reloadCategories, selectedCategory?.id])
 
   const changeCategory = useCallback(category => {
-    const categoryId =
-      category?._isAllProducts || category?.['@id'] === ALL_PRODUCTS_SENTINEL['@id']
-        ? ALL_PRODUCTS_SENTINEL['@id']
-        : normalizeEntityId(category)
-
-    categoryActions.setItem(category || null)
-    navigation.navigate({
-      name: 'ProductsPage',
-      params: {
-        ...operationalRouteParams,
-        categoryId,
-        context,
-        interactionMode,
-        showBottomCart: interactionMode === 'pdv',
-        showBottomToolBar: interactionMode === 'pdv',
-      },
-      merge: false,
+    navigateToCategoryProducts({
+      category,
+      categoryActions,
+      context,
+      interactionMode,
+      navigation,
+      operationalRouteParams,
     })
   }, [categoryActions, context, interactionMode, navigation, operationalRouteParams])
 
@@ -284,10 +236,7 @@ const CategoriesPage = ({ route }) => {
 
   const openMenuModelPicker = useCallback(async () => {
     if (!currentCompany?.id) {
-      Alert.alert(
-        global.t?.t?.('categories', 'title', 'companyNotSelected'),
-        global.t?.t?.('categories', 'message', 'selectCompanyForMenuModel'),
-      )
+      alertCatalogMessage('companyNotSelected', 'selectCompanyForMenuModel')
       return
     }
 
@@ -295,10 +244,7 @@ const CategoriesPage = ({ route }) => {
       menuModels.length > 0 || isLoadingMenuModels ? menuModels : await loadMenuModels()
 
     if (!isLoadingMenuModels && availableModels.length === 0) {
-      Alert.alert(
-        global.t?.t?.('categories', 'title', 'noMenuModels'),
-        global.t?.t?.('categories', 'message', 'createMenuModelForCompany'),
-      )
+      alertCatalogMessage('noMenuModels', 'createMenuModelForCompany')
       return
     }
 
@@ -308,23 +254,19 @@ const CategoriesPage = ({ route }) => {
   const downloadCatalog = useCallback(async () => {
     if (isDownloadingCatalog || !currentCompany?.id) return
 
-    const availableModels = menuModels.length > 0 ? menuModels : await loadMenuModels()
-    const modelIri =
-      selectedMenuModel && availableModels.some(model => model?.['@id'] === selectedMenuModel)
-        ? selectedMenuModel
-        : availableModels[0]?.['@id'] || ''
-
+    let modelIri = selectedMenuModel
+    if (!modelIri) {
+      const availableModels = menuModels.length ? menuModels : await loadMenuModels()
+      modelIri = availableModels[0]?.['@id'] || ''
+      if (modelIri) setSelectedMenuModel(modelIri)
+    }
     if (!modelIri) return openMenuModelPicker()
 
     setIsDownloadingCatalog(true)
     try {
-      await downloadCompanyMenuCatalog({
-        companyId: currentCompany.id,
-        companyName: currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
-        modelReference: modelIri,
-      })
+      await downloadMenuCatalogForCompany({ currentCompany, modelIri })
     } catch (error) {
-      Alert.alert(global.t?.t?.('categories', 'title', 'downloadError'), error?.message)
+      alertCatalogError('downloadError', error)
     } finally {
       setIsDownloadingCatalog(false)
     }
@@ -342,13 +284,9 @@ const CategoriesPage = ({ route }) => {
 
     setIsDownloadingNormalizedCatalog(true)
     try {
-      await downloadCompanyNormalizedCatalog({
-        companyId: currentCompany.id,
-        companyName: currentCompany?.alias || currentCompany?.name || slugifyFileName(currentCompany?.id),
-        context,
-      })
+      await downloadNormalizedCatalogForCompany({ currentCompany, context })
     } catch (error) {
-      Alert.alert(global.t?.t?.('categories', 'title', 'exportError'), error?.message)
+      alertCatalogError('exportError', error)
     } finally {
       setIsDownloadingNormalizedCatalog(false)
     }
@@ -358,7 +296,7 @@ const CategoriesPage = ({ route }) => {
     try {
       await syncAllEligible()
     } catch (error) {
-      Alert.alert(global.t?.t?.('categories', 'title', 'syncError'), error?.message)
+      alertCatalogError('syncError', error)
     }
   }, [syncAllEligible])
 
@@ -390,18 +328,12 @@ const CategoriesPage = ({ route }) => {
   }, [categoryActions, context, currentCompany, refreshSelectedCategory, selectedCategory])
 
   const openAllProducts = useCallback(() => {
-    categoryActions.setItem(ALL_PRODUCTS_SENTINEL)
-    navigation.navigate({
-      name: 'ProductsPage',
-      params: {
-        ...operationalRouteParams,
-        categoryId: ALL_PRODUCTS_SENTINEL['@id'],
-        context,
-        interactionMode,
-        showBottomCart: interactionMode === 'pdv',
-        showBottomToolBar: interactionMode === 'pdv',
-      },
-      merge: false,
+    navigateToAllProducts({
+      categoryActions,
+      context,
+      interactionMode,
+      navigation,
+      operationalRouteParams,
     })
   }, [categoryActions, context, interactionMode, navigation, operationalRouteParams])
 
@@ -498,7 +430,16 @@ const CategoriesPage = ({ route }) => {
           } : null}
           initialViewMode="cards"
           onAdd={openCreateModal}
-          onDataLoaded={data => writeCachedCategories(currentCompany?.id, data || [], context)}
+          onDataLoaded={data => {
+            writeCachedCategories(currentCompany?.id, data || [], context)
+            if (
+              !emptyCategoriesRedirectedRef.current &&
+              shouldRedirectEmptyCategoriesToProducts({ isManagerApp, data })
+            ) {
+              emptyCategoriesRedirectedRef.current = true
+              openAllProducts()
+            }
+          }}
           onEditRow={openEditModal}
           onRowPress={changeCategory}
           renderCard={renderCategoryCard}
