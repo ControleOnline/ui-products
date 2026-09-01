@@ -100,6 +100,8 @@ const ordersRoutes = [
       headerBackFallback: () => buildProductsBackFallback(route),
       title: getCatalogEntityLabel(route.params?.context),
       showBottomCart: isPosApp,
+      showCompanyFilter: true,
+      companyFilterMode: 'icon',
     }),
     initialParams: { store: 'products', categoryId: ALL_PRODUCTS_SENTINEL_ID },
   },
