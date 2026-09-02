@@ -3,6 +3,8 @@ import { Platform, StyleSheet } from 'react-native';
 const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
+    width: '100%',
+    alignSelf: 'stretch',
     backgroundColor: '#fff',
     borderRadius: 16,
     marginBottom: 10,
