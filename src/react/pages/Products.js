@@ -361,11 +361,14 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     () => ({
       key: `products-${width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4}`,
       numColumns: width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4,
-      columnWrapperStyle: width < 640 ? null : { gap: 12 },
+      columnWrapperStyle:
+        width < 640
+          ? null
+          : { gap: 12, width: '100%', alignItems: 'stretch' },
       contentContainerStyle: {
         gap: 12,
         paddingBottom: isManager ? 104 : 16,
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
       },
     }),
     [isManager, width],
