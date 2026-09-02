@@ -335,7 +335,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       );
 
       return isManager ? (
-        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)}>
+        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)} style={{ width: '100%' }}>
           {productCard}
         </TouchableOpacity>
       ) : (
@@ -357,15 +357,20 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     ],
   );
 
+  // Card grid: fill content width edge-to-edge; multi-column rows stretch via
+  // ui-default cardItem flex:1 (app-community#710).
   const cardListProps = useMemo(
     () => ({
       key: `products-${width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4}`,
       numColumns: width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4,
-      columnWrapperStyle: width < 640 ? null : { gap: 12 },
+      columnWrapperStyle: width < 640
+        ? null
+        : { gap: 12, width: '100%', alignItems: 'stretch' },
       contentContainerStyle: {
         gap: 12,
         paddingBottom: isManager ? 104 : 16,
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
+        width: '100%',
       },
     }),
     [isManager, width],
