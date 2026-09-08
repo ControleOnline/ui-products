@@ -365,12 +365,19 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       numColumns: width < 640 ? 1 : width < 960 ? 2 : width < 1280 ? 3 : 4,
       columnWrapperStyle: width < 640
         ? null
-        : { gap: 12, width: '100%', alignItems: 'stretch' },
+        : {
+            gap: 8,
+            width: '100%',
+            alignItems: 'stretch',
+            justifyContent: 'flex-start',
+            alignSelf: 'stretch',
+          },
       contentContainerStyle: {
-        gap: 12,
+        gap: 8,
         paddingBottom: isManager ? 104 : 16,
-        paddingHorizontal: 8,
+        paddingHorizontal: 0,
         width: '100%',
+        alignSelf: 'stretch',
       },
     }),
     [isManager, width],
