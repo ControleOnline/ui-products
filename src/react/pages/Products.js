@@ -364,11 +364,19 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       columnWrapperStyle:
         width < 640
           ? null
-          : { gap: 12, width: '100%', alignItems: 'stretch' },
+          : {
+              gap: 8,
+              width: '100%',
+              alignItems: 'stretch',
+              justifyContent: 'flex-start',
+              alignSelf: 'stretch',
+            },
       contentContainerStyle: {
-        gap: 12,
+        gap: 8,
+        width: '100%',
+        alignSelf: 'stretch',
         paddingBottom: isManager ? 104 : 16,
-        paddingHorizontal: 8,
+        paddingHorizontal: 0,
       },
     }),
     [isManager, width],
