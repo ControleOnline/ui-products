@@ -332,7 +332,7 @@ const CustomizeScreen = () => {
   const ordersActions = ordersStore.actions;
   const ordersGetters = ordersStore.getters;
   const peopleStore = useStore('people');
-  const {currentCompany, defaultCompany} = peopleStore.getters;
+  const {currentCompany, mainCompany} = peopleStore.getters;
   const deviceStore = useStore('device');
   const {item: storagedDevice} = deviceStore.getters;
   const isSingleItemCustomizationFlow =
@@ -363,7 +363,7 @@ const CustomizeScreen = () => {
   const {ensureActiveOrder} = usePosCartSession({
     companyId: currentCompany?.id,
     deviceId: storagedDevice?.id,
-    defaultStatusId: defaultCompany?.configs?.['pos-default-status'],
+    defaultStatusId: mainCompany?.configs?.['pos-default-status'],
     companyConfigs: currentCompany?.configs,
   });
   const activeChannel = String(order?.app || app_type || 'default').toLowerCase();
@@ -1503,8 +1503,8 @@ const CustomizeScreen = () => {
          * simple quantity controls.
          */
         const ensuredCart = await cartActions.discoveryCart({
-          provider: defaultCompany?.id,
-          client: currentCompany?.id || defaultCompany?.id,
+          provider: mainCompany?.id,
+          client: currentCompany?.id || mainCompany?.id,
         });
         const ensuredCartId = normalizeEntityId(
           ensuredCart?.id || ensuredCart?.['@id'],
