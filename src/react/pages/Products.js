@@ -335,7 +335,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       );
 
       return isManager ? (
-        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)} style={{ width: '100%', alignSelf: 'stretch' }}>
+        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)}>
           {productCard}
         </TouchableOpacity>
       ) : (
@@ -364,19 +364,11 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       columnWrapperStyle:
         width < 640
           ? null
-          : {
-              gap: 12,
-              width: '100%',
-              alignSelf: 'stretch',
-              alignItems: 'stretch',
-              justifyContent: 'space-between',
-            },
+          : { gap: 12, width: '100%', alignItems: 'stretch' },
       contentContainerStyle: {
         gap: 12,
         paddingBottom: isManager ? 104 : 16,
-        paddingHorizontal: 0,
-        width: '100%',
-        alignSelf: 'stretch',
+        paddingHorizontal: 8,
       },
     }),
     [isManager, width],
