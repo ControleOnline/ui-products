@@ -20,6 +20,7 @@ import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import {useStore} from '@store';
 import {app_type} from '@appType';
 import usePosCartSession from '@controleonline/ui-orders/src/react/hooks/usePosCartSession';
+import {getActivePosOrderContext} from '@controleonline/ui-orders/src/react/hooks/posCartSession/activePosOrderContext';
 import {isPosSingleItemMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 
 import {
@@ -101,11 +102,11 @@ import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/o
 import {
   buildManagerPdvRouteParams,
   buildCheckoutRouteParams,
-  buildOrderDetailsRouteParams,
 } from '@controleonline/ui-orders/src/react/utils/orderRoute';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import {resolveFileImageUrl} from '@controleonline/ui-common/src/react/utils/fileUrl';
 import NestedCustomizationModal from '../components/NestedCustomizationModal';
+import {resolveCustomizationOrderContext} from './customizationOrderContext';
 import {nestedEditButtonStyle} from '../components/NestedCustomizationModal.styles';
 import {
   buildUnitTreeFromOrderProductComponents,
@@ -314,6 +315,7 @@ const CustomizeScreen = () => {
     productId: routeProductId = null,
     orderProduct: routeOrderProduct = null,
     orderProductId: routeOrderProductId = null,
+    orderId: routeOrderId = null,
     interactionMode = null,
     singleItemMode = false,
     redirectToCart = false,
@@ -360,6 +362,10 @@ const CustomizeScreen = () => {
   const isSavingCustomization = Boolean(orderProductsGetters?.isSaving);
   const {item: order} = ordersGetters;
   const {item: cart} = cartGetters;
+  const sessionOrder = getActivePosOrderContext({
+    companyId: currentCompany?.id,
+    deviceId: storagedDevice?.id,
+  });
   const {ensureActiveOrder} = usePosCartSession({
     companyId: currentCompany?.id,
     deviceId: storagedDevice?.id,
@@ -494,36 +500,16 @@ const CustomizeScreen = () => {
   }, [activeProduct, activeProductId]);
   const isEditingExistingOrderProduct = !!activeOrderProductId;
 
-  const activeOrderId = useMemo(
-    () =>
-      normalizeEntityId(
-        activeOrderProduct?.order?.id ||
-          activeOrderProduct?.order?.['@id'] ||
-          order?.id ||
-          order?.['@id'] ||
-          cart?.id ||
-          cart?.['@id'],
-      ),
-    [activeOrderProduct, cart, order],
+  const {id: activeOrderId, iri: activeOrderIri} = useMemo(
+    () => resolveCustomizationOrderContext({
+      activeOrderProduct,
+      cart,
+      order,
+      routeOrderId,
+      sessionOrder,
+    }),
+    [activeOrderProduct, cart, order, routeOrderId, sessionOrder],
   );
-
-  const activeOrderIri = useMemo(() => {
-    if (activeOrderProduct?.order?.['@id']) {
-      return activeOrderProduct.order['@id'];
-    }
-
-    if (activeOrderProduct?.order?.id) {
-      return `/orders/${activeOrderProduct.order.id}`;
-    }
-
-    if (order?.['@id']) {
-      return order['@id'];
-    }
-    if (cart?.['@id']) {
-      return cart['@id'];
-    }
-    return cart?.id ? `/orders/${cart.id}` : null;
-  }, [activeOrderProduct, cart, order]);
 
   const existingSelectionsByGroup = useMemo(() => {
     const mappedSelections = {};
@@ -888,17 +874,19 @@ const CustomizeScreen = () => {
       return;
     }
 
-    if (
-      isPdvCustomizationFlow &&
-      nextOrderId
-    ) {
-      navigation.replace(
-        'OrderDetails',
-        buildOrderDetailsRouteParams(
-          nextOrderId,
-          buildManagerPdvRouteParams({showBottomCart: false}),
-        ),
-      );
+    if (isPdvCustomizationFlow && nextOrderId) {
+      if (typeof navigation.goBack === 'function' && navigation.canGoBack?.()) {
+        navigation.goBack();
+        return;
+      }
+
+      navigation.navigate('AddProductScreen', {
+        id: nextOrderId,
+        resumeExistingOrder: true,
+        interactionMode: 'pdv',
+        showBottomCart: true,
+        showBottomToolBar: true,
+      });
       return;
     }
 

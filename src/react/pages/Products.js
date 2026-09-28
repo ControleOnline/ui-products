@@ -14,6 +14,7 @@ import ProductItem, {
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 import { resolveRouteCategoryId } from '@controleonline/ui-products/src/react/utils/categorySelection';
+import { buildProductCatalogRequestParams } from '@controleonline/ui-products/src/react/utils/productCatalogRequestParams';
 import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue';
 import { styles } from './Products.styles';
 
@@ -53,7 +54,7 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
     showBottomToolBar: interactionMode === 'pdv',
   };
 
-  ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].forEach(key => {
+  ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].forEach(key => {
     if (routeParams?.[key] !== undefined) {
       params[key] = routeParams[key];
     }
@@ -62,47 +63,7 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
   return params;
 };
 
-const buildRequestParams = ({
-  categoryId,
-  companyId,
-  context,
-  searchQuery,
-  typeFilter,
-}) => {
-  if (!companyId) return {};
-
-  const effectiveTypeFilter =
-    context === 'supplies'
-      ? (normalizeProductTypeFilter(typeFilter) || 'feedstock')
-      : normalizeProductTypeFilter(typeFilter);
-
-  const params = {
-    active: 1,
-    company: companyId,
-    'order[description]': 'ASC',
-    'order[product]': 'ASC',
-    type: effectiveTypeFilter
-      ? [effectiveTypeFilter]
-      : (
-          context === 'supplies'
-            ? ['feedstock', 'component', 'package']
-            : ['product', 'manufactured', 'custom', 'service', 'recipe']
-        ),
-  };
-
-  const normalizedSearch = String(searchQuery || '').trim();
-  if (normalizedSearch) {
-    params.search = normalizedSearch;
-  }
-
-  if (categoryId && categoryId !== ALL_PRODUCTS_SENTINEL_ID) {
-    params['productCategory.category'] = `/categories/${categoryId}`;
-  }
-
-  return params;
-};
-
-const ProductsPage = ({ navigation: navigationProp, route }) => {
+const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route }) => {
   const navigation = navigationProp || useNavigation();
   const routeParams = route?.params || {};
   const context = useMemo(() => normalizeCatalogContext(routeParams.context), [routeParams.context]);
@@ -170,7 +131,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   );
   const { currentOrderId } = useProductAddQueue({
     isSingleItemMode,
-    orderId: routeParams.id || routeParams.order || '',
+    orderId: activeOrderId || routeParams.orderId || routeParams.id || routeParams.order || '',
   });
   const {
     getProductStatuses,
@@ -188,7 +149,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   );
 
   const requestParams = useMemo(
-    () => buildRequestParams({
+    () => buildProductCatalogRequestParams({
       categoryId,
       companyId: currentCompany?.id,
       context,
@@ -425,7 +386,10 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           showRowActions={false}
           showSearch
           showToolbar={!hideCatalogToolbar}
-          showTotalItemsInCompactToolbar
+          showTotalItemsInCompactToolbar={isManager}
+          showTotalItemsInFooter={isManager}
+          showToolbarActions={isManager}
+          showToolbarControls={isManager}
           storeName="products"
           toolbarActions={toolbarActions}
           visibleColumnsPreferenceKey={`products:${context}:${interactionMode}`}
