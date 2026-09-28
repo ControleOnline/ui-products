@@ -85,6 +85,14 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     interactionMode,
     isMobileCatalog,
   })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (useInlinePdvCategories) {
+        setActivePdvCategoryId('')
+      }
+    }, [useInlinePdvCategories]),
+  )
   const routeCategoryId = useMemo(
     () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
     [route?.params?.category, route?.params?.categoryId],
