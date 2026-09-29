@@ -3,6 +3,10 @@ import { SafeAreaView, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { useStore } from '@store'
 import { app_type } from '@appType'
+import {
+  POS_OPERATION_MODE_WAITER,
+  resolvePosOperationMode,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
 import css from '@controleonline/ui-orders/src/react/css/orders'
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore'
 import DefaultSearch from '@controleonline/ui-default/src/react/components/filters/DefaultSearch'
@@ -65,6 +69,8 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
   const { items, isLoading: storeLoading } = categoriesStore.getters
   const categoryActions = categoriesStore.actions
   const productsStore = useStore('products')
+  const deviceConfigStore = useStore('device_config')
+  const { item: runtimeDeviceConfig } = deviceConfigStore.getters
   const productsActions = productsStore.actions
   const { currentOrderId } = useProductAddQueue({
     orderId: activeOrderId || route?.params?.orderId || route?.params?.id || route?.params?.order || '',
@@ -85,6 +91,9 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     appType: app_type,
     interactionMode,
     isMobileCatalog,
+    isWaiterPosMode:
+      String(app_type || '').trim().toUpperCase() === 'POS' &&
+      resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER,
   })
 
   useFocusEffect(
@@ -627,13 +636,13 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
           rowStyle={rowStyle}
           searchKey="search"
           searchPlaceholder={global.t?.t?.('categories', 'input', 'search')}
-          showSearch={isManagerApp}
-          showToolbar={isManagerApp && !hideCatalogToolbar}
+          showSearch={!useInlinePdvCategories}
+          showToolbar={!useInlinePdvCategories && !hideCatalogToolbar}
           showRowActions={false}
-          showTotalItemsInCompactToolbar={isManagerApp}
-          showTotalItemsInFooter={isManagerApp}
-          showToolbarActions={isManagerApp}
-          showToolbarControls={isManagerApp}
+          showTotalItemsInCompactToolbar={!useInlinePdvCategories}
+          showTotalItemsInFooter={!useInlinePdvCategories}
+          showToolbarActions={!useInlinePdvCategories}
+          showToolbarControls={!useInlinePdvCategories}
           storeName="categories"
           toolbarActions={toolbarActions}
           visibleColumnsPreferenceKey={`categories:${context}`}

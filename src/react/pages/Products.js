@@ -1,6 +1,10 @@
 import React, { useCallback, useMemo } from 'react';
 import { Alert, SafeAreaView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { app_type } from '@appType';
+import {
+  POS_OPERATION_MODE_WAITER,
+  resolvePosOperationMode,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
@@ -71,6 +75,11 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
   const context = useMemo(() => normalizeCatalogContext(routeParams.context), [routeParams.context]);
   const interactionMode = routeParams.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv');
   const isManager = app_type === 'MANAGER' && interactionMode !== 'pdv';
+  const { item: runtimeDeviceConfig } = useStore('device_config').getters;
+  const isWaiterPosMode =
+    String(app_type || '').trim().toUpperCase() === 'POS' &&
+    interactionMode === 'pdv' &&
+    resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER;
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -396,10 +405,10 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
           showRowActions={false}
           showSearch
           showToolbar={!hideCatalogToolbar}
-          showTotalItemsInCompactToolbar={isManager}
-          showTotalItemsInFooter={isManager}
-          showToolbarActions={isManager}
-          showToolbarControls={isManager}
+          showTotalItemsInCompactToolbar={!isWaiterPosMode}
+          showTotalItemsInFooter={!isWaiterPosMode}
+          showToolbarActions={!isWaiterPosMode}
+          showToolbarControls={!isWaiterPosMode}
           storeName="products"
           toolbarActions={toolbarActions}
           visibleColumnsPreferenceKey={`products:${context}:${interactionMode}`}
