@@ -277,7 +277,7 @@ const CustomizeScreen = () => {
         id: nextOrderId,
         resumeExistingOrder: true,
         interactionMode: 'pdv',
-        showBottomCart: true,
+        showBottomCart: route?.params?.showBottomCart ?? true,
         showBottomToolBar: true,
       });
       return;

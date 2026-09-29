@@ -41,6 +41,7 @@ import {
   downloadNormalizedCatalogForCompany,
   loadMenuModelsForCompany,
 } from './CategoriesPage/categoryCatalogDownloads'
+const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart')
 
 const CategoriesPage = ({ activeOrderId = '', route }) => {
   const [isDownloadingCatalog, setIsDownloadingCatalog] = useState(false)
@@ -128,7 +129,7 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
   const operationalRouteParams = useMemo(() => {
     const params = route?.params || {}
 
-    return ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].reduce(
+    return ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar', 'showBottomCart'].reduce(
       (nextParams, key) => (params[key] === undefined ? nextParams : { ...nextParams, [key]: params[key] }),
       {},
     )

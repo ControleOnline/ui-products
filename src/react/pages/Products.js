@@ -18,6 +18,8 @@ import { buildProductCatalogRequestParams } from '@controleonline/ui-products/sr
 import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue';
 import { styles } from './Products.styles';
 
+const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart');
+
 const DESKTOP_GRID_MIN_WIDTH = 960;
 
 const normalizeCatalogContext = value =>
@@ -50,11 +52,11 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
   const params = {
     context,
     interactionMode,
-    showBottomCart: interactionMode === 'pdv',
+    showBottomCart: resolveShowBottomCart(interactionMode, routeParams?.showBottomCart),
     showBottomToolBar: interactionMode === 'pdv',
   };
 
-  ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].forEach(key => {
+  ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar', 'showBottomCart'].forEach(key => {
     if (routeParams?.[key] !== undefined) {
       params[key] = routeParams[key];
     }
