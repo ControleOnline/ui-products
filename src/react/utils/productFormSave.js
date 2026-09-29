@@ -198,6 +198,5 @@ export function createProductFormSaveHandler(deps) {
         'Falha ao salvar produto.';
       setActionStatus(detail);
     }
-  
   };
 }

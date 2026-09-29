@@ -1,18 +1,28 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { SafeAreaView, View } from 'react-native'
+import { SafeAreaView, Text, View } from 'react-native'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { useStore } from '@store'
 import { app_type } from '@appType'
+import {
+  POS_OPERATION_MODE_WAITER,
+  resolvePosOperationMode,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap'
 import css from '@controleonline/ui-orders/src/react/css/orders'
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore'
+import DefaultSearch from '@controleonline/ui-default/src/react/components/filters/DefaultSearch'
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable'
 import { colors } from '@controleonline/../../src/styles/colors'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
 import { writeCachedCategories } from '@controleonline/ui-products/src/react/utils/categoryCache'
 
-import { styles } from './Categories.styles'
+import ProductItem from '@controleonline/ui-products/src/react/components/products/ProductItem'
 import CategoryCard from './CategoriesPage/CategoryCard'
+import PdvCategoryTabs from './CategoriesPage/PdvCategoryTabs'
+import { styles } from './Categories.styles'
+import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue'
+import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels'
+import { buildProductCatalogRequestParams } from '@controleonline/ui-products/src/react/utils/productCatalogRequestParams'
 import CategoryEditorModal from './CategoriesPage/CategoryEditorModal'
 import MenuModelPickerModal from './CategoriesPage/MenuModelPickerModal'
 import { buildCatalogLabels } from './CategoriesPage/catalogLabels'
@@ -22,6 +32,7 @@ import {
   normalizeEntityId,
 } from './CategoriesPage/categoryPageUtils'
 import { shouldRedirectEmptyCategoriesToProducts } from './CategoriesPage/pdvEmptyCategoriesRedirect'
+import { shouldUseInlinePdvCategories as resolveInlinePdvCategories } from './CategoriesPage/shouldUseInlinePdvCategories'
 import {
   navigateToAllProducts,
   navigateToCategoryProducts,
@@ -34,14 +45,18 @@ import {
   downloadNormalizedCatalogForCompany,
   loadMenuModelsForCompany,
 } from './CategoriesPage/categoryCatalogDownloads'
+const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart')
 
-const CategoriesPage = ({ route }) => {
+const CategoriesPage = ({ activeOrderId = '', route }) => {
   const [isDownloadingCatalog, setIsDownloadingCatalog] = useState(false)
   const [isDownloadingNormalizedCatalog, setIsDownloadingNormalizedCatalog] = useState(false)
   const [isLoadingMenuModels, setIsLoadingMenuModels] = useState(false)
   const [showMenuModelModal, setShowMenuModelModal] = useState(false)
   const [menuModels, setMenuModels] = useState([])
   const [selectedMenuModel, setSelectedMenuModel] = useState('')
+  const [productSearchDraft, setProductSearchDraft] = useState('')
+  const [activeProductSearch, setActiveProductSearch] = useState('')
+  const [activePdvCategoryId, setActivePdvCategoryId] = useState('')
   const [modalVisible, setModalVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const formRef = useRef(null)
@@ -53,6 +68,13 @@ const CategoriesPage = ({ route }) => {
   const categoriesStore = useStore('categories')
   const { items, isLoading: storeLoading } = categoriesStore.getters
   const categoryActions = categoriesStore.actions
+  const productsStore = useStore('products')
+  const deviceConfigStore = useStore('device_config')
+  const { item: runtimeDeviceConfig } = deviceConfigStore.getters
+  const productsActions = productsStore.actions
+  const { currentOrderId } = useProductAddQueue({
+    orderId: activeOrderId || route?.params?.orderId || route?.params?.id || route?.params?.order || '',
+  })
   const modelActions = useStore('models').actions
   const { currentCompany } = useStore('people').getters
   const { colors: themeColors } = useStore('theme').getters
@@ -65,6 +87,22 @@ const CategoriesPage = ({ route }) => {
   const interactionMode =
     route?.params?.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv')
   const isManagerApp = app_type === 'MANAGER' && interactionMode !== 'pdv'
+  const useInlinePdvCategories = resolveInlinePdvCategories({
+    appType: app_type,
+    interactionMode,
+    isMobileCatalog,
+    isWaiterPosMode:
+      String(app_type || '').trim().toUpperCase() === 'POS' &&
+      resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER,
+  })
+
+  useFocusEffect(
+    useCallback(() => {
+      if (useInlinePdvCategories) {
+        setActivePdvCategoryId('')
+      }
+    }, [useInlinePdvCategories]),
+  )
   const routeCategoryId = useMemo(
     () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
     [route?.params?.category, route?.params?.categoryId],
@@ -100,7 +138,7 @@ const CategoriesPage = ({ route }) => {
   const operationalRouteParams = useMemo(() => {
     const params = route?.params || {}
 
-    return ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].reduce(
+    return ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar', 'showBottomCart'].reduce(
       (nextParams, key) => (params[key] === undefined ? nextParams : { ...nextParams, [key]: params[key] }),
       {},
     )
@@ -171,6 +209,44 @@ const CategoriesPage = ({ route }) => {
     'order[sortOrder]': 'ASC',
     'order[name]': 'ASC',
   }), [context, currentCompany?.id])
+  const productSearchRequestParams = useMemo(
+    () => buildProductCatalogRequestParams({
+      categoryId: activePdvCategoryId || ALL_PRODUCTS_SENTINEL_ID,
+      companyId: currentCompany?.id,
+      context,
+      searchQuery: activeProductSearch,
+    }),
+    [activePdvCategoryId, activeProductSearch, context, currentCompany?.id],
+  )
+  const productSearchFilters = useMemo(
+    () => ({ search: productSearchDraft }),
+    [productSearchDraft],
+  )
+  const handleProductSearchFiltersChange = useCallback(filters => {
+    setProductSearchDraft(String(filters?.search || ''))
+  }, [])
+  const handleProductSearch = useCallback(query => {
+    const normalizedQuery = String(query || '').trim()
+    setProductSearchDraft(normalizedQuery)
+    setActiveProductSearch(normalizedQuery)
+    setActivePdvCategoryId('')
+    productsActions?.setFilters?.({})
+  }, [productsActions])
+  const handlePdvCategorySelect = useCallback(category => {
+    const categoryId = normalizeEntityId(category)
+    if (!categoryId) return
+
+    categoryActions.setItem(category)
+    setProductSearchDraft('')
+    setActiveProductSearch('')
+    setActivePdvCategoryId(categoryId)
+    productsActions?.setFilters?.({})
+  }, [categoryActions, productsActions])
+  const productSearchCardListProps = useMemo(() => ({
+    key: 'pdv-product-search-results',
+    numColumns: 1,
+    contentContainerStyle: { gap: 8, paddingBottom: 24, paddingHorizontal: 8 },
+  }), [])
 
   const tableCardProps = useMemo(() => ({
     key: `categories-${columns}`,
@@ -337,6 +413,48 @@ const CategoriesPage = ({ route }) => {
     })
   }, [categoryActions, context, interactionMode, navigation, operationalRouteParams])
 
+  useFocusEffect(
+    useCallback(() => {
+      if (
+        !useInlinePdvCategories ||
+        route?.params?.categoriesPrefetched === true ||
+        !currentCompany?.id
+      ) {
+        return undefined
+      }
+
+      let cancelled = false
+      categoryActions.getItems(requestParams)
+        .then(data => {
+          if (cancelled) return
+
+          const resolvedCategories = Array.isArray(data) ? data : []
+          writeCachedCategories(currentCompany.id, resolvedCategories, context)
+          if (
+            !emptyCategoriesRedirectedRef.current &&
+            shouldRedirectEmptyCategoriesToProducts({ isManagerApp, data: resolvedCategories })
+          ) {
+            emptyCategoriesRedirectedRef.current = true
+            openAllProducts()
+          }
+        })
+        .catch(() => {})
+
+      return () => {
+        cancelled = true
+      }
+    }, [
+      categoryActions,
+      context,
+      currentCompany?.id,
+      isManagerApp,
+      openAllProducts,
+      requestParams,
+      route?.params?.categoriesPrefetched,
+      useInlinePdvCategories,
+    ]),
+  )
+
   const toolbarActions = useMemo(() => isManagerApp ? buildCategoryToolbarActions({
     buttonPalette,
     canUseCompany: Boolean(currentCompany?.id),
@@ -391,8 +509,78 @@ const CategoriesPage = ({ route }) => {
 
   return (
     <SafeAreaView style={[orderStyles.container, styles.container]}>
-      {!storeLoading && <StateStore store="categories" />}
       <View style={styles.tableContent}>
+        {!isManagerApp ? (
+          <View
+            style={[
+              styles.searchStickyShell,
+              styles.searchStickyShellCompact,
+              { paddingHorizontal: 8, paddingVertical: 10 },
+            ]}
+          >
+            <DefaultSearch
+              filters={productSearchFilters}
+              onChangeFilters={handleProductSearchFiltersChange}
+              onSearch={handleProductSearch}
+              placeholder={global.t?.t?.('products', 'input', 'search') || 'Buscar produto'}
+              searchKey="search"
+              storeName="products"
+              style={[styles.searchInputWrap, { width: '100%' }]}
+              value={productSearchDraft}
+            />
+          </View>
+        ) : null}
+        {useInlinePdvCategories && storeLoading ? (
+          <StateStore compact mode="compact" store="categories" />
+        ) : null}
+        {useInlinePdvCategories && !activeProductSearch ? (
+          <View style={styles.pdvCategoryTabsShell}>
+            <PdvCategoryTabs
+              categories={Array.isArray(items) ? items : []}
+              onSelectCategory={handlePdvCategorySelect}
+              palette={brandColors}
+              selectedCategoryId={activePdvCategoryId}
+            />
+          </View>
+        ) : null}
+        {(!isManagerApp && activeProductSearch) || (useInlinePdvCategories && activePdvCategoryId) ? (
+          <>
+            <DefaultTable
+              accentColor={brandColors.primary}
+              cardListProps={productSearchCardListProps}
+              compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
+              data={undefined}
+              initialViewMode="cards"
+              renderCard={({ item }) => (
+                <ProductItem
+                  catalogContext={context}
+                  displayMode="search"
+                  interactionMode={interactionMode}
+                  orderId={currentOrderId}
+                  palette={brandColors}
+                  product={item}
+                />
+              )}
+              requestParams={productSearchRequestParams}
+              showRowActions={false}
+              showSearch={false}
+              showToolbar={false}
+              showToolbarActions={false}
+              showToolbarControls={false}
+              showTotalItemsInCompactToolbar={false}
+              showTotalItemsInFooter={false}
+              storeName="products"
+            />
+          </>
+        ) : useInlinePdvCategories ? (
+          storeLoading ? null : (
+            <View style={{ flex: 1 }}>
+              <Text style={styles.pdvCategoryEmptyHint}>
+                {global.t?.t?.('categories', 'helper', 'selectCategory') || 'Selecione uma categoria para ver os produtos.'}
+              </Text>
+            </View>
+          )
+        ) : (
         <DefaultTable
           accentColor={brandColors.primary}
           add={isManagerApp}
@@ -444,17 +632,22 @@ const CategoriesPage = ({ route }) => {
           onRowPress={changeCategory}
           renderCard={renderCategoryCard}
           requestParams={requestParams}
+          data={route?.params?.categoriesPrefetched === true ? items : undefined}
           rowStyle={rowStyle}
           searchKey="search"
           searchPlaceholder={global.t?.t?.('categories', 'input', 'search')}
-          showSearch
-          showToolbar={!hideCatalogToolbar}
+          showSearch={!useInlinePdvCategories}
+          showToolbar={!useInlinePdvCategories && !hideCatalogToolbar}
           showRowActions={false}
-          showTotalItemsInCompactToolbar
+          showTotalItemsInCompactToolbar={!useInlinePdvCategories}
+          showTotalItemsInFooter={!useInlinePdvCategories}
+          showToolbarActions={!useInlinePdvCategories}
+          showToolbarControls={!useInlinePdvCategories}
           storeName="categories"
           toolbarActions={toolbarActions}
           visibleColumnsPreferenceKey={`categories:${context}`}
         />
+        )}
       </View>
 
       {isManagerApp ? (

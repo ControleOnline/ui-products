@@ -1,6 +1,10 @@
 import React, { useCallback, useMemo } from 'react';
 import { Alert, SafeAreaView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { app_type } from '@appType';
+import {
+  POS_OPERATION_MODE_WAITER,
+  resolvePosOperationMode,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
@@ -14,8 +18,11 @@ import ProductItem, {
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 import { resolveRouteCategoryId } from '@controleonline/ui-products/src/react/utils/categorySelection';
+import { buildProductCatalogRequestParams } from '@controleonline/ui-products/src/react/utils/productCatalogRequestParams';
 import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue';
 import { styles } from './Products.styles';
+
+const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart');
 
 const DESKTOP_GRID_MIN_WIDTH = 960;
 
@@ -49,11 +56,11 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
   const params = {
     context,
     interactionMode,
-    showBottomCart: interactionMode === 'pdv',
+    showBottomCart: resolveShowBottomCart(interactionMode, routeParams?.showBottomCart),
     showBottomToolBar: interactionMode === 'pdv',
   };
 
-  ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].forEach(key => {
+  ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar', 'showBottomCart'].forEach(key => {
     if (routeParams?.[key] !== undefined) {
       params[key] = routeParams[key];
     }
@@ -62,52 +69,17 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
   return params;
 };
 
-const buildRequestParams = ({
-  categoryId,
-  companyId,
-  context,
-  searchQuery,
-  typeFilter,
-}) => {
-  if (!companyId) return {};
-
-  const effectiveTypeFilter =
-    context === 'supplies'
-      ? (normalizeProductTypeFilter(typeFilter) || 'feedstock')
-      : normalizeProductTypeFilter(typeFilter);
-
-  const params = {
-    active: 1,
-    company: companyId,
-    'order[description]': 'ASC',
-    'order[product]': 'ASC',
-    type: effectiveTypeFilter
-      ? [effectiveTypeFilter]
-      : (
-          context === 'supplies'
-            ? ['feedstock', 'component', 'package']
-            : ['product', 'manufactured', 'custom', 'service', 'recipe']
-        ),
-  };
-
-  const normalizedSearch = String(searchQuery || '').trim();
-  if (normalizedSearch) {
-    params.search = normalizedSearch;
-  }
-
-  if (categoryId && categoryId !== ALL_PRODUCTS_SENTINEL_ID) {
-    params['productCategory.category'] = `/categories/${categoryId}`;
-  }
-
-  return params;
-};
-
-const ProductsPage = ({ navigation: navigationProp, route }) => {
+const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route }) => {
   const navigation = navigationProp || useNavigation();
   const routeParams = route?.params || {};
   const context = useMemo(() => normalizeCatalogContext(routeParams.context), [routeParams.context]);
   const interactionMode = routeParams.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv');
   const isManager = app_type === 'MANAGER' && interactionMode !== 'pdv';
+  const { item: runtimeDeviceConfig } = useStore('device_config').getters;
+  const isWaiterPosMode =
+    String(app_type || '').trim().toUpperCase() === 'POS' &&
+    interactionMode === 'pdv' &&
+    resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER;
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -170,7 +142,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   );
   const { currentOrderId } = useProductAddQueue({
     isSingleItemMode,
-    orderId: routeParams.id || routeParams.order || '',
+    orderId: activeOrderId || routeParams.orderId || routeParams.id || routeParams.order || '',
   });
   const {
     getProductStatuses,
@@ -188,7 +160,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   );
 
   const requestParams = useMemo(
-    () => buildRequestParams({
+    () => buildProductCatalogRequestParams({
       categoryId,
       companyId: currentCompany?.id,
       context,
@@ -433,7 +405,10 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           showRowActions={false}
           showSearch
           showToolbar={!hideCatalogToolbar}
-          showTotalItemsInCompactToolbar
+          showTotalItemsInCompactToolbar={!isWaiterPosMode}
+          showTotalItemsInFooter={!isWaiterPosMode}
+          showToolbarActions={!isWaiterPosMode}
+          showToolbarControls={!isWaiterPosMode}
           storeName="products"
           toolbarActions={toolbarActions}
           visibleColumnsPreferenceKey={`products:${context}:${interactionMode}`}

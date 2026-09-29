@@ -96,4 +96,3 @@ export const normalizeProductForForm = data => {
     defaultInInventory: normalizeProductRelationId(data.defaultInInventory),
   };
 };
-
