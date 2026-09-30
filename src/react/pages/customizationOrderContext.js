@@ -24,11 +24,15 @@ export const buildCustomizeScreenRouteParams = ({
   orderId = null,
   productId = null,
   singleItemMode = false,
+  showBottomCart,
+  catalogContext,
 } = {}) => ({
   productId,
   ...(orderId ? {orderId} : {}),
   interactionMode,
   singleItemMode,
+  ...(showBottomCart === undefined ? {} : {showBottomCart}),
+  ...(catalogContext ? {context: catalogContext} : {}),
 })
 
 export const resolveCustomizationOrderContext = ({
