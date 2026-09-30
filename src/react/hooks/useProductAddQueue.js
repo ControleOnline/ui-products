@@ -67,7 +67,7 @@ const applyPendingSelectionToOrder = ({ order, product, quantity }) => {
 const resolveOrderId = (orderId, order) =>
   String(orderId || order?.id || order?.['@id'] || '').replace(/\D+/g, '');
 
-const useProductAddQueue = ({ isSingleItemMode = false, orderId = '' } = {}) => {
+const useProductAddQueue = ({ isSingleItemMode = false, orderId = '', onProductIncluded } = {}) => {
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
@@ -140,8 +140,9 @@ const useProductAddQueue = ({ isSingleItemMode = false, orderId = '' } = {}) => 
 
       currentOrderRef.current = nextOrder;
       ordersActionsRef.current.syncOrder?.(nextOrder);
+      if (Number(payload?.quantity) > 0) onProductIncluded?.();
     },
-    [isSingleItemMode],
+    [isSingleItemMode, onProductIncluded],
   );
 
   useEffect(() => {

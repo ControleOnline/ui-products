@@ -24,7 +24,7 @@ import {useStore} from '@store';
 import {app_type} from '@appType';
 import usePosCartSession from '@controleonline/ui-orders/src/react/hooks/usePosCartSession';
 import {getActivePosOrderContext} from '@controleonline/ui-orders/src/react/hooks/posCartSession/activePosOrderContext';
-import {isPosSingleItemMode} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
+import {isPosSingleItemMode, resolvePosOperationMode, POS_OPERATION_MODE_WAITER} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import {
   customizeBackdropPressableStyle,
   customizeChipRowStyle,
@@ -57,10 +57,7 @@ import {
   resolveCustomizePalette,
 } from './CustomizeScreen.styles';
 import {mergeOrderWithOrderProducts} from '@controleonline/ui-orders/src/utils/orderState';
-import {
-  buildManagerPdvRouteParams,
-  buildCheckoutRouteParams,
-} from '@controleonline/ui-orders/src/react/utils/orderRoute';
+import {finishCustomization} from './customizationNavigation';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import NestedCustomizationModal from '../components/NestedCustomizationModal';
 import {resolveCustomizationOrderContext} from './customizationOrderContext';
@@ -119,6 +116,9 @@ const CustomizeScreen = () => {
   const {currentCompany, mainCompany} = peopleStore.getters;
   const deviceStore = useStore('device');
   const {item: storagedDevice} = deviceStore.getters;
+  const {item: runtimeDeviceConfig} = useStore('device_config').getters;
+  const isWaiterPosMode = app_type === 'POS' && isPdvCustomizationFlow &&
+    resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER;
   const isSingleItemCustomizationFlow =
     singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const product_groupStore = useStore('product_group');
@@ -206,7 +206,7 @@ const CustomizeScreen = () => {
 
   const {
     isLoadingProductGroups, selectedItems, optionProductsById,
-    resolvedProductGroups, resolvedProductGroupsById,
+    resolvedProductGroups,
     groupSummaries, groupSummariesById, invalidGroupSummaries,
     getProcessedOptions, updateNestedOption, inspectNestedOption, handleToggleOption,
     nestedEditor, setNestedEditor,
@@ -260,30 +260,12 @@ const CustomizeScreen = () => {
   }, [navigation]);
 
   const finishCustomizeScreen = useCallback((nextOrderId = activeOrderId) => {
-    if (redirectToCart) { navigation.navigate('ShopCartPage'); return; }
-    if (isSingleItemCustomizationFlow && nextOrderId) {
-      // No single-item, o customizado vai direto para o pagamento;
-      navigation.replace('Checkout', buildCheckoutRouteParams(
-        nextOrderId, buildManagerPdvRouteParams({showBottomCart: false}),
-      ));
-      return;
-    }
-    if (isPdvCustomizationFlow && nextOrderId) {
-      if (typeof navigation.canGoBack === 'function' && navigation.canGoBack()) {
-        navigation.goBack();
-        return;
-      }
-      navigation.navigate('AddProductScreen', {
-        id: nextOrderId,
-        resumeExistingOrder: true,
-        interactionMode: 'pdv',
-        showBottomCart: route?.params?.showBottomCart ?? true,
-        showBottomToolBar: true,
-      });
-      return;
-    }
-    navigation.pop(Math.max(1, Number(returnDepth || 1)));
-  }, [activeOrderId, isPdvCustomizationFlow, isSingleItemCustomizationFlow, navigation, redirectToCart, returnDepth]);
+    finishCustomization({navigation, nextOrderId, redirectToCart,
+      singleItemMode: isSingleItemCustomizationFlow,
+      interactionMode: isPdvCustomizationFlow ? 'pdv' : interactionMode,
+      isWaiterPosMode, routeParams: route.params, returnDepth});
+  }, [activeOrderId, interactionMode, isPdvCustomizationFlow, isSingleItemCustomizationFlow,
+    isWaiterPosMode, navigation, redirectToCart, returnDepth, route.params]);
 
   const addHandle = async () => {
     const showAlert = message =>

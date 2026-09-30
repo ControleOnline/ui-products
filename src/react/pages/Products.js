@@ -302,6 +302,7 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
           product={item}
           productCategories={[]}
           singleItemMode={isSingleItemMode}
+          showBottomCart={resolveShowBottomCart(interactionMode, routeParams.showBottomCart)}
           onMarketplaceSync={handleMarketplaceSync}
         />
       );
@@ -325,6 +326,7 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
       isManager,
       isSingleItemMode,
       marketplaceSyncingKey,
+      routeParams.showBottomCart,
       width,
     ],
   );
