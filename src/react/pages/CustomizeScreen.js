@@ -71,6 +71,7 @@ import {
 } from './customizeScreenHelpers';
 import useCustomizeScreenIds from './useCustomizeScreenIds';
 import useCustomizeScreenData from './useCustomizeScreenData';
+import useShopCustomizationSource from './useShopCustomizationSource';
 import GroupCard from './GroupCard';
 import SummaryPanel from './SummaryPanel';
 
@@ -122,14 +123,21 @@ const CustomizeScreen = () => {
   const isSingleItemCustomizationFlow =
     singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const product_groupStore = useStore('product_group');
-  const productGroupActions = product_groupStore.actions;
+  const rawProductGroupActions = product_groupStore.actions;
   const productsStore = useStore('products');
-  const productsActions = productsStore.actions;
-  const productsGetters = productsStore.getters;
+  const rawProductsActions = productsStore.actions;
+  const rawProductsGetters = productsStore.getters;
   const themeStore = useStore('theme');
   const palette = resolveCustomizePalette(themeStore.getters?.colors || {});
   const productGroupProductStore = useStore('product_group_product');
-  const productGroupProductActions = productGroupProductStore.actions;
+  const {source: shopSource, product: shopProduct} = useShopCustomizationSource({
+    enabled: app_type === 'SHOP', companyId: currentCompany?.id || mainCompany?.id,
+    productId: normalizeEntityId(routeProductId || routeProduct?.id || routeProduct?.['@id'] || routeOrderProduct?.product?.id || route.params?.id),
+  });
+  const productGroupActions = shopSource?.productGroupActions || rawProductGroupActions;
+  const productsActions = shopSource?.productsActions || rawProductsActions;
+  const productsGetters = shopSource ? {item: shopProduct} : rawProductsGetters;
+  const productGroupProductActions = shopSource?.productGroupProductActions || productGroupProductStore.actions;
   const cartStore = useStore('cart');
   const cartActions = cartStore.actions;
   const cartGetters = cartStore.getters;
@@ -162,7 +170,7 @@ const CustomizeScreen = () => {
     activeOrderProductId, activeOrderProduct, activeProductId, activeProduct,
     activeResolvedProductId, activeOrderProductQuantity, activeProductIri,
   } = useCustomizeScreenIds({
-    routeProduct, routeProductId, routeOrderProduct, routeOrderProductId,
+    routeProduct: shopSource ? shopProduct : routeProduct, routeProductId: routeProductId || routeProduct?.id || routeProduct?.['@id'], routeOrderProduct, routeOrderProductId,
     routeParamsId: route.params?.id,
     storedOrderProductItem: orderProductsGetters?.item,
     storedOrderProducts,
@@ -222,7 +230,7 @@ const CustomizeScreen = () => {
    * rehydration before persisting the customized order product.
    */
   const canSubmitCustomization =
-    !!activeProductIri &&
+    !!activeProductIri && (!shopSource || !!shopProduct) &&
     (isPdvCustomizationFlow || !!activeOrderIri || !isEditingExistingOrderProduct) &&
     !isLoadingProductGroups &&
     invalidGroupSummaries.length === 0;
