@@ -1,3 +1,6 @@
+import {categoryModelPickerStyles} from './CategoriesPage/categoryModelPickerStyles'
+import {categoryEditorStyles} from './CategoriesPage/categoryEditorStyles'
+import {categoryCardStyles} from './CategoriesPage/categoryCardStyles'
 import { StyleSheet, Platform } from 'react-native'
 
 const skeletonStyles = StyleSheet.create({
@@ -31,6 +34,44 @@ const styles = StyleSheet.create({
   searchStickyShellCompact: {
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+  },
+  pdvCategoryTabsShell: {
+    width: '100%',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    zIndex: 5,
+  },
+  pdvCategoryTabsContent: {
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+  },
+  pdvCategoryTab: {
+    minHeight: 38,
+    maxWidth: 180,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#DCE7F3',
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+  },
+  pdvCategoryTabText: {
+    color: '#334155',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pdvCategoryTabTextSelected: {
+    color: '#FFFFFF',
+  },
+  pdvCategoryEmptyHint: {
+    marginTop: 18,
+    paddingHorizontal: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    fontSize: 13,
   },
   searchSection: {
     width: '100%',
@@ -268,94 +309,7 @@ const styles = StyleSheet.create({
     top: 8,
     zIndex: 3,
   },
-  pickerModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.45)',
-    justifyContent: 'flex-end',
-  },
-  pickerModalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '78%',
-    minHeight: 240,
-    paddingBottom: 16,
-  },
-  pickerModalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  pickerModalTitle: {
-    flex: 1,
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
-    paddingRight: 12,
-  },
-  pickerModalClose: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pickerModalBody: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  pickerState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    gap: 10,
-  },
-  pickerStateText: {
-    fontSize: 14,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  modelOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    backgroundColor: '#fff',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-  },
-  modelOptionSelected: {
-    borderColor: '#C4B5FD',
-    backgroundColor: '#F5F3FF',
-  },
-  modelOptionCopy: {
-    flex: 1,
-  },
-  modelOptionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  modelOptionTitleSelected: {
-    color: '#5B21B6',
-  },
-  modelOptionSubtitle: {
-    marginTop: 2,
-    fontSize: 12,
-    color: '#64748B',
-  },
-
+  ...categoryModelPickerStyles,
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -365,170 +319,7 @@ const styles = StyleSheet.create({
   cardTouchable: {
     width: '100%',
   },
-  cardImage: {
-    width: '100%',
-    aspectRatio: 3 / 4,
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10 },
-      android: { elevation: 4 },
-      web: { boxShadow: '0 4px 16px rgba(0,0,0,0.10)' },
-    }),
-  },
-  cardImageCompact: {
-    borderRadius: 16,
-  },
-  cardImageMobile: {
-    borderRadius: 8,
-    ...Platform.select({
-      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 12 },
-      android: { elevation: 5 },
-      web: { boxShadow: '0 8px 20px rgba(15,23,42,0.16)' },
-    }),
-  },
-
-  cardCoverImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
-
-  cardOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 12,
-    paddingBottom: 14,
-    paddingTop: 48,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    ...Platform.select({
-      web: {
-        backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%)',
-      },
-      default: {
-        backgroundColor: 'rgba(0,0,0,0.45)',
-      },
-    }),
-  },
-  cardOverlayCompact: {
-    paddingHorizontal: 10,
-    paddingBottom: 10,
-    paddingTop: 36,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  cardOverlayMobile: {
-    minHeight: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingTop: 10,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    backgroundColor: 'rgba(15,23,42,0.50)',
-    ...Platform.select({
-      web: {
-        backgroundImage: 'linear-gradient(to top, rgba(15,23,42,0.90) 0%, rgba(15,23,42,0.78) 62%, rgba(15,23,42,0.16) 100%)',
-      },
-    }),
-  },
-  cardOverlayName: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-    lineHeight: 19,
-    ...Platform.select({
-      web: { textShadow: '0 1px 3px rgba(0,0,0,0.4)' },
-      default: {
-        textShadowColor: 'rgba(0,0,0,0.4)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 3,
-      },
-    }),
-  },
-  cardOverlayNameCompact: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  cardOverlayNameMobile: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-
-  editOverlay: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.40)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  /* ─── card sem categoria ─── */
-  noCategoryCard: {
-    width: '100%',
-    borderRadius: 20,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  noCategoryCardMobile: {
-    borderRadius: 8,
-    borderStyle: 'solid',
-    borderWidth: 1.5,
-    paddingHorizontal: 14,
-    ...Platform.select({
-      ios: { shadowColor: '#0F172A', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.10, shadowRadius: 12 },
-      android: { elevation: 3 },
-      web: { boxShadow: '0 8px 18px rgba(15,23,42,0.10)' },
-    }),
-  },
-  noCategoryCardCompact: {
-    borderRadius: 16,
-  },
-  noCategoryIconWrap: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noCategoryName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  noCategoryNameMobile: {
-    fontSize: 16,
-    lineHeight: 20,
-    fontWeight: '800',
-  },
-  noCategoryNameCompact: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-
-
+  ...categoryCardStyles,
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
@@ -590,82 +381,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  modalContainer: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    width: '100%',
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
-      android: { elevation: 10 },
-      web: { boxShadow: '0 -4px 24px rgba(0,0,0,0.1)' },
-    }),
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  headerCloseButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalScroll: {
-    flexShrink: 1,
-  },
-  modalBody: {
-    padding: 24,
-  },
-  attachmentSection: {
-    marginTop: 18,
-  },
+  ...categoryEditorStyles,
 
-  modalFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#94A3B8',
-    alignItems: 'center',
-  },
-  modalCancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  modalSaveButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  modalSaveButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-  },
 })
 
 export { skeletonStyles, styles }
@@ -709,4 +426,3 @@ export const inlineStyle_631_42 = (
 export const inlineStyle_692_8 = {
   justifyContent: 'flex-end',
 };
-
