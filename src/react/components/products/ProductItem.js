@@ -9,79 +9,13 @@ import SingleItemProductCard from '@controleonline/ui-products/src/react/compone
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
+import { buildCustomizeScreenRouteParams } from '@controleonline/ui-products/src/react/pages/customizationOrderContext';
 import {app_type} from '@appType';
+import ProductSearchResult from './ProductSearchResult';
 import styles from './ProductItem.styles';
 
-export const PRODUCT_TYPE_CONFIG = {
-  product: {
-    label: 'Produto',
-    pluralLabel: 'Produtos',
-    backgroundToken: 'chipSelectedBackground',
-    textToken: 'chipSelectedText',
-  },
-  service: {
-    label: 'Serviço',
-    pluralLabel: 'Serviços',
-    backgroundToken: 'buttonBackgroundSecondary',
-    textToken: 'buttonTextSecondary',
-  },
-  component: {
-    label: 'Componente',
-    pluralLabel: 'Componentes',
-    backgroundToken: 'chipBackground',
-    textToken: 'textWarning',
-  },
-  feedstock: {
-    label: 'Matéria Prima',
-    pluralLabel: 'Matérias-primas',
-    backgroundToken: 'chipBackground',
-    textToken: 'textSuccess',
-  },
-  package: {
-    label: 'Embalagem',
-    pluralLabel: 'Embalagens',
-    backgroundToken: 'chipSelectedBackground',
-    textToken: 'chipSelectedText',
-  },
-  custom: {
-    label: 'Custom',
-    pluralLabel: 'Customizados',
-    backgroundToken: 'buttonBackgroundSecondary',
-    textToken: 'buttonTextSecondary',
-  },
-  manufactured: {
-    label: 'Fabricado',
-    pluralLabel: 'Fabricados',
-    backgroundToken: 'chipBackground',
-    textToken: 'textWarning',
-  },
-  recipe: {
-    label: 'Preparo',
-    pluralLabel: 'Preparos',
-    backgroundToken: 'chipBackground',
-    textToken: 'textMuted',
-  },
-};
-
-export const getProductTypeLabel = type =>
-  PRODUCT_TYPE_CONFIG[type]?.label || String(type || '').trim() || '';
-
-export const getProductTypePluralLabel = type =>
-  PRODUCT_TYPE_CONFIG[type]?.pluralLabel || getProductTypeLabel(type);
-
-export const resolveProductTypeTheme = (type, palette = {}) => {
-  const typeConfig = PRODUCT_TYPE_CONFIG[type] || null;
-
-  if (!typeConfig) {
-    return null;
-  }
-
-  return {
-    ...typeConfig,
-    backgroundColor: palette[typeConfig.backgroundToken],
-    textColor: palette[typeConfig.textToken],
-  };
-};
+export {PRODUCT_TYPE_CONFIG, getProductTypeLabel, getProductTypePluralLabel, resolveProductTypeTheme} from './productTypeMetadata';
+import {resolveProductTypeTheme} from './productTypeMetadata';
 
 const collectionFrom = value => {
   if (!value) return [];
@@ -114,6 +48,7 @@ const ProductItem = ({
   palette = {},
   singleItemMode = false,
   orderId = '',
+  showBottomCart,
   marketplaceStatuses = [],
   onMarketplaceSync,
   marketplaceSyncingKey = '',
@@ -214,12 +149,18 @@ const ProductItem = ({
       return (
         <TouchableOpacity
           onPress={() =>
-            navigation.navigate('CustomizeScreen', {
-              productId: product?.id || product?.['@id'],
-              interactionMode,
-              // O custom do fluxo single-item precisa manter a mesma saida do PDV.
-              singleItemMode: singleItemMode === true,
-            })
+            navigation.navigate(
+              'CustomizeScreen',
+              buildCustomizeScreenRouteParams({
+                productId: product?.id || product?.['@id'],
+                orderId,
+                interactionMode,
+                showBottomCart,
+                catalogContext,
+                // O custom do fluxo single-item precisa manter a mesma saida do PDV.
+                singleItemMode: singleItemMode === true,
+              }),
+            )
           }
           style={[
             styles.customizeButton,
@@ -244,7 +185,13 @@ const ProductItem = ({
         />
       );
     }
-    return <ProductQuantity product={product} category={category} />;
+    return (
+      <ProductQuantity
+        compact={displayMode === 'search'}
+        product={product}
+        category={category}
+      />
+    );
   };
 
   const renderCategoryChip = ({ showPlaceholder = false } = {}) => {
@@ -294,6 +241,11 @@ const ProductItem = ({
       </View>
     );
   };
+
+  if (displayMode === 'search') {
+    return <ProductSearchResult product={product} coverUrl={coverUrl} hasImage={hasImage}
+      resolvedPalette={resolvedPalette} action={renderAction()} />;
+  }
 
   if (isTableMode) {
     return (

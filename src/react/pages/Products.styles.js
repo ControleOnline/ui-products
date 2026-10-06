@@ -32,7 +32,9 @@ const styles = StyleSheet.create({
   managerTableContent: {
     flex: 1,
     minHeight: 0,
-    paddingHorizontal: 8,
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingHorizontal: 0,
     paddingTop: 12,
   },
 
