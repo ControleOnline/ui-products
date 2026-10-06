@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { SafeAreaView, Text, View } from 'react-native'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useNavigation } from '@react-navigation/native'
 import { useStore } from '@store'
 import { app_type } from '@appType'
 import {
@@ -15,6 +15,8 @@ import DefaultTable from '@controleonline/ui-default/src/react/components/table/
 import { colors } from '@controleonline/../../src/styles/colors'
 import { resolveThemePalette } from '@controleonline/../../src/styles/branding'
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
+import useCachedCatalogActions from '../hooks/useCachedCatalogActions'
+import useCachedCatalogView from '../hooks/useCachedCatalogView'
 import { writeCachedCategories } from '@controleonline/ui-products/src/react/utils/categoryCache'
 
 import ProductItem from '@controleonline/ui-products/src/react/components/products/ProductItem'
@@ -58,21 +60,14 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
 
   const categoriesStore = useStore('categories')
   const { items, isLoading: storeLoading } = categoriesStore.getters
-  const categoryActions = categoriesStore.actions
   const productsStore = useStore('products')
   const deviceConfigStore = useStore('device_config')
   const { item: runtimeDeviceConfig } = deviceConfigStore.getters
   const isWaiterPosMode = String(app_type || '').trim().toUpperCase() === 'POS' &&
     String(route?.params?.interactionMode || 'pdv').trim().toLowerCase() === 'pdv' &&
     resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER
-  const resetCategorySelection = useCallback(() => {
-    setActivePdvCategoryId('')
-    setProductSearchDraft('')
-    setActiveProductSearch('')
-  }, [])
   const productsActions = productsStore.actions
   const { currentOrderId } = useProductAddQueue({
-    onProductIncluded: isWaiterPosMode ? resetCategorySelection : undefined,
     orderId: activeOrderId || route?.params?.orderId || route?.params?.id || route?.params?.order || '',
   })
   const { currentCompany } = useStore('people').getters
@@ -82,6 +77,16 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     () => normalizeCatalogContext(route?.params?.context),
     [route?.params?.context],
   )
+  const categoryActions = useCachedCatalogActions(categoriesStore, isWaiterPosMode, currentCompany?.id, context)
+  const cachedProductActions = useCachedCatalogActions(productsStore, isWaiterPosMode, currentCompany?.id, context)
+  const restoreCatalogView = useCallback(saved => {
+    setActivePdvCategoryId(saved.categoryId || '')
+    setProductSearchDraft(saved.search || '')
+    setActiveProductSearch(saved.search || '')
+  }, [])
+  const cachedListProps = useCachedCatalogView({enabled: isWaiterPosMode, companyId: currentCompany?.id,
+    context, viewKey: 'categories', scopeRevision: runtimeDeviceConfig?.id, resetKey: route?.params?.catalogResetKey,
+    view: {categoryId: activePdvCategoryId, search: activeProductSearch}, restore: restoreCatalogView})
   const labels = useMemo(() => buildCatalogLabels(context), [context])
   const interactionMode =
     route?.params?.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv')
@@ -93,11 +98,6 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     isWaiterPosMode,
   })
 
-  useFocusEffect(
-    useCallback(() => {
-      if (isWaiterPosMode) resetCategorySelection()
-    }, [isWaiterPosMode, resetCategorySelection]),
-  )
   const routeCategoryId = useMemo(
     () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
     [route?.params?.category, route?.params?.categoryId],
@@ -348,7 +348,8 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
           <>
             <DefaultTable
               accentColor={brandColors.primary}
-              cardListProps={productSearchCardListProps}
+              actions={cachedProductActions}
+              cardListProps={{...productSearchCardListProps, ...cachedListProps}}
               compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
               data={undefined}
               initialViewMode="cards"
@@ -388,7 +389,8 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
           add={isManagerApp}
           addButtonPlacement="bottom"
           addLabel={labels.addCategoryLabel}
-          cardListProps={tableCardProps}
+          actions={categoryActions}
+          cardListProps={{...tableCardProps, ...cachedListProps}}
           compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
           defaultColor="$primary"
           importAction={isManagerApp ? {

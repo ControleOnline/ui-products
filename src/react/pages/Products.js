@@ -20,6 +20,8 @@ import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/
 import { resolveRouteCategoryId } from '@controleonline/ui-products/src/react/utils/categorySelection';
 import { buildProductCatalogRequestParams } from '@controleonline/ui-products/src/react/utils/productCatalogRequestParams';
 import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue';
+import useCachedCatalogActions from '../hooks/useCachedCatalogActions';
+import useCachedCatalogView from '../hooks/useCachedCatalogView';
 import { styles } from './Products.styles';
 
 const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart');
@@ -113,6 +115,9 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
     [routeParams.category, routeParams.categoryId],
   );
   const isAllProducts = !categoryId || categoryId === ALL_PRODUCTS_SENTINEL_ID;
+  const cachedActions = useCachedCatalogActions(productsStore, isWaiterPosMode, currentCompany?.id, context);
+  const cachedListProps = useCachedCatalogView({enabled: isWaiterPosMode, companyId: currentCompany?.id,
+    context, viewKey: `products:${categoryId || 'all'}`, view: {}, scopeRevision: runtimeDeviceConfig?.id});
   const typeFilter = useMemo(
     () => normalizeProductTypeFilter(routeParams.typeFilter),
     [routeParams.typeFilter],
@@ -382,7 +387,8 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
           add={isManager}
           addButtonPlacement="bottom"
           addLabel={labels.addLabel}
-          cardListProps={cardListProps}
+          actions={cachedActions}
+          cardListProps={{...cardListProps, ...cachedListProps}}
           compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
           defaultColor="$primary"
           importAction={isManager ? {
