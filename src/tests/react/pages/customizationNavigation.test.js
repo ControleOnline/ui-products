@@ -32,3 +32,21 @@ describe('finishCustomization', () => {
     expect(navigation.navigate).toHaveBeenCalledWith('ShopCartPage');
   });
 });
+
+it('marks the previous catalog route for reset only after waiter customization succeeds', () => {
+ const navigation = navigationFor();
+ navigation.getState = () => ({index: 1, routes: [{key: 'pdv-70', name: 'PdvPage'}, {key: 'custom'}]});
+ navigation.dispatch = jest.fn();
+ finishCustomization({navigation, nextOrderId: '70', interactionMode: 'pdv', isWaiterPosMode: true});
+ expect(navigation.dispatch).toHaveBeenCalledWith({type: 'SET_PARAMS', source: 'pdv-70',
+   payload: {params: {catalogResetKey: expect.stringMatching(/^70:/)}}});
+ expect(navigation.dispatch.mock.invocationCallOrder[0]).toBeLessThan(navigation.goBack.mock.invocationCallOrder[0]);
+});
+it('restores the catalog bar on a waiter deep-link return and requests a clean category selection', () => {
+ const navigation = navigationFor(false);
+ finishCustomization({navigation, nextOrderId: '70', interactionMode: 'pdv', isWaiterPosMode: true,
+   routeParams: {showBottomCart: false, catalogShowBottomCart: true}});
+ expect(navigation.navigate).toHaveBeenCalledWith('AddProductScreen', expect.objectContaining({
+   showBottomCart: true, catalogResetKey: expect.stringMatching(/^70:/), resumeExistingOrder: true,
+ }));
+});

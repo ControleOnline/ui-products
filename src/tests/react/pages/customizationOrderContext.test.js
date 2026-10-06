@@ -17,6 +17,7 @@ describe('customizationOrderContext', () => {
       orderId: 72908,
       interactionMode: 'pdv',
       singleItemMode: false,
+      showBottomCart: false,
     });
   });
 
@@ -38,5 +39,5 @@ describe('customizationOrderContext', () => {
 });
 
 it('preserves false bottom cart and catalog context through customization', () => {
-  expect(buildCustomizeScreenRouteParams({productId: 134, orderId: 72908, interactionMode: 'pdv', showBottomCart: false, catalogContext: 'supplies'})).toEqual({productId: 134, orderId: 72908, interactionMode: 'pdv', singleItemMode: false, showBottomCart: false, context: 'supplies'});
+  expect(buildCustomizeScreenRouteParams({productId: 134, orderId: 72908, interactionMode: 'pdv', showBottomCart: false, catalogContext: 'supplies'})).toEqual({productId: 134, orderId: 72908, interactionMode: 'pdv', singleItemMode: false, showBottomCart: false, catalogShowBottomCart: false, context: 'supplies'});
 });

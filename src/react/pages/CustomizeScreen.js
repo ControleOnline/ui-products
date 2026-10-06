@@ -4,14 +4,10 @@
 //   - customizeScreenHelpers.js  (pure helpers, ~230 lines)
 //   - useCustomizeScreenIds.js   (ID resolution hook, ~100 lines)
 //   - useCustomizeScreenData.js  (data loading + selection state hook, ~490 lines)
-//   - OptionRow.js               (option row subcomponent, ~200 lines)
-//   - GroupCard.js               (group card subcomponent, ~90 lines)
-//   - SummaryPanel.js            (summary panel subcomponent, ~160 lines)
 
 import React, {useState, useCallback, useEffect, useMemo, useRef} from 'react';
 import {
   Alert,
-  Image,
   Platform,
   ScrollView,
   Text,
@@ -23,7 +19,7 @@ import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native'
 import {useStore} from '@store';
 import {app_type} from '@appType';
 import usePosCartSession from '@controleonline/ui-orders/src/react/hooks/usePosCartSession';
-import {getActivePosOrderContext} from '@controleonline/ui-orders/src/react/hooks/posCartSession/activePosOrderContext';
+import {getActivePosOrderContext, setActivePosOrderContext} from '@controleonline/ui-orders/src/react/hooks/posCartSession/activePosOrderContext';
 import {isPosSingleItemMode, resolvePosOperationMode, POS_OPERATION_MODE_WAITER} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import {
   customizeBackdropPressableStyle,
@@ -72,8 +68,12 @@ import {
 import useCustomizeScreenIds from './useCustomizeScreenIds';
 import useCustomizeScreenData from './useCustomizeScreenData';
 import useShopCustomizationSource from './useShopCustomizationSource';
+import useCachedCatalogActions from '../hooks/useCachedCatalogActions';
 import GroupCard from './GroupCard';
 import SummaryPanel from './SummaryPanel';
+import useCustomizationSubmission from '../hooks/useCustomizationSubmission';
+import CustomizationImage, {CustomizationImageProvider} from '../components/CustomizationImage';
+import {reportProductConfirmationError} from '@controleonline/ui-orders/src/react/utils/confirmPendingProducts';
 
 const CustomizeScreen = () => {
   const navigation = useNavigation();
@@ -123,9 +123,9 @@ const CustomizeScreen = () => {
   const isSingleItemCustomizationFlow =
     singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const product_groupStore = useStore('product_group');
-  const rawProductGroupActions = product_groupStore.actions;
+  const cachedGroupActions = useCachedCatalogActions(product_groupStore, isWaiterPosMode, currentCompany?.id, 'products', false);
   const productsStore = useStore('products');
-  const rawProductsActions = productsStore.actions;
+  const cachedProductsActions = useCachedCatalogActions(productsStore, isWaiterPosMode, currentCompany?.id, 'products', false);
   const rawProductsGetters = productsStore.getters;
   const themeStore = useStore('theme');
   const palette = resolveCustomizePalette(themeStore.getters?.colors || {});
@@ -134,10 +134,11 @@ const CustomizeScreen = () => {
     enabled: app_type === 'SHOP', companyId: currentCompany?.id || mainCompany?.id,
     productId: normalizeEntityId(routeProductId || routeProduct?.id || routeProduct?.['@id'] || routeOrderProduct?.product?.id || route.params?.id),
   });
-  const productGroupActions = shopSource?.productGroupActions || rawProductGroupActions;
-  const productsActions = shopSource?.productsActions || rawProductsActions;
+  const cachedGroupProductActions = useCachedCatalogActions(productGroupProductStore, isWaiterPosMode, currentCompany?.id, 'products', false);
+  const productGroupActions = shopSource?.productGroupActions || cachedGroupActions;
+  const productsActions = shopSource?.productsActions || cachedProductsActions;
   const productsGetters = shopSource ? {item: shopProduct} : rawProductsGetters;
-  const productGroupProductActions = shopSource?.productGroupProductActions || productGroupProductStore.actions;
+  const productGroupProductActions = shopSource?.productGroupProductActions || cachedGroupProductActions;
   const cartStore = useStore('cart');
   const cartActions = cartStore.actions;
   const cartGetters = cartStore.getters;
@@ -145,7 +146,6 @@ const CustomizeScreen = () => {
   const orderProductsActions = order_productsStore.actions;
   const orderProductsGetters = order_productsStore.getters;
   const storedOrderProducts = Array.isArray(orderProductsGetters?.items) ? orderProductsGetters.items : [];
-  const isSavingCustomization = Boolean(orderProductsGetters?.isSaving);
   const {item: order} = ordersGetters;
   const {item: cart} = cartGetters;
   const sessionOrder = getActivePosOrderContext({
@@ -189,6 +189,8 @@ const CustomizeScreen = () => {
     }),
     [activeOrderProduct, cart, order, routeOrderId, sessionOrder],
   );
+  const {stage: submissionStage, submit: submitCustomization, confirmingPrevious} = useCustomizationSubmission(isWaiterPosMode && !isSingleItemCustomizationFlow, activeOrderId);
+  const isSavingCustomization = submissionStage !== 'idle' || (!(isWaiterPosMode && !isSingleItemCustomizationFlow) && Boolean(orderProductsGetters?.isSaving || ordersGetters?.isSaving));
   const isEditingExistingOrderProduct = !!activeOrderProductId;
   const [itemQuantity, setItemQuantity] = useState(() => activeOrderProductQuantity);
 
@@ -243,7 +245,7 @@ const CustomizeScreen = () => {
   // No single-item, a quantidade eh implicita e a tela nao mostra o stepper.
   const resolvedItemQuantity = isSingleItemCustomizationFlow ? 1 : resolvePositiveQuantity(itemQuantity);
   const itemTotal = (basePrice + complementsTotal) * resolvedItemQuantity;
-  const submitLabel = isSavingCustomization ? 'SALVANDO...' : isEditingExistingOrderProduct ? 'MODIFICAR' : 'ADICIONAR';
+  const submitLabel = submissionStage === 'confirming' ? 'CONFIRMANDO ITENS...' : isSavingCustomization ? 'SALVANDO...' : isEditingExistingOrderProduct ? 'MODIFICAR' : 'ADICIONAR';
   const selectedOptionsLabel =
     selectedOptionsCount === 1 ? '1 selecao feita' : `${selectedOptionsCount} selecoes feitas`;
 
@@ -329,22 +331,32 @@ const CustomizeScreen = () => {
     };
 
     try {
-      if (isSingleItemCustomizationFlow) {
-        // No single-item, a troca precisa substituir o pai e manter os filhos
-        await ordersActions.replaceProducts(targetOrderId, orderProductData);
-      } else if (activeOrderProductId) {
-        await orderProductsActions.save(orderProductData);
-      } else {
-        /*
-         * @agents New customized lines use the order aggregate endpoint so the
-         * backend can consolidate an equivalent product and component tree.
-         */
-        await ordersActions.addProducts(targetOrderId, [orderProductData]);
-      }
-      try { await refreshSavedOrderProducts(); } catch { /* parent screen refetches on focus */ }
-      finishCustomizeScreen(targetOrderId);
+      await submitCustomization(targetOrderId, async () => {
+        let confirmedOrder;
+        if (isSingleItemCustomizationFlow) {
+          // No single-item, a troca precisa substituir o pai e manter os filhos
+          confirmedOrder = await ordersActions.replaceProducts(targetOrderId, orderProductData);
+        } else if (activeOrderProductId) {
+          await orderProductsActions.save(orderProductData);
+        } else {
+          /*
+           * @agents New customized lines use the order aggregate endpoint so the
+           * backend can consolidate an equivalent product and component tree.
+           */
+          confirmedOrder = await ordersActions.addProducts(targetOrderId, [orderProductData]);
+        }
+        if (isWaiterPosMode && normalizeEntityId(confirmedOrder?.id || confirmedOrder?.['@id']) === String(targetOrderId) && Array.isArray(confirmedOrder?.orderProducts)) {
+          orderProductsActions.setItems?.(confirmedOrder.orderProducts);
+          setActivePosOrderContext({companyId: currentCompany?.id, deviceId: storagedDevice?.id,
+            order: confirmedOrder, confirmed: true});
+        } else {
+          try { await refreshSavedOrderProducts(); } catch { /* parent screen refetches on focus */ }
+        }
+        finishCustomizeScreen(targetOrderId);
+      });
     } catch (error) {
-      showAlert(error?.message || 'Nao foi possivel salvar a customizacao do item.');
+      if (isWaiterPosMode) reportProductConfirmationError(error, showAlert);
+      else showAlert(error?.message || 'Nao foi possivel salvar a customizacao do item.');
     }
   };
 
@@ -356,18 +368,13 @@ const CustomizeScreen = () => {
     setNestedEditor(null);
   };
 
-  const renderProductImage = ({product, imageUrl, wrapperStyle, imageStyle}) => {
-    if (imageUrl) {
-      return <View style={wrapperStyle}><Image source={{uri: imageUrl}} style={imageStyle} resizeMode="cover" /></View>;
-    }
-    return (
-      <View style={wrapperStyle}>
-        <View style={customizeHeroPlaceholderStyle({palette})}>
-          <Text style={customizeHeroPlaceholderTextStyle({palette})}>{resolveProductInitial(product)}</Text>
-        </View>
+  const renderProductImage = ({product, imageUrl, wrapperStyle, imageStyle}) => (
+    <CustomizationImage uri={imageUrl} style={wrapperStyle} imageStyle={imageStyle}>
+      <View style={customizeHeroPlaceholderStyle({palette})}>
+        <Text style={customizeHeroPlaceholderTextStyle({palette})}>{resolveProductInitial(product)}</Text>
       </View>
-    );
-  };
+    </CustomizationImage>
+  );
 
   const renderSubmitButton = () => {
     const disabled = isSavingCustomization || !canSubmitCustomization;
@@ -389,6 +396,7 @@ const CustomizeScreen = () => {
     activeProduct, quantityTouchedRef, setItemQuantity};
 
   return (
+    <CustomizationImageProvider key={`${currentCompany?.id}:${storagedDevice?.id}`} enabled={isWaiterPosMode && !isSingleItemCustomizationFlow} paused={confirmingPrevious || isSavingCustomization || Boolean(ordersGetters?.isSaving || orderProductsGetters?.isSaving)}>
     <View
       style={[
         customizeScreenRootStyle({palette, isLargeScreen, isBottomSheet}),
@@ -484,6 +492,7 @@ const CustomizeScreen = () => {
         />
       ) : null}
     </View>
+    </CustomizationImageProvider>
   );
 };
 

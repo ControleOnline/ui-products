@@ -2,8 +2,9 @@
 // Renders a single selectable option within a customization group.
 
 import React from 'react';
-import {Image, Text, TouchableOpacity, View} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import {MaterialCommunityIcons} from '@expo/vector-icons';
+import CustomizationImage from '../components/CustomizationImage';
 import Formatter from '@controleonline/ui-common/src/utils/formatter';
 import {nestedEditButtonStyle} from '../components/NestedCustomizationModal.styles';
 import {
@@ -148,19 +149,9 @@ const OptionRow = ({
           <View style={customizeOptionControlInnerStyle({palette})} />
         ) : null}
       </View>
-      <View style={customizeOptionImageWrapStyle({palette})}>
-        {optionImageUrl ? (
-          <Image
-            source={{uri: optionImageUrl}}
-            style={customizeOptionImageStyle}
-            resizeMode="cover"
-          />
-        ) : (
-          <Text style={customizeOptionPlaceholderTextStyle({palette})}>
-            {resolveProductInitial(optionProduct)}
-          </Text>
-        )}
-      </View>
+      <CustomizationImage uri={optionImageUrl} style={customizeOptionImageWrapStyle({palette})} imageStyle={customizeOptionImageStyle}>
+        <Text style={customizeOptionPlaceholderTextStyle({palette})}>{resolveProductInitial(optionProduct)}</Text>
+      </CustomizationImage>
       <View style={customizeOptionBodyStyle}>
         <Text style={customizeOptionNameStyle({palette})} numberOfLines={1}>
           {option.label}

@@ -31,7 +31,10 @@ export const buildCustomizeScreenRouteParams = ({
   ...(orderId ? {orderId} : {}),
   interactionMode,
   singleItemMode,
-  ...(showBottomCart === undefined ? {} : {showBottomCart}),
+  // Customization owns its Add button; keep the catalog bar for the return only.
+  ...(interactionMode === 'pdv'
+    ? {showBottomCart: false, ...(showBottomCart === undefined ? {} : {catalogShowBottomCart: showBottomCart})}
+    : showBottomCart === undefined ? {} : {showBottomCart}),
   ...(catalogContext ? {context: catalogContext} : {}),
 })
 

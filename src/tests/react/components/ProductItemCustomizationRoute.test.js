@@ -20,9 +20,17 @@ afterEach(()=>{renderer.act(()=>tree?.unmount());tree=null;mockNavigation.naviga
 it.each(['card','search','table'])('carries false override, catalog, order and single item through %s custom action',displayMode=>{
  renderer.act(()=>{tree=renderer.create(React.createElement(ProductItem,{product:{id:134,type:'custom',product:'Gyros',price:5},orderId:'70',catalogContext:'supplies',showBottomCart:false,interactionMode:'pdv',singleItemMode:true,displayMode}));});
  renderer.act(()=>tree.root.findAllByType('TouchableOpacity')[0].props.onPress());
- expect(mockNavigation.navigate).toHaveBeenCalledWith('CustomizeScreen',{productId:134,orderId:'70',interactionMode:'pdv',singleItemMode:true,showBottomCart:false,context:'supplies'});
+ expect(mockNavigation.navigate).toHaveBeenCalledWith('CustomizeScreen',{productId:134,orderId:'70',interactionMode:'pdv',singleItemMode:true,showBottomCart:false,catalogShowBottomCart:false,context:'supplies'});
 });
 it('keeps a standard single item in its dedicated card',()=>{
  renderer.act(()=>{tree=renderer.create(React.createElement(ProductItem,{product:{id:2,type:'product'},singleItemMode:true,orderId:'70'}));});
  expect(tree.root.findByType('SingleItemProductCard').props.orderId).toBe('70');
+});
+
+it('hides the inherited catalog cart bar on the customization route',()=>{
+ renderer.act(()=>{tree=renderer.create(React.createElement(ProductItem,{product:{id:134,type:'custom'},orderId:'70',showBottomCart:true,interactionMode:'pdv'}));});
+ renderer.act(()=>tree.root.findAllByType('TouchableOpacity')[0].props.onPress());
+ expect(mockNavigation.navigate).toHaveBeenCalledWith('CustomizeScreen',expect.objectContaining({
+   showBottomCart:false,catalogShowBottomCart:true,orderId:'70',
+ }));
 });

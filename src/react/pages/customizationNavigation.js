@@ -18,14 +18,25 @@ export const finishCustomization = ({
   }
   if (interactionMode === 'pdv' && nextOrderId) {
     if (isWaiterPosMode) {
-      if (navigation.canGoBack?.()) { navigation.goBack(); return; }
+      const catalogResetKey = `${nextOrderId}:${Date.now()}`;
+      if (navigation.canGoBack?.()) {
+        const state = navigation.getState?.();
+        const previousRoute = state?.routes?.[state.index - 1];
+        if (previousRoute?.key) {
+          navigation.dispatch({type: 'SET_PARAMS', source: previousRoute.key,
+            payload: {params: {catalogResetKey}}});
+        }
+        navigation.goBack();
+        return;
+      }
       navigation.navigate('AddProductScreen', {
         ...buildManagerPdvRouteParams(),
         id: nextOrderId,
         orderId: nextOrderId,
         context: routeParams.context || 'products',
         resumeExistingOrder: true,
-        showBottomCart: resolveShowBottomCart('pdv', routeParams.showBottomCart),
+        catalogResetKey,
+        showBottomCart: resolveShowBottomCart('pdv', routeParams.catalogShowBottomCart ?? routeParams.showBottomCart),
       });
     } else {
       navigation.replace('OrderDetails', buildOrderDetailsRouteParams(
