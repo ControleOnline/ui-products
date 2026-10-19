@@ -1,13 +1,14 @@
 {
   "name": "@controleonline/ui-products",
-  "version": "1.0.36",
+  "version": "1.0.37",
   "author": "ControleOnline",
   "description": "ControleOnline products Quasar UI Component",
   "license": "MIT",
   "main": "src/react/index.js",
   "scripts": {
-    "test": "npm run test:service-units",
+    "test": "npm run test:service-units && npm run test:product-form",
     "test:service-units": "node --test src/tests/react/domain/serviceUnitOptions.test.mjs",
+    "test:product-form": "node --test src/tests/react/components/ProductForm.hookOrder.test.mjs",
     "test:coverage": "c8 --reporter=clover --report-dir coverage npm test"
   },
   "devDependencies": {
