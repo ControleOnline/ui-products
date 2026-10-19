@@ -388,6 +388,11 @@ const ProductForm = ({
     }
   };
 
+  // Must be declared before handleSave: its argument object reads these setters
+  // eagerly during render (TDZ ReferenceError blanks the screen otherwise).
+  const [openSections, setOpenSections] = React.useState(new Set(['identificacao']));
+  const [errorSections, setErrorSections] = React.useState(new Set());
+
   const handleSave = useCallback(
     createProductFormSaveHandler({
       getProduct: () => product,
@@ -425,8 +430,6 @@ const ProductForm = ({
   );
 
   const brandColors = useMemo(() => resolveThemePalette(), []);
-  const [openSections, setOpenSections] = React.useState(new Set(['identificacao']));
-  const [errorSections, setErrorSections] = React.useState(new Set());
   const isServiceProduct = product?.type === SERVICE_TYPE;
   const productUnitOptions = useMemo(
     () => buildProductUnitOptions(productUnitGetters.items, isServiceProduct),

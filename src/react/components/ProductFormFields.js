@@ -8,6 +8,7 @@ import styles, {
   inlineStyle_78_20,
   inlineStyle_84_14,
   inlineStyle_85_16,
+  inlineStyle_92_14,
   inlineStyle_144_12,
   inlineStyle_150_12,
 } from './ProductForm.styles';
