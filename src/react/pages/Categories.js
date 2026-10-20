@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { SafeAreaView, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useStore } from '@store'
@@ -10,12 +10,14 @@ import {
 import css from '@controleonline/ui-orders/src/react/css/orders'
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore'
 import DefaultToolbarAction from '@controleonline/ui-default/src/react/components/table/DefaultToolbarAction'
-import PdvProductSearch, {useNativeCatalogActions, PdvEmptyCategoryHint} from './CategoriesPage/PdvProductSearch'
+import PdvProductSearch, {PdvEmptyCategoryHint} from './CategoriesPage/PdvProductSearch'
 import NativePdvCategoryEntry from './CategoriesPage/NativePdvCategoryEntry'
+import PdvCategoryLevelCards from './CategoriesPage/PdvCategoryLevelCards'
+import PdvCatalogToolbar from './CategoriesPage/PdvCatalogToolbar'
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable'
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync'
 import useCachedCatalogActions from '../hooks/useCachedCatalogActions'
-import useCachedCatalogView from '../hooks/useCachedCatalogView'
+import usePdvCategoryNavigation from './CategoriesPage/usePdvCategoryNavigation'
 import { writeCachedCategories } from '@controleonline/ui-products/src/react/utils/categoryCache'
 
 import ProductItem from '@controleonline/ui-products/src/react/components/products/ProductItem'
@@ -50,9 +52,6 @@ import {alertCatalogError} from './CategoriesPage/categoryCatalogDownloads'
 const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart')
 
 const CategoriesPage = ({ activeOrderId = '', route }) => {
-  const [productSearchDraft, setProductSearchDraft] = useState('')
-  const [activeProductSearch, setActiveProductSearch] = useState('')
-  const [activePdvCategoryId, setActivePdvCategoryId] = useState('')
   const formRef = useRef(null)
   const emptyCategoriesRedirectedRef = useRef(false)
   const navigation = useNavigation()
@@ -78,20 +77,11 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     () => normalizeCatalogContext(route?.params?.context),
     [route?.params?.context],
   )
-  const isManagerNativeInline = process.env.EXPO_PUBLIC_MANAGER_NATIVE_PREVIEW === '1' && app_type === 'MANAGER' && route?.params?.interactionMode === 'pdv'
-  const [nativeSearchOpen, setNativeSearchOpen] = useState(false)
-  const nativeCatalogActions = useNativeCatalogActions(setNativeSearchOpen, setActivePdvCategoryId, setActiveProductSearch, setProductSearchDraft)
+  const modernManagerCatalog = app_type === 'MANAGER' && route?.params?.interactionMode === 'pdv' && process.env.EXPO_PUBLIC_MANAGER_LAYOUT !== 'legacy'
+  const isManagerNativeInline = modernManagerCatalog || (process.env.EXPO_PUBLIC_MANAGER_NATIVE_PREVIEW === '1' && app_type === 'MANAGER' && route?.params?.interactionMode === 'pdv')
   const cacheCatalog = isWaiterPosMode || isManagerNativeInline
   const categoryActions = useCachedCatalogActions(categoriesStore, cacheCatalog, currentCompany?.id, context)
   const cachedProductActions = useCachedCatalogActions(productsStore, cacheCatalog, currentCompany?.id, context)
-  const restoreCatalogView = useCallback(saved => {
-    setActivePdvCategoryId(saved.categoryId || '')
-    setProductSearchDraft(saved.search || '')
-    setActiveProductSearch(saved.search || '')
-  }, [])
-  const cachedListProps = useCachedCatalogView({enabled: cacheCatalog, companyId: currentCompany?.id,
-    context, viewKey: 'categories', scopeRevision: runtimeDeviceConfig?.id, resetKey: route?.params?.catalogResetKey,
-    view: {categoryId: activePdvCategoryId, search: activeProductSearch}, restore: restoreCatalogView})
   const labels = useMemo(() => buildCatalogLabels(context), [context])
   const interactionMode =
     route?.params?.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv')
@@ -103,6 +93,13 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     isMobileCatalog,
     isWaiterPosMode,
   })
+
+  const {productSearchDraft, activeProductSearch, activePdvCategoryId, browseCategoryId,
+    nativeSearchOpen, setNativeSearchOpen, nativeCatalogActions, cachedListProps,
+    handleProductSearchFiltersChange, handleProductSearch, handlePdvCategorySelect,
+    browseCategories} = usePdvCategoryNavigation({modernManagerCatalog, isManagerInline,
+      cacheCatalog, categoryActions, productsActions, items, companyId:currentCompany?.id,
+      context, scopeRevision:runtimeDeviceConfig?.id, resetKey:route?.params?.catalogResetKey})
 
   const routeCategoryId = useMemo(
     () => normalizeEntityId(route?.params?.categoryId || route?.params?.category),
@@ -150,26 +147,6 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
     () => ({ search: productSearchDraft }),
     [productSearchDraft],
   )
-  const handleProductSearchFiltersChange = useCallback(filters => {
-    setProductSearchDraft(String(filters?.search || ''))
-  }, [])
-  const handleProductSearch = useCallback(query => {
-    const normalizedQuery = String(query || '').trim()
-    setProductSearchDraft(normalizedQuery)
-    setActiveProductSearch(normalizedQuery)
-    setActivePdvCategoryId('')
-    productsActions?.setFilters?.({})
-  }, [productsActions])
-  const handlePdvCategorySelect = useCallback(category => {
-    const categoryId = isManagerInline && category?._isAllProducts ? ALL_PRODUCTS_SENTINEL_ID : normalizeEntityId(category)
-    if (!categoryId) return
-
-    categoryActions.setItem(category)
-    setProductSearchDraft('')
-    setActiveProductSearch('')
-    setActivePdvCategoryId(categoryId)
-    productsActions?.setFilters?.({})
-  }, [categoryActions, productsActions,isManagerInline])
   const categoryCounts = useCategoryProductCounts({categories:items,companyId:currentCompany?.id,context,enabled:isManagerInline && !isManagerNativeInline})
   useEffect(()=>{
     if(isManagerInline && !isManagerNativeInline && !activePdvCategoryId && !activeProductSearch && items?.length){
@@ -312,13 +289,17 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
   return (
     <SafeAreaView style={[orderStyles.container, styles.container,isManagerInline ? {backgroundColor:brandColors.background} : null]}>
       <View style={styles.tableContent}>
-        <PdvProductSearch native={isManagerNativeInline} waiter={isWaiterPosMode} palette={brandColors} onOpen={()=>setNativeSearchOpen(true)}
+        {modernManagerCatalog ? <PdvCatalogToolbar palette={brandColors}
+          filters={productSearchFilters} onChangeFilters={handleProductSearchFiltersChange}
+          onSearch={handleProductSearch} value={productSearchDraft} onCategories={()=>browseCategories()}
+          showProductControls={!!activePdvCategoryId || !!activeProductSearch}/>
+        : <PdvProductSearch native={isManagerNativeInline} waiter={isWaiterPosMode} palette={brandColors} onOpen={()=>setNativeSearchOpen(true)}
           visible={nativeSearchOpen} onClose={()=>setNativeSearchOpen(false)} filters={productSearchFilters}
-          onChangeFilters={handleProductSearchFiltersChange} onSearch={handleProductSearch} value={productSearchDraft}/>
+          onChangeFilters={handleProductSearchFiltersChange} onSearch={handleProductSearch} value={productSearchDraft}/>}
         {useInlinePdvCategories && (storeLoading || categoryFetchLoading) ? (
           <StateStore compact mode="compact" store="categories" />
         ) : null}
-        {useInlinePdvCategories && !activeProductSearch && !categoryFetchError ? (
+        {useInlinePdvCategories && !categoryFetchError && (modernManagerCatalog || !activeProductSearch) ? (
           <View style={[styles.pdvCategoryTabsShell,isManagerInline ? {paddingVertical:0,backgroundColor:brandColors.background,borderBottomColor:brandColors.cardBorder||brandColors.border} : null]}>
             <PdvCategoryTabs
               allCategory={isManagerInline ? ALL_PRODUCTS_SENTINEL : null}
@@ -330,6 +311,7 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
               onSelectCategory={handlePdvCategorySelect}
               palette={brandColors}
               selectedCategoryId={activePdvCategoryId}
+              browsingCategoryId={modernManagerCatalog ? browseCategoryId : ''}
             />
           </View>
         ) : null}
@@ -370,6 +352,7 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
               showToolbarControls={false}
               showTotalItemsInCompactToolbar={false}
               externalCatalogSearch={isManagerNativeInline}
+              externalCatalogToolbar={modernManagerCatalog}
               toolbarActions={isManagerNativeInline ? nativeCatalogActions : undefined}
               catalogTitle={isManagerInline ? (activePdvCategoryId===ALL_PRODUCTS_SENTINEL_ID ? 'Todos os produtos' : items?.find(item=>normalizeEntityId(item)===activePdvCategoryId)?.name || 'Produtos') : undefined}
               showTotalItemsInFooter={false}
@@ -377,7 +360,11 @@ const CategoriesPage = ({ activeOrderId = '', route }) => {
             />
           </>
         ) : isManagerNativeInline && !storeLoading && !categoryFetchLoading ? (
-          <NativePdvCategoryEntry items={items} actions={categoryActions} renderCard={renderCategoryCard}
+          modernManagerCatalog ? <PdvCategoryLevelCards items={items} browseId={browseCategoryId}
+            onBrowse={browseCategories} onSelect={handlePdvCategorySelect}
+            actions={categoryActions} renderCard={renderCategoryCard} palette={brandColors}
+            toolbarActions={nativeCatalogActions} requestParams={requestParams}/>
+          : <NativePdvCategoryEntry items={items} actions={categoryActions} renderCard={renderCategoryCard}
             onSelect={handlePdvCategorySelect} toolbarActions={nativeCatalogActions} requestParams={requestParams}/>
         ) : useInlinePdvCategories ? (
           <PdvEmptyCategoryHint loading={storeLoading || categoryFetchLoading}/>
