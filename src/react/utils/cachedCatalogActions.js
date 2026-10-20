@@ -1,13 +1,18 @@
-import localDB from '@controleonline/ui-common/src/api/localDB';
+import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
+import {readCatalogStorage, writeCatalogStorage, clearCatalogStorage} from './catalogCacheStorage';
 import {api} from '@controleonline/ui-common/src/api';
 import {getCatalogCacheScope} from './catalogCacheScope';
 
-const db = new localDB({resourceEndpoint: 'pos_catalog_cache', columns: [], filters: {}});
 const memory = new Map();
 const pending = new Map();
-const owners = new WeakMap();
+let owners = new WeakMap();
 export const invalidateCatalogOwner = actions => owners.delete(actions);
 const refreshAttempts = new Map();
+let storageClearing = Promise.resolve();
+eventBus.on('product-catalog-cache:cleared', () => {
+  memory.clear(); pending.clear(); refreshAttempts.clear(); owners = new WeakMap();
+  storageClearing = clearCatalogStorage().catch(() => {});
+});
 const TTL = 60 * 1000;
 let networkTail = Promise.resolve();
 const serialize = value => Array.isArray(value) ? `[${value.map(serialize)}]` :
@@ -20,17 +25,19 @@ const limitNetwork = task => {
   return result;
 };
 export const readCatalogRecord = async id => {
+  await storageClearing;
   if (memory.has(id)) return memory.get(id);
   try {
-    const record = await db.get(id);
+    const record = await readCatalogStorage(id);
     if (record?.id === id) { memory.set(id, record); return record; }
   } catch { /* Storage is optional; the ERP remains usable when it is blocked. */ }
   return null;
 };
 export const writeCatalogRecord = async record => {
+  await storageClearing;
   memory.set(record.id, record);
   if (memory.size > 100) memory.delete(memory.keys().next().value);
-  try { await db.saveItem(record); } catch { /* Quota/private mode: retain memory cache. */ }
+  try { await writeCatalogStorage(record); } catch { /* Quota/private mode: retain memory cache. */ }
 };
 
 export function createCachedCatalogActions(store, companyId, context = 'products', deps = {}) {

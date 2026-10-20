@@ -31,7 +31,7 @@ jest.mock('@controleonline/ui-products/src/react/utils/categoryCache', () => ({w
 jest.mock('@controleonline/ui-common/src/react/utils/fileUrl', () => ({resolveFileImageUrl:()=>null}));
 jest.mock('../../../../react/pages/CategoriesPage/categoryCatalogDownloads', () => ({loadMenuModelsForCompany:()=>Promise.resolve([])}));
 jest.mock('react-native-vector-icons/Feather', () => mockNode('Icon'));
-jest.mock('@controleonline/ui-default/src/react/components/table/useDefaultTableTheme', () => () => ({tableActionColors:{}}));
+jest.mock('@controleonline/ui-default/src/react/components/table/useDefaultTableTheme', () => ({__esModule:true,default:()=>({tableActionColors:{}}),DefaultTableThemeContext:require('react').createContext(null)}));
 const Categories = require('../../../../react/pages/Categories').default;
 const eventBus = require('@controleonline/ui-common/src/react/components/EventBus').default;
 const {ADD_PRODUCT_SELECTION_CHANGE_EVENT,clearPendingAddProducts} = require('@controleonline/ui-orders/src/react/utils/addProductSession');
@@ -44,7 +44,7 @@ beforeEach(() => {
  mockNavigation.navigate.mockClear(); mockFocusCallbacks.length=0; clearPendingAddProducts();
  mockGetItems.mockReset().mockResolvedValue([{id:10,name:'Lanches'}]);
  const actions = {getItems:mockGetItems,setItem:jest.fn(),setFilters:jest.fn(), syncOrder:jest.fn(),addToQueue:jest.fn(),initQueue:jest.fn()};
- Object.assign(mockStores,{order_products:{actions:{}},categories:{getters:{items:[{id:10,name:'Lanches'}],isLoading:false},actions},products:{getters:{},actions},device_config:{getters:{get item(){return {configs:mockConfig};}},actions},models:{getters:{},actions},people:{getters:{currentCompany:{id:3}},actions},theme:{getters:{colors:{}},actions},orders:{getters:{item:{id:70,orderProducts:[]}},actions}});
+ Object.assign(mockStores,{auth:{getters:{isLogged:false,user:null},actions:{}},device:{getters:{item:{id:9,type:'POS'}},actions:{}},order_products:{actions:{}},categories:{getters:{items:[{id:10,name:'Lanches'}],isLoading:false},actions},products:{getters:{},actions},device_config:{getters:{get item(){return {configs:mockConfig};}},actions},models:{getters:{},actions},people:{getters:{currentCompany:{id:3}},actions},theme:{getters:{colors:{}},actions},orders:{getters:{item:{id:70,orderProducts:[]}},actions}});
 });
 afterEach(async () => {if(tree) await renderer.act(async()=>tree.unmount()); tree=null;});
 it.each([['POS','cashier'],['POS','counter'],['POS','single-item'],['POS','totem'],['TOTEM','waiter'],['SHOP','waiter'],['MANAGER','waiter']])('preserves %s/%s category catalog without waiter search or tabs',async(appType,mode)=>{

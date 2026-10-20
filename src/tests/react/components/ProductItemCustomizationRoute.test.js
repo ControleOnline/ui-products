@@ -5,6 +5,8 @@ const mockNavigation = {navigate:jest.fn()};
 let mockAppType = 'POS';
 const mockNode = name => props => React.createElement(name,props,props.children);
 jest.mock('react-native',()=>({View:mockNode('View'),Text:mockNode('Text'),TouchableOpacity:mockNode('TouchableOpacity'),Image:mockNode('Image'),Platform:{select: v=>v.web||v.default},StyleSheet:{create:v=>v}}));
+// File loading is an external boundary; customization route behavior remains real.
+jest.mock('@controleonline/ui-default/src/react/components/files/DefaultFile',()=>mockNode('DefaultFile'));
 jest.mock('@react-navigation/native',()=>({useNavigation:()=>mockNavigation}));
 jest.mock('@appType',()=>({get app_type(){return mockAppType;}}));
 jest.mock('@expo/vector-icons',()=>({MaterialCommunityIcons:mockNode('Icon')}));
