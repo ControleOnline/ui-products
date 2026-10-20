@@ -10,12 +10,13 @@ const PdvCategoryTabs = ({
   onSelectCategory,
   palette = {},
   selectedCategoryId = '',
+  browsingCategoryId = '',
   hierarchical = false,
   showCounts = true,
   compact = false,
   counts = {},
   allCategory = null,
-}) => hierarchical ? <HierarchicalCategoryTabs compact={compact} showCounts={showCounts} categories={categories} onSelectCategory={onSelectCategory} palette={palette} selectedCategoryId={selectedCategoryId} counts={counts} allCategory={allCategory}/> : (
+}) => hierarchical ? <HierarchicalCategoryTabs compact={compact} showCounts={showCounts} categories={categories} onSelectCategory={onSelectCategory} palette={palette} selectedCategoryId={selectedCategoryId} browsingCategoryId={browsingCategoryId} counts={counts} allCategory={allCategory}/> : (
   <ScrollView
     contentContainerStyle={styles.pdvCategoryTabsContent}
     horizontal
