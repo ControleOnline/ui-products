@@ -1,6 +1,7 @@
 import React from 'react'
 import { ScrollView, Text, TouchableOpacity } from 'react-native'
 
+import HierarchicalCategoryTabs from './HierarchicalCategoryTabs'
 import { styles } from '../Categories.styles'
 import { normalizeEntityId } from './categoryPageUtils'
 
@@ -9,7 +10,12 @@ const PdvCategoryTabs = ({
   onSelectCategory,
   palette = {},
   selectedCategoryId = '',
-}) => (
+  hierarchical = false,
+  showCounts = true,
+  compact = false,
+  counts = {},
+  allCategory = null,
+}) => hierarchical ? <HierarchicalCategoryTabs compact={compact} showCounts={showCounts} categories={categories} onSelectCategory={onSelectCategory} palette={palette} selectedCategoryId={selectedCategoryId} counts={counts} allCategory={allCategory}/> : (
   <ScrollView
     contentContainerStyle={styles.pdvCategoryTabsContent}
     horizontal

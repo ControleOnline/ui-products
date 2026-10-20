@@ -379,7 +379,7 @@ const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route })
     : null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, themeColors.pageBackground ? {backgroundColor: themeColors.pageBackground} : null]}>
       {!storeLoading ? <StateStore store="products" /> : null}
       <View style={styles.managerTableContent}>
         <DefaultTable

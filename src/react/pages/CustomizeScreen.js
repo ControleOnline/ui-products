@@ -120,12 +120,16 @@ const CustomizeScreen = () => {
   const {item: runtimeDeviceConfig} = useStore('device_config').getters;
   const isWaiterPosMode = app_type === 'POS' && isPdvCustomizationFlow &&
     resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER;
+  // Reuse read optimizations without changing waiter-only submission/navigation.
+  const useCustomizationCache = isWaiterPosMode || (
+    process.env.EXPO_PUBLIC_MANAGER_PREVIEW === '1' && app_type === 'MANAGER' && isPdvCustomizationFlow
+  );
   const isSingleItemCustomizationFlow =
     singleItemMode === true || isPosSingleItemMode(storagedDevice?.configs);
   const product_groupStore = useStore('product_group');
-  const cachedGroupActions = useCachedCatalogActions(product_groupStore, isWaiterPosMode, currentCompany?.id, 'products', false);
+  const cachedGroupActions = useCachedCatalogActions(product_groupStore, useCustomizationCache, currentCompany?.id, 'products', false);
   const productsStore = useStore('products');
-  const cachedProductsActions = useCachedCatalogActions(productsStore, isWaiterPosMode, currentCompany?.id, 'products', false);
+  const cachedProductsActions = useCachedCatalogActions(productsStore, useCustomizationCache, currentCompany?.id, 'products', false);
   const rawProductsGetters = productsStore.getters;
   const themeStore = useStore('theme');
   const palette = resolveCustomizePalette(themeStore.getters?.colors || {});
@@ -134,7 +138,7 @@ const CustomizeScreen = () => {
     enabled: app_type === 'SHOP', companyId: currentCompany?.id || mainCompany?.id,
     productId: normalizeEntityId(routeProductId || routeProduct?.id || routeProduct?.['@id'] || routeOrderProduct?.product?.id || route.params?.id),
   });
-  const cachedGroupProductActions = useCachedCatalogActions(productGroupProductStore, isWaiterPosMode, currentCompany?.id, 'products', false);
+  const cachedGroupProductActions = useCachedCatalogActions(productGroupProductStore, useCustomizationCache, currentCompany?.id, 'products', false);
   const productGroupActions = shopSource?.productGroupActions || cachedGroupActions;
   const productsActions = shopSource?.productsActions || cachedProductsActions;
   const productsGetters = shopSource ? {item: shopProduct} : rawProductsGetters;
@@ -396,7 +400,7 @@ const CustomizeScreen = () => {
     activeProduct, quantityTouchedRef, setItemQuantity};
 
   return (
-    <CustomizationImageProvider key={`${currentCompany?.id}:${storagedDevice?.id}`} enabled={isWaiterPosMode && !isSingleItemCustomizationFlow} paused={confirmingPrevious || isSavingCustomization || Boolean(ordersGetters?.isSaving || orderProductsGetters?.isSaving)}>
+    <CustomizationImageProvider key={`${currentCompany?.id}:${storagedDevice?.id}`} enabled={useCustomizationCache && !isSingleItemCustomizationFlow} paused={confirmingPrevious || isSavingCustomization || Boolean(ordersGetters?.isSaving || orderProductsGetters?.isSaving)}>
     <View
       style={[
         customizeScreenRootStyle({palette, isLargeScreen, isBottomSheet}),
