@@ -12,6 +12,10 @@ import styles, {
   inlineStyle_144_12,
   inlineStyle_150_12,
 } from './ProductForm.styles';
+import {
+  extractCategoryIdValue,
+  uniqueCategoryIds,
+} from '../utils/productFormHelpers';
 
 const SkeletonLine = ({ width = '100%', height = 14, mb = 10 }) => (
   <View style={inlineStyle_71_8({
