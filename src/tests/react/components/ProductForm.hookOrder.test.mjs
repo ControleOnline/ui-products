@@ -35,3 +35,39 @@ test('ProductFormFields imports every inlineStyle it uses', () => {
     assert.ok(importBlock.includes(name), `${name} is used but not imported`);
   }
 });
+
+// Regression for #1142: identifiers used without import/declaration crashed at runtime.
+test('ProductFormFields imports the category helpers it uses', () => {
+  const fields = readFileSync(
+    new URL('../../../react/components/ProductFormFields.js', import.meta.url),
+    'utf8',
+  );
+  for (const name of ['uniqueCategoryIds', 'extractCategoryIdValue']) {
+    assert.match(
+      fields,
+      new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*'../utils/productFormHelpers'`),
+      `${name} must be imported from productFormHelpers`,
+    );
+  }
+});
+
+test('ProductFeedStock imports useMemo', () => {
+  const feed = readFileSync(
+    new URL('../../../react/components/ProductFeedStock.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(feed, /import React,\s*\{[^}]*\buseMemo\b[^}]*\}\s*from 'react'/);
+});
+
+test('save handler receives syncProductCategories from ProductForm', () => {
+  const form = readFileSync(
+    new URL('../../../react/components/ProductForm.js', import.meta.url),
+    'utf8',
+  );
+  const save = readFileSync(
+    new URL('../../../react/utils/productFormSave.js', import.meta.url),
+    'utf8',
+  );
+  assert.match(form, /createProductFormSaveHandler\(\{[\s\S]*\bsyncProductCategories,[\s\S]*helpers:/);
+  assert.match(save, /\bsyncProductCategories,\n\s*\} = deps;/);
+});
