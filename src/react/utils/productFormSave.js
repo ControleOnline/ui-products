@@ -25,6 +25,7 @@ export function createProductFormSaveHandler(deps) {
     onSaved,
     onSavedProductId,
     propProductId,
+    syncProductCategories,
   } = deps;
 
   const {
