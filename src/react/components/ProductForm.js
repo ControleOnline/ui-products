@@ -417,6 +417,7 @@ const ProductForm = ({
       onSaved,
       onSavedProductId,
       propProductId,
+      syncProductCategories,
       helpers: {
         uniqueCategoryIds, extractId, extractCategoryIdValue, collectionFrom,
         extractCategoryIds, normalizeProductRelationId, mergeProductDraftIntoExisting,
@@ -426,7 +427,7 @@ const ProductForm = ({
     [product, selectedCategoryIds, ProductId, currentCompany, context, controlarEstoque,
       initialProviderId, productActions, productCategoryActions, productPeopleActions,
       findDuplicateFeedstockProduct, entityLabels, reloadProduct, navigation, onSaved,
-      onSavedProductId, propProductId],
+      onSavedProductId, propProductId, syncProductCategories],
   );
 
   const brandColors = useMemo(() => resolveThemePalette(), []);
