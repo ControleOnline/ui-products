@@ -1,6 +1,10 @@
+import {app_type} from '@appType';
 import { useCallback, useEffect, useRef } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useStore } from '@store';
+import {useMessage} from '@controleonline/ui-common/src/react/components/MessageService';
+import {resolvePosOperationMode, POS_OPERATION_MODE_WAITER} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
+import {confirmPendingProducts, reportProductConfirmationError} from '@controleonline/ui-orders/src/react/utils/confirmPendingProducts';
 import eventBus from '@controleonline/ui-common/src/react/components/EventBus';
 import {
   ADD_PRODUCT_SELECTION_CHANGE_EVENT,
@@ -67,11 +71,17 @@ const applyPendingSelectionToOrder = ({ order, product, quantity }) => {
 const resolveOrderId = (orderId, order) =>
   String(orderId || order?.id || order?.['@id'] || '').replace(/\D+/g, '');
 
-const useProductAddQueue = ({ isSingleItemMode = false, orderId = '' } = {}) => {
+const useProductAddQueue = ({ isSingleItemMode = false, orderId = '', onProductIncluded } = {}) => {
+  const {showError} = useMessage() || {};
+  const deviceConfigStore = useStore('device_config');
+  const orderProductsStore = useStore('order_products');
+  const waiterMode = String(app_type).toUpperCase() === 'POS' && !isSingleItemMode && resolvePosOperationMode(deviceConfigStore.getters?.item?.configs) === POS_OPERATION_MODE_WAITER;
   const ordersStore = useStore('orders');
   const ordersActions = ordersStore.actions;
   const currentOrderRef = useRef(ordersStore.getters?.item || null);
   const ordersActionsRef = useRef(ordersActions);
+  const confirmationRef = useRef({waiterMode, orderProductsActions: orderProductsStore.actions, showError});
+  confirmationRef.current = {waiterMode, orderProductsActions: orderProductsStore.actions, showError};
 
   useEffect(() => {
     currentOrderRef.current = ordersStore.getters?.item || null;
@@ -85,6 +95,15 @@ const useProductAddQueue = ({ isSingleItemMode = false, orderId = '' } = {}) => 
     const currentOrder = currentOrderRef.current;
     const currentOrderId = resolveOrderId(orderId, currentOrder);
     const pendingSelections = listPendingAddProducts();
+
+    if (confirmationRef.current.waiterMode && currentOrderId) {
+      // This path owns its error notification, including when leaving the catalog.
+      return confirmPendingProducts({
+        order: {...currentOrder, id: currentOrderId},
+        ordersActions: ordersActionsRef.current,
+        orderProductsActions: confirmationRef.current.orderProductsActions,
+      }).catch(error => reportProductConfirmationError(error, confirmationRef.current.showError));
+    }
 
     if (currentOrderId && pendingSelections.length > 0) {
       const lastSelection = pendingSelections[pendingSelections.length - 1];
@@ -140,8 +159,9 @@ const useProductAddQueue = ({ isSingleItemMode = false, orderId = '' } = {}) => 
 
       currentOrderRef.current = nextOrder;
       ordersActionsRef.current.syncOrder?.(nextOrder);
+      if (Number(payload?.quantity) > 0) onProductIncluded?.();
     },
-    [isSingleItemMode],
+    [isSingleItemMode, onProductIncluded],
   );
 
   useEffect(() => {
