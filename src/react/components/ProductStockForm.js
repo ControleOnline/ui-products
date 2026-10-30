@@ -6,6 +6,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
 import { colors as baseColors } from '@controleonline/ui-layout/src/styles/colors';
 import styles from './ProductStockForm.styles';
+import {
+  buildInventoryShowcaseMap,
+  getShowcaseChannelMeta,
+} from './stock/showcaseChannelMeta';
 
 import {
   MovementModal,
@@ -82,6 +86,7 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
   const productInvStore  = useStore('product_inventories');
   const inventoriesStore = useStore('inventories');
   const productsStore    = useStore('products');
+  const productShowcaseStore = useStore('product_showcases');
 
   const { currentCompany }      = peopleStore.getters;
   const { colors: themeColors } = themeStore.getters;
@@ -120,6 +125,7 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
   const [movRow, setMovRow]           = useState(null);
   const [movInv, setMovInv]           = useState(null);
   const [editRow, setEditRow]         = useState(null);
+  const [showcaseByInventory, setShowcaseByInventory] = useState({});
 
   const productItem = productsStore.getters.item;
 
@@ -143,10 +149,14 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
   const loadData = useCallback(async () => {
     if (!ProductId || !currentCompany?.id) return;
     try {
-      const [piData, invData] = await Promise.all([
+      const [piData, invData, scData] = await Promise.all([
         productInvStore.actions.getItems({ product: `/products/${ProductId}` }).catch(() => []),
         inventoriesStore.actions.getItems({
           people: `/people/${currentCompany.id}`,
+        }).catch(() => []),
+        productShowcaseStore.actions.getItems({
+          company: `/people/${currentCompany.id}`,
+          active: true,
         }).catch(() => []),
       ]);
       const map = {};
@@ -154,8 +164,10 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
       setInvMap(map);
       setInventories(invData || []);
       setPiRows(piData || []);
+      setShowcaseByInventory(buildInventoryShowcaseMap(scData || []));
     } catch (_) {
       setPiRows([]);
+      setShowcaseByInventory({});
     }
   }, [ProductId, currentCompany?.id]);
 
@@ -302,6 +314,25 @@ const ProductStockForm = ({ ProductId, rootNavigation }) => {
                     <MaterialCommunityIcons name="warehouse" size={16} color={iconColor} style={inlineStyle_269_89} />
                     <Text style={[styles.snapshotCardTitle, { color: titleColor }]}>{inv.inventory}</Text>
                   </View>
+                  {!!(showcaseByInventory[String(inv.id)] || []).length && (
+                    <View style={styles.channelChipsRow}>
+                      {(showcaseByInventory[String(inv.id)] || []).map(sc => {
+                        const meta = getShowcaseChannelMeta(sc);
+                        return (
+                          <View
+                            key={`${inv.id}-${meta.id || meta.name}`}
+                            style={[styles.channelChip, { backgroundColor: meta.color }]}
+                            accessibilityLabel={`Canal ${meta.name}`}
+                          >
+                            <MaterialCommunityIcons name={meta.icon} size={11} color={meta.textColor} />
+                            <Text style={[styles.channelChipText, { color: meta.textColor }]} numberOfLines={1}>
+                              {meta.label}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
                   {/* badges padrão */}
                   {(isDefaultIn || isDefaultOut) && (
                     <View style={styles.badgesRow}>
