@@ -6,7 +6,7 @@ import {
   resolveInitialProviderId,
   buildProductPeopleSupplierPayload,
 } from '../domain/productProviderLink';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
+import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { useNavigation } from '@react-navigation/native';
 import DefaultUpload from '@controleonline/ui-default/src/react/components/upload/DefaultUpload';

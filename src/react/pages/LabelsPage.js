@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { useStore } from '@store';
-import { resolveThemePalette, withOpacity } from '@controleonline/../../src/styles/branding';
-import { colors } from '@controleonline/../../src/styles/colors';
+import { resolveThemePalette, withOpacity } from '@controleonline/ui-layout/src/styles/branding';
+import { colors } from '@controleonline/ui-layout/src/styles/colors';
 import { PRINT_JOB_TYPE_PRODUCT_LABEL } from '@controleonline/ui-common/src/react/print/jobs';
 import PrintButton from '@controleonline/ui-orders/src/react/components/PrintButton';
 import styles from './LabelsPage.styles';

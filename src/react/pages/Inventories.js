@@ -6,8 +6,8 @@ import StateStore from '@controleonline/ui-common/src/react/components/StateStor
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
-import { colors } from '@controleonline/../../src/styles/colors';
+import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
+import { colors } from '@controleonline/ui-layout/src/styles/colors';
 import InventoryForm from '@controleonline/ui-products/src/react/components/InventoryForm';
 import { skeletonStyles, styles } from './Inventories.styles'
 
