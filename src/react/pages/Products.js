@@ -1,6 +1,10 @@
 import React, { useCallback, useMemo } from 'react';
 import { Alert, SafeAreaView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { app_type } from '@appType';
+import {
+  POS_OPERATION_MODE_WAITER,
+  resolvePosOperationMode,
+} from '@controleonline/ui-common/src/react/config/deviceConfigBootstrap';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useStore } from '@store';
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
@@ -14,8 +18,13 @@ import ProductItem, {
 import useMarketplaceCatalogSync from '@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync';
 import { ALL_PRODUCTS_SENTINEL_ID } from '@controleonline/ui-products/src/react/constants/categorySentinels';
 import { resolveRouteCategoryId } from '@controleonline/ui-products/src/react/utils/categorySelection';
+import { buildProductCatalogRequestParams } from '@controleonline/ui-products/src/react/utils/productCatalogRequestParams';
 import useProductAddQueue from '@controleonline/ui-products/src/react/hooks/useProductAddQueue';
+import useCachedCatalogActions from '../hooks/useCachedCatalogActions';
+import useCachedCatalogView from '../hooks/useCachedCatalogView';
 import { styles } from './Products.styles';
+
+const {resolveShowBottomCart} = require('@controleonline/ui-products/src/react/utils/resolveShowBottomCart');
 
 const DESKTOP_GRID_MIN_WIDTH = 960;
 
@@ -49,11 +58,11 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
   const params = {
     context,
     interactionMode,
-    showBottomCart: interactionMode === 'pdv',
+    showBottomCart: resolveShowBottomCart(interactionMode, routeParams?.showBottomCart),
     showBottomToolBar: interactionMode === 'pdv',
   };
 
-  ['id', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar'].forEach(key => {
+  ['id', 'orderId', 'resumeExistingOrder', 'allowLinkedOrderManagement', 'hideBottomToolBar', 'hideCatalogToolbar', 'showBottomCart'].forEach(key => {
     if (routeParams?.[key] !== undefined) {
       params[key] = routeParams[key];
     }
@@ -62,52 +71,18 @@ const buildRouteParams = (routeParams, context, interactionMode) => {
   return params;
 };
 
-const buildRequestParams = ({
-  categoryId,
-  companyId,
-  context,
-  searchQuery,
-  typeFilter,
-}) => {
-  if (!companyId) return {};
-
-  const effectiveTypeFilter =
-    context === 'supplies'
-      ? (normalizeProductTypeFilter(typeFilter) || 'feedstock')
-      : normalizeProductTypeFilter(typeFilter);
-
-  const params = {
-    active: 1,
-    company: companyId,
-    'order[description]': 'ASC',
-    'order[product]': 'ASC',
-    type: effectiveTypeFilter
-      ? [effectiveTypeFilter]
-      : (
-          context === 'supplies'
-            ? ['feedstock', 'component', 'package']
-            : ['product', 'manufactured', 'custom', 'service', 'recipe']
-        ),
-  };
-
-  const normalizedSearch = String(searchQuery || '').trim();
-  if (normalizedSearch) {
-    params.search = normalizedSearch;
-  }
-
-  if (categoryId && categoryId !== ALL_PRODUCTS_SENTINEL_ID) {
-    params['productCategory.category'] = `/categories/${categoryId}`;
-  }
-
-  return params;
-};
-
-const ProductsPage = ({ navigation: navigationProp, route }) => {
+const ProductsPage = ({ activeOrderId = '', navigation: navigationProp, route }) => {
   const navigation = navigationProp || useNavigation();
   const routeParams = route?.params || {};
   const context = useMemo(() => normalizeCatalogContext(routeParams.context), [routeParams.context]);
   const interactionMode = routeParams.interactionMode || (app_type === 'MANAGER' ? 'manager' : 'pdv');
   const isManager = app_type === 'MANAGER' && interactionMode !== 'pdv';
+  const { item: runtimeDeviceConfig } = useStore('device_config').getters;
+  const isCompactSingleItem = app_type === 'POS' && resolvePosOperationMode(runtimeDeviceConfig?.configs) === 'single-item' && interactionMode === 'pdv';
+  const isWaiterPosMode =
+    String(app_type || '').trim().toUpperCase() === 'POS' &&
+    interactionMode === 'pdv' &&
+    resolvePosOperationMode(runtimeDeviceConfig?.configs) === POS_OPERATION_MODE_WAITER;
   const { width } = useWindowDimensions();
 
   const productsStore = useStore('products');
@@ -116,11 +91,13 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   const { colors: themeColors } = useStore('theme').getters;
 
   const brandColors = useMemo(
-    () => resolveThemePalette(
-      { ...themeColors, ...(currentCompany?.theme?.colors || {}) },
-      colors,
-    ),
-    [currentCompany?.id, currentCompany?.theme?.colors, themeColors],
+    () => isCompactSingleItem ? {
+      ...resolveThemePalette(themeColors, colors), ...themeColors,
+      radioBorder: themeColors.textSecondary,
+      radioSelectedBorder: themeColors.buttonBackground,
+      radioSelectedDot: themeColors.buttonBackground,
+    } : resolveThemePalette({ ...themeColors, ...(currentCompany?.theme?.colors || {}) }, colors),
+    [currentCompany?.id, currentCompany?.theme?.colors, themeColors, isCompactSingleItem],
   );
   const buttonPalette = useMemo(() => {
     const mergedThemeColors = {
@@ -141,6 +118,9 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     [routeParams.category, routeParams.categoryId],
   );
   const isAllProducts = !categoryId || categoryId === ALL_PRODUCTS_SENTINEL_ID;
+  const cachedActions = useCachedCatalogActions(productsStore, isWaiterPosMode || isCompactSingleItem, currentCompany?.id, context);
+  const cachedListProps = useCachedCatalogView({enabled: isWaiterPosMode || isCompactSingleItem, companyId: currentCompany?.id,
+    context, viewKey: `products:${categoryId || 'all'}`, view: {}, scopeRevision: runtimeDeviceConfig?.id});
   const typeFilter = useMemo(
     () => normalizeProductTypeFilter(routeParams.typeFilter),
     [routeParams.typeFilter],
@@ -170,7 +150,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   );
   const { currentOrderId } = useProductAddQueue({
     isSingleItemMode,
-    orderId: routeParams.id || routeParams.order || '',
+    orderId: activeOrderId || routeParams.orderId || routeParams.id || routeParams.order || '',
   });
   const {
     getProductStatuses,
@@ -188,7 +168,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
   );
 
   const requestParams = useMemo(
-    () => buildRequestParams({
+    () => buildProductCatalogRequestParams({
       categoryId,
       companyId: currentCompany?.id,
       context,
@@ -330,12 +310,13 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           product={item}
           productCategories={[]}
           singleItemMode={isSingleItemMode}
+          showBottomCart={resolveShowBottomCart(interactionMode, routeParams.showBottomCart)}
           onMarketplaceSync={handleMarketplaceSync}
         />
       );
 
       return isManager ? (
-        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)}>
+        <TouchableOpacity activeOpacity={0.84} onPress={() => handleProductPress(item)} style={{ width: '100%', alignSelf: 'stretch' }}>
           {productCard}
         </TouchableOpacity>
       ) : (
@@ -353,6 +334,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       isManager,
       isSingleItemMode,
       marketplaceSyncingKey,
+      routeParams.showBottomCart,
       width,
     ],
   );
@@ -364,14 +346,23 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
       columnWrapperStyle:
         width < 640
           ? null
-          : { gap: 12, width: '100%', alignItems: 'stretch' },
+          : {
+              gap: 12,
+              width: '100%',
+              alignSelf: 'stretch',
+              alignItems: 'stretch',
+              justifyContent: 'space-between',
+            },
+      unframedCards: isCompactSingleItem,
       contentContainerStyle: {
         gap: 12,
         paddingBottom: isManager ? 104 : 16,
-        paddingHorizontal: 8,
+        paddingHorizontal: isCompactSingleItem ? 12 : 0,
+        width: '100%',
+        alignSelf: 'stretch',
       },
     }),
-    [isManager, width],
+    [isManager, width, isCompactSingleItem],
   );
 
   const exportAction = isManager
@@ -392,7 +383,7 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
     : null;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, themeColors.pageBackground ? {backgroundColor: themeColors.pageBackground} : null]}>
       {!storeLoading ? <StateStore store="products" /> : null}
       <View style={styles.managerTableContent}>
         <DefaultTable
@@ -400,7 +391,8 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           add={isManager}
           addButtonPlacement="bottom"
           addLabel={labels.addLabel}
-          cardListProps={cardListProps}
+          actions={cachedActions}
+          cardListProps={{...cardListProps, ...cachedListProps}}
           compactBreakpoint={DESKTOP_GRID_MIN_WIDTH}
           defaultColor="$primary"
           importAction={isManager ? {
@@ -415,20 +407,25 @@ const ProductsPage = ({ navigation: navigationProp, route }) => {
           } : null}
           exportAction={exportAction}
           initialViewMode="cards"
+          viewMode={isCompactSingleItem ? "cards" : null}
           onAdd={handleAddProduct}
           onEditRow={handleProductPress}
           onRowPress={handleProductPress}
           renderCard={renderProductCard}
           requestParams={requestParams}
-          searchKey="search"
-          searchPlaceholder={global.t?.t?.('products', 'input', 'search') || 'Search'}
+          searchKey={isCompactSingleItem ? "product" : "search"}
+          searchPlaceholder={isCompactSingleItem ? 'Buscar produto ou serviço' : global.t?.t?.('products', 'input', 'search') || 'Search'}
           showRowActions={false}
           showSearch
           showToolbar={!hideCatalogToolbar}
-          showTotalItemsInCompactToolbar
+          showTotalItemsInCompactToolbar={!isWaiterPosMode && !isCompactSingleItem}
+          showTotalItemsInFooter={!isWaiterPosMode && !isCompactSingleItem}
+          showCompactCaption={!isCompactSingleItem}
+          showToolbarActions={!isWaiterPosMode && !isCompactSingleItem}
+          showToolbarControls={!isWaiterPosMode && !isCompactSingleItem}
           storeName="products"
           toolbarActions={toolbarActions}
-          visibleColumnsPreferenceKey={`products:${context}:${interactionMode}`}
+          visibleColumnsPreferenceKey={`products:${context}:${interactionMode}${isCompactSingleItem ? ":single-item" : ""}`}
         />
       </View>
     </SafeAreaView>

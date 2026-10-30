@@ -74,3 +74,20 @@ export const resolveCatalogCategory = ({
     return resolveRouteCategoryId(currentCategory) === normalizedRouteCategoryId;
   }) || null;
 };
+
+export const shouldReloadCategoryOptions = ({
+  categories,
+  routeCategoryId,
+}) => {
+  const resolvedRouteCategoryId = resolveRouteCategoryId(routeCategoryId);
+
+  if (!resolvedRouteCategoryId || resolvedRouteCategoryId === ALL_PRODUCTS_SENTINEL_ID) {
+    return false;
+  }
+
+  const availableCategories = Array.isArray(categories) ? categories : [];
+
+  return !availableCategories.some(category => {
+    return resolveRouteCategoryId(category) === resolvedRouteCategoryId;
+  });
+};
