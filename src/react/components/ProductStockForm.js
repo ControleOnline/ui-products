@@ -3,8 +3,8 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useStore } from '@store';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
-import { colors as baseColors } from '@controleonline/../../src/styles/colors';
+import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
+import { colors as baseColors } from '@controleonline/ui-layout/src/styles/colors';
 import styles from './ProductStockForm.styles';
 
 import {

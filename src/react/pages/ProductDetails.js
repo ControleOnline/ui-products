@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react'
 import { useWindowDimensions, View, Text, Image, TouchableOpacity } from 'react-native';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { useStore } from '@store';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
+import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
 import ProductForm from '@controleonline/ui-products/src/react/components/ProductForm';
 import ProductFeedStock from '@controleonline/ui-products/src/react/components/ProductFeedStock';
 import ProductGroups from '@controleonline/ui-products/src/react/components/ProductGroups';

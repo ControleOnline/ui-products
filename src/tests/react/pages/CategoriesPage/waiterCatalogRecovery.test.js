@@ -21,8 +21,8 @@ jest.mock('@controleonline/ui-common/src/react/components/StateStore', () => moc
 jest.mock('@controleonline/ui-default/src/react/components/filters/DefaultSearch', () => mockNode('DefaultSearch'));
 jest.mock('@controleonline/ui-default/src/react/components/table/DefaultTable', () => mockNode('DefaultTable'));
 jest.mock('@controleonline/ui-products/src/react/hooks/useMarketplaceCatalogSync', () => () => mockSync);
-jest.mock('@controleonline/../../src/styles/colors', () => ({colors:{}}));
-jest.mock('@controleonline/../../src/styles/branding', () => ({resolveThemePalette:()=>({})}));
+jest.mock('@controleonline/ui-layout/src/styles/colors', () => ({colors:{}}));
+jest.mock('@controleonline/ui-layout/src/styles/branding', () => ({resolveThemePalette:()=>({})}));
 jest.mock('../../../../react/pages/CategoriesPage/CategoryCard', () => mockNode('CategoryCard'));
 jest.mock('../../../../react/pages/CategoriesPage/CategoryEditorModal', () => mockNode('CategoryEditorModal'));
 jest.mock('../../../../react/pages/CategoriesPage/MenuModelPickerModal', () => mockNode('MenuModelPickerModal'));
