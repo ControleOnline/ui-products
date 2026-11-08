@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
+    minHeight: 40,
     minWidth: 96,
     paddingHorizontal: 16,
   },
