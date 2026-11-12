@@ -195,6 +195,26 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 22,
     backgroundColor: '#FFFFFF',
   },
+  formModalBackdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: 'rgba(15,23,42,0.45)',
+  },
+  formModalSheet: {
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '90%',
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+  },
+  colorRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
   confirmSheet: {
     width: '100%',
     padding: 18,
@@ -327,6 +347,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0F172A',
     backgroundColor: '#FFFFFF',
+  },
+  lockedField: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#F1F5F9',
+  },
+  lockedFieldText: {
+    fontSize: 14,
+    color: '#475569',
   },
   modalFooter: {
     flexDirection: 'row',

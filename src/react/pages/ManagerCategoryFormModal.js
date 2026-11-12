@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { humanizeCategoryContext } from '@controleonline/ui-common/src/react/utils/categoryContexts';
+import DefaultFeatherIconPicker from '@controleonline/ui-default/src/react/components/inputs/DefaultFeatherIconPicker';
 import styles from './ManagerCategoriesPage.styles';
 import { COLOR_PRESETS } from './managerCategoriesHelpers';
 
@@ -40,9 +41,9 @@ export default function ManagerCategoryFormModal({
         animationType="fade"
         onRequestClose={onClose}>
         <TouchableWithoutFeedback onPress={onClose}>
-          <View style={styles.modalBackdrop}>
+          <View style={styles.formModalBackdrop}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalSheet}>
+              <View style={styles.formModalSheet}>
                 <View style={styles.modalHeader}>
                   <Text style={styles.modalTitle}>
                     {editingCategory ? 'Editar categoria' : 'Nova categoria'}
@@ -102,13 +103,10 @@ export default function ManagerCategoryFormModal({
                   </View>
                   <View style={styles.formField}>
                     <Text style={styles.formLabel}>Ícone</Text>
-                    <TextInput
-                      style={styles.textInput}
+                    <DefaultFeatherIconPicker
                       value={formIcon}
-                      onChangeText={setFormIcon}
-                      placeholder="Ex: tag, shopping-cart"
-                      placeholderTextColor="#94A3B8"
-                      autoCapitalize="none"
+                      onChange={setFormIcon}
+                      placeholder="Buscar icone"
                     />
                   </View>
                   <View style={styles.formField}>
@@ -122,22 +120,27 @@ export default function ManagerCategoryFormModal({
                     </TouchableOpacity>
                   </View>
                 </ScrollView>
-                <View style={styles.formActions}>
-                  <TouchableOpacity style={styles.btnCancel} onPress={onClose}>
-                    <Text style={styles.btnCancelText}>Cancelar</Text>
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={styles.cancelButton}
+                    onPress={onClose}>
+                    <Text style={styles.cancelButtonText}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
-                      styles.btnSave,
+                      styles.saveButton,
                       { backgroundColor: palette.primary },
                       isSubmitting && { opacity: 0.6 },
                     ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: isSubmitting }}
                     onPress={onSave}
                     disabled={isSubmitting}>
                     {isSubmitting ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <Text style={styles.btnSaveText}>Salvar</Text>
+                      <Text style={styles.saveButtonText}>Salvar</Text>
                     )}
                   </TouchableOpacity>
                 </View>
