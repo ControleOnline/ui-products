@@ -119,14 +119,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryCard: {
-    padding: 14,
+    padding: 16,
     borderRadius: 18,
     backgroundColor: '#FFFFFF',
   },
+  categoryIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   categoryCardTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    gap: 14,
   },
   categoryColorDot: {
     width: 14,
@@ -136,6 +144,8 @@ const styles = StyleSheet.create({
   },
   categoryInfo: {
     flex: 1,
+    minWidth: 0,
+    gap: 8,
   },
   categoryName: {
     fontSize: 16,
@@ -148,6 +158,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   contextBadge: {
+    alignSelf: 'flex-start',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -209,6 +220,17 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 22,
     backgroundColor: '#FFFFFF',
+  },
+  contextChipsRow: {
+    gap: 8,
+    paddingTop: 8,
+    paddingRight: 8,
+  },
+  deleteMsg: {
+    marginTop: 8,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#475569',
   },
   colorRow: {
     flexDirection: 'row',
@@ -391,6 +413,30 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  parentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  parentItemSelected: {
+    backgroundColor: '#F0F9FF',
+  },
+  parentItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#0F172A',
+  },
+  emptyInline: {
+    paddingVertical: 18,
+    fontSize: 13,
+    textAlign: 'center',
+    color: '#94A3B8',
   },
   parentList: {
     maxHeight: 420,

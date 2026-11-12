@@ -21,6 +21,7 @@ import {
   humanizeCategoryContext,
   normalizeCategoryContext,
 } from '@controleonline/ui-common/src/react/utils/categoryContexts';
+import { isValidFeatherIconName } from '@controleonline/ui-default/src/react/components/inputs/DefaultFeatherIconPicker';
 import styles from './ManagerCategoriesPage.styles';
 import ManagerCategoryParentPicker from './ManagerCategoryParentPicker';
 import ManagerCategoryFormModal from './ManagerCategoryFormModal';
@@ -251,14 +252,28 @@ export default function ManagerCategoriesPage({ route }) {
     ({ item: category }) => {
       if (!category) return null;
       const categoryId = normalizeEntityId(category?.id || category?.['@id']);
+      const categoryColor = category?.color || '#64748B';
       return (
-        <View>
+        <View style={styles.categoryCard}>
           <View style={styles.categoryCardTop}>
             <View
-              style={[styles.colorDot, { backgroundColor: category?.color || '#CBD5E1' }]}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.categoryName}>{category?.name}</Text>
+              style={[
+                styles.categoryIconBox,
+                {
+                  backgroundColor: withOpacity(categoryColor, 0.14),
+                  borderColor: withOpacity(categoryColor, 0.35),
+                },
+              ]}>
+              <Icon
+                name={isValidFeatherIconName(category?.icon) ? category.icon : 'tag'}
+                size={22}
+                color={categoryColor}
+              />
+            </View>
+            <View style={styles.categoryInfo}>
+              <Text style={styles.categoryName} numberOfLines={2}>
+                {category?.name}
+              </Text>
               <View
                 style={[
                   styles.contextBadge,
@@ -270,18 +285,17 @@ export default function ManagerCategoriesPage({ route }) {
                 </Text>
               </View>
             </View>
-          </View>
-          <View style={styles.categoryCardBottom}>
-            <Text style={styles.categoryMeta}>
-              {category?.icon ? `Icone: ${category.icon}` : 'Sem icone'}
-            </Text>
             <View style={styles.cardActions}>
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Editar categoria"
                 style={styles.cardActionButton}
                 onPress={() => openEditModal(category)}>
                 <Icon name="edit-2" size={16} color="#475569" />
               </TouchableOpacity>
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Excluir categoria"
                 style={[styles.cardActionButton, styles.cardActionDanger]}
                 onPress={() =>
                   setDeleteTarget({
@@ -425,24 +439,30 @@ export default function ManagerCategoriesPage({ route }) {
         animationType="fade"
         onRequestClose={() => setDeleteTarget(null)}>
         <TouchableWithoutFeedback onPress={() => setDeleteTarget(null)}>
-          <View style={styles.modalBackdrop}>
+          <View style={styles.formModalBackdrop}>
             <TouchableWithoutFeedback>
-              <View style={styles.modalSheet}>
+              <View style={styles.formModalSheet}>
                 <Text style={styles.modalTitle}>Confirmar exclusão</Text>
                 <Text style={styles.deleteMsg}>
                   Deseja excluir <Text style={{ fontWeight: '700' }}>{deleteTarget?.label}</Text>?
                 </Text>
-                <View style={styles.formActions}>
+                <View style={styles.modalFooter}>
                   <TouchableOpacity
-                    style={styles.btnCancel}
+                    accessibilityRole="button"
+                    style={styles.cancelButton}
                     onPress={() => setDeleteTarget(null)}>
-                    <Text style={styles.btnCancelText}>Cancelar</Text>
+                    <Text style={styles.cancelButtonText}>Cancelar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.btnSave, { backgroundColor: '#c10015' }]}
+                    accessibilityRole="button"
+                    style={[
+                      styles.saveButton,
+                      { backgroundColor: '#c10015' },
+                      isSubmitting && { opacity: 0.6 },
+                    ]}
                     onPress={handleDeleteCategory}
                     disabled={isSubmitting}>
-                    <Text style={styles.btnSaveText}>Excluir</Text>
+                    <Text style={styles.saveButtonText}>Excluir</Text>
                   </TouchableOpacity>
                 </View>
               </View>
