@@ -17,7 +17,7 @@ import {
   getDateRange,
   resolveDateRangeSummary,
 } from '@controleonline/ui-common/src/react/utils/dateRangeFilter';
-import { withOpacity } from '@controleonline/../../src/styles/branding';
+import { withOpacity } from '@controleonline/ui-layout/src/styles/branding';
 import {
   formatCurrency,
   normalizeEntityId,

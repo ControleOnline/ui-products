@@ -92,6 +92,34 @@ export default {
       {
         sortable: true,
         editable: true,
+        name: 'inventories',
+        align: 'left',
+        label: 'warehouses',
+        editable: true,
+        sortable: false,
+        list: 'inventories/getItems',
+        multiple: true,
+        format(value) {
+          if (!Array.isArray(value) || !value.length) return '';
+          return value
+            .map(v => (typeof v === 'string' ? v : v?.inventory || v?.name || ''))
+            .filter(Boolean)
+            .join(', ');
+        },
+        saveFormat(value) {
+          if (!value) return [];
+          const list = Array.isArray(value) ? value : [value];
+          return list
+            .map(v => {
+              if (typeof v === 'string' && v.startsWith('/')) return v;
+              const id = v?.value || v?.id || v;
+              return id ? `/inventories/${id}` : null;
+            })
+            .filter(Boolean);
+        },
+      },
+      {
+        sortable: true,
         name: 'active',
         align: 'left',
         label: 'active',

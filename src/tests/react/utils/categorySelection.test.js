@@ -2,6 +2,7 @@ const {
   resolveRouteCategoryId,
   resolveCatalogCategory,
   shouldSyncStoredCategory,
+  shouldReloadCategoryOptions,
 } = require('../../../react/utils/categorySelection')
 const {
   ALL_PRODUCTS_SENTINEL_ID,
@@ -63,5 +64,56 @@ describe('categorySelection', () => {
       '@id': ALL_PRODUCTS_SENTINEL_ID,
       name: 'Todos os produtos',
     })
+  })
+})
+
+
+describe('shouldReloadCategoryOptions', () => {
+  it('does not reload when route category is missing', () => {
+    expect(
+      shouldReloadCategoryOptions({
+        categories: [{ id: 1, name: 'A' }],
+        routeCategoryId: '',
+      }),
+    ).toBe(false)
+  })
+
+  it('does not reload for all-products sentinel', () => {
+    expect(
+      shouldReloadCategoryOptions({
+        categories: [{ id: 1, name: 'A' }],
+        routeCategoryId: ALL_PRODUCTS_SENTINEL_ID,
+      }),
+    ).toBe(false)
+  })
+
+  it('does not reload when route category is already in the list', () => {
+    expect(
+      shouldReloadCategoryOptions({
+        categories: [
+          { id: 10, '@id': '/categories/10', name: 'Bebidas' },
+          { id: 11, '@id': '/categories/11', name: 'Lanches' },
+        ],
+        routeCategoryId: '11',
+      }),
+    ).toBe(false)
+  })
+
+  it('reloads when route category is absent from the local list', () => {
+    expect(
+      shouldReloadCategoryOptions({
+        categories: [{ id: 10, '@id': '/categories/10', name: 'Bebidas' }],
+        routeCategoryId: '/categories/42',
+      }),
+    ).toBe(true)
+  })
+
+  it('reloads when category list is empty and route has a concrete id', () => {
+    expect(
+      shouldReloadCategoryOptions({
+        categories: [],
+        routeCategoryId: 7,
+      }),
+    ).toBe(true)
   })
 })

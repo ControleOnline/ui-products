@@ -1,3 +1,4 @@
+import DefaultFile from '@controleonline/ui-default/src/react/components/files/DefaultFile';
 import React, { memo, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -9,79 +10,13 @@ import SingleItemProductCard from '@controleonline/ui-products/src/react/compone
 import MarketplaceSyncIndicators from '@controleonline/ui-products/src/react/components/MarketplaceSyncIndicators';
 import ProductReferenceLink from '@controleonline/ui-products/src/react/components/ProductReferenceLink';
 import { resolveProductCoverUrl } from '@controleonline/ui-products/src/react/domain/productMedia';
+import { buildCustomizeScreenRouteParams } from '@controleonline/ui-products/src/react/pages/customizationOrderContext';
 import {app_type} from '@appType';
-import styles from './ProductItem.styles';
+import ProductSearchResult from './ProductSearchResult';
+import legacyStyles from './ProductItem.styles';
 
-export const PRODUCT_TYPE_CONFIG = {
-  product: {
-    label: 'Produto',
-    pluralLabel: 'Produtos',
-    backgroundToken: 'chipSelectedBackground',
-    textToken: 'chipSelectedText',
-  },
-  service: {
-    label: 'Serviço',
-    pluralLabel: 'Serviços',
-    backgroundToken: 'buttonBackgroundSecondary',
-    textToken: 'buttonTextSecondary',
-  },
-  component: {
-    label: 'Componente',
-    pluralLabel: 'Componentes',
-    backgroundToken: 'chipBackground',
-    textToken: 'textWarning',
-  },
-  feedstock: {
-    label: 'Matéria Prima',
-    pluralLabel: 'Matérias-primas',
-    backgroundToken: 'chipBackground',
-    textToken: 'textSuccess',
-  },
-  package: {
-    label: 'Embalagem',
-    pluralLabel: 'Embalagens',
-    backgroundToken: 'chipSelectedBackground',
-    textToken: 'chipSelectedText',
-  },
-  custom: {
-    label: 'Custom',
-    pluralLabel: 'Customizados',
-    backgroundToken: 'buttonBackgroundSecondary',
-    textToken: 'buttonTextSecondary',
-  },
-  manufactured: {
-    label: 'Fabricado',
-    pluralLabel: 'Fabricados',
-    backgroundToken: 'chipBackground',
-    textToken: 'textWarning',
-  },
-  recipe: {
-    label: 'Preparo',
-    pluralLabel: 'Preparos',
-    backgroundToken: 'chipBackground',
-    textToken: 'textMuted',
-  },
-};
-
-export const getProductTypeLabel = type =>
-  PRODUCT_TYPE_CONFIG[type]?.label || String(type || '').trim() || '';
-
-export const getProductTypePluralLabel = type =>
-  PRODUCT_TYPE_CONFIG[type]?.pluralLabel || getProductTypeLabel(type);
-
-export const resolveProductTypeTheme = (type, palette = {}) => {
-  const typeConfig = PRODUCT_TYPE_CONFIG[type] || null;
-
-  if (!typeConfig) {
-    return null;
-  }
-
-  return {
-    ...typeConfig,
-    backgroundColor: palette[typeConfig.backgroundToken],
-    textColor: palette[typeConfig.textToken],
-  };
-};
+export {PRODUCT_TYPE_CONFIG, getProductTypeLabel, getProductTypePluralLabel, resolveProductTypeTheme} from './productTypeMetadata';
+import {resolveProductTypeTheme} from './productTypeMetadata';
 
 const collectionFrom = value => {
   if (!value) return [];
@@ -106,6 +41,7 @@ const normalizeCategory = value => {
 
 const ProductItem = ({
   product,
+  presentation = null,
   category,
   productCategories = [],
   catalogContext = 'products',
@@ -114,13 +50,19 @@ const ProductItem = ({
   palette = {},
   singleItemMode = false,
   orderId = '',
+  showBottomCart,
   marketplaceStatuses = [],
   onMarketplaceSync,
   marketplaceSyncingKey = '',
 }) => {
+  const styles = {...legacyStyles,...(presentation?.styles || {})};
+  const FileComponent = presentation?.FileComponent;
+  const TableFileComponent = FileComponent || DefaultFile;
+  const files = Array.isArray(product?.productFiles) ? product.productFiles : [];
+  const coverFile = (files.find(item=>String(item.id)===String(product?.extraData?.imageCoverRelationId)&&item.file) || files.find(item=>item.file))?.file;
   const navigation = useNavigation();
   const coverUrl = resolveProductCoverUrl(product);
-  const hasImage = !!coverUrl
+  const hasImage = !!(FileComponent && coverFile || coverUrl)
   const isManager =
     app_type === 'MANAGER' && interactionMode !== 'pdv'
   const queueLabel = product?.queue?.queue || product?.queue?.name || ''
@@ -178,6 +120,7 @@ const ProductItem = ({
 
     return Object.values(categoriesById);
   }, [product?.productCategory, productCategories]);
+  const categoryKnown = Array.isArray(product?.productCategory) || productCategories.length > 0;
   const primaryCategory = resolvedCategories[0] || null;
   const extraCategoryCount = Math.max(0, resolvedCategories.length - 1);
 
@@ -213,13 +156,20 @@ const ProductItem = ({
     if (product.type === 'custom') {
       return (
         <TouchableOpacity
+          accessibilityRole="button" accessibilityLabel={`Personalizar ${product.product}`}
           onPress={() =>
-            navigation.navigate('CustomizeScreen', {
-              productId: product?.id || product?.['@id'],
-              interactionMode,
-              // O custom do fluxo single-item precisa manter a mesma saida do PDV.
-              singleItemMode: singleItemMode === true,
-            })
+            navigation.navigate(
+              'CustomizeScreen',
+              buildCustomizeScreenRouteParams({
+                productId: product?.id || product?.['@id'],
+                orderId,
+                interactionMode,
+                showBottomCart,
+                catalogContext,
+                // O custom do fluxo single-item precisa manter a mesma saida do PDV.
+                singleItemMode: singleItemMode === true,
+              }),
+            )
           }
           style={[
             styles.customizeButton,
@@ -228,7 +178,7 @@ const ProductItem = ({
           ]}
         >
           <Text style={[styles.customizeButtonText, { color: resolvedPalette.buttonText }]}>
-            CUSTOMIZAR
+            {presentation?.pdv ? 'Personalizar' : 'CUSTOMIZAR'}
           </Text>
         </TouchableOpacity>
       );
@@ -244,8 +194,16 @@ const ProductItem = ({
         />
       );
     }
-    return <ProductQuantity product={product} category={category} />;
+    return (
+      <ProductQuantity
+        compact={displayMode === 'search'}
+        product={product}
+        category={category}
+      />
+    );
   };
+
+  if(presentation?.actionOnly)return renderAction();
 
   const renderCategoryChip = ({ showPlaceholder = false } = {}) => {
     if (!primaryCategory && !showPlaceholder) {
@@ -295,6 +253,11 @@ const ProductItem = ({
     );
   };
 
+  if (displayMode === 'search') {
+    return <ProductSearchResult product={product} coverUrl={coverUrl} hasImage={hasImage}
+      resolvedPalette={resolvedPalette} action={renderAction()} />;
+  }
+
   if (isTableMode) {
     return (
       <View
@@ -307,13 +270,17 @@ const ProductItem = ({
         ]}>
         <View style={styles.tableImageCell}>
           {hasImage && (
-            <Image
+            coverFile ? <TableFileComponent
+              file={coverFile}
+              style={styles.tableImage}
+              resizeMode="cover"
+            /> : <Image
               source={{ uri: coverUrl }}
               style={styles.tableImage}
               resizeMode="cover"
             />
           )}
-          {!hasImage && (
+          {!hasImage && !presentation?.compact && (
             <View
               style={[
                 styles.tableImage,
@@ -387,8 +354,7 @@ const ProductItem = ({
     );
   }
 
-  return (
-    <View style={[styles.card, {backgroundColor: resolvedPalette.cardBackground}]}>
+  const media = <>
       {hasImage && (
         <View
           style={[
@@ -398,14 +364,11 @@ const ProductItem = ({
               borderColor: resolvedPalette.cardBorder,
             },
           ]}>
-          <Image
-            source={{ uri: coverUrl }}
-            style={styles.coverImage}
-            resizeMode="contain"
-          />
+          {FileComponent && coverFile ? <FileComponent file={coverFile} style={styles.coverImage} resizeMode="contain"/> : <Image
+            source={{ uri: coverUrl }} style={styles.coverImage} resizeMode="contain"/>}
         </View>
       )}
-      {!hasImage && (
+      {!hasImage && !presentation?.compact && (
         <View
           style={[
             styles.imageWrap,
@@ -423,17 +386,17 @@ const ProductItem = ({
         </View>
       )}
 
-      <View style={[styles.body, !hasImage && styles.bodyNoImage]}>
-        <View style={styles.cardContent}>
+</>;
+  const content = (<View style={styles.cardContent}>
           <View style={styles.cardTopRow}>
             <View style={styles.cardIdentity}>
-              <ProductReferenceLink product={product} />
+              {!presentation?.pdv && <ProductReferenceLink product={product} />}
               <View style={styles.nameRow}>
                 <Text style={[styles.name, {color: resolvedPalette.cardText}]} numberOfLines={2}>
                   {product.product}
                 </Text>
               </View>
-              <Text
+              {(!presentation?.compact || !!product.description) && <Text
                 style={[
                   styles.description,
                   !product.description && styles.descriptionPlaceholder,
@@ -441,7 +404,7 @@ const ProductItem = ({
                 numberOfLines={1}
               >
                 {product.description || ' '}
-              </Text>
+              </Text>}
             </View>
             <MarketplaceSyncIndicators
               entityLabel={product.product}
@@ -454,10 +417,10 @@ const ProductItem = ({
           </View>
           <View style={styles.metaGridRow}>
             <View style={styles.metaGridCell}>
-              {renderCategoryChip({ showPlaceholder: true })}
+              {renderCategoryChip({ showPlaceholder: !presentation?.compact || categoryKnown })}
             </View>
               <View style={styles.metaGridCell}>
-                {typeConf && (
+                {typeConf && (!presentation?.compact || (product.type!=='product' && !(presentation?.pdv && product.type==='custom'))) && (
                   <View
                     style={[
                       styles.typeChip,
@@ -485,7 +448,7 @@ const ProductItem = ({
               </View>
             </View>
           )}
-          <View style={styles.queueLine}>
+          {(!presentation?.compact || !!queueLabel) && <View style={styles.queueLine}>
             <MaterialCommunityIcons
               name="tray-full"
               size={12}
@@ -506,10 +469,9 @@ const ProductItem = ({
                 </>
               ) : 'Sem fila'}
             </Text>
-          </View>
-        </View>
-
-        <View style={styles.priceRow}>
+          </View>}
+        </View>);
+  const footer = (<View style={styles.priceRow}>
           <View>
             {!!priceLabel && (
               <Text style={[styles.priceLabel, {color: resolvedPalette.textMuted}]}>
@@ -535,10 +497,12 @@ const ProductItem = ({
           <View style={styles.actionWrap}>
             {renderAction()}
           </View>
-        </View>
-      </View>
-    </View>
-  );
+        </View>);
+  const CardComponent = presentation?.CardComponent;
+  if(CardComponent)return <CardComponent media={hasImage ? media : null} footer={footer} palette={resolvedPalette}>{content}</CardComponent>;
+  return <View style={[styles.card,{backgroundColor:resolvedPalette.cardBackground}]}>
+    {media}<View style={[styles.body,!hasImage && styles.bodyNoImage]}>{content}{footer}</View>
+  </View>;
 };
 
 export default memo(ProductItem);

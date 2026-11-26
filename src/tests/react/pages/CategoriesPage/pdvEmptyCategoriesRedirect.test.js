@@ -5,7 +5,7 @@ const {
 const {describe, expect, it} = global;
 
 describe('shouldRedirectEmptyCategoriesToProducts', () => {
-  it('redirects PDV when categories list is empty or missing', () => {
+  it('redirects PDV when categories list is confirmed empty', () => {
     expect(
       shouldRedirectEmptyCategoriesToProducts({
         isManagerApp: false,
@@ -18,14 +18,14 @@ describe('shouldRedirectEmptyCategoriesToProducts', () => {
         isManagerApp: false,
         data: null,
       }),
-    ).toBe(true);
+    ).toBe(false);
 
     expect(
       shouldRedirectEmptyCategoriesToProducts({
         isManagerApp: false,
         data: undefined,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('does not redirect when categories exist in PDV', () => {
@@ -52,4 +52,8 @@ describe('shouldRedirectEmptyCategoriesToProducts', () => {
       }),
     ).toBe(false);
   });
+});
+
+it('does not hide failed fetches behind an empty fallback', () => {
+ expect(shouldRedirectEmptyCategoriesToProducts({isManagerApp:false, data:[], fetchError:true})).toBe(false);
 });

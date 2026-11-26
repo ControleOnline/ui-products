@@ -8,6 +8,7 @@ import { buildCoverUrl } from './categoryPageUtils'
 
 const CategoryCard = ({
   brandColors,
+  presentation = null,
   category,
   getCategoryStatuses,
   isCompactMobile,
@@ -18,6 +19,13 @@ const CategoryCard = ({
   onOpen,
   onSync,
 }) => {
+  const cardStyles = {...styles, ...(presentation?.styles || {})};
+  const coverFile = useMemo(() => {
+    const files = Array.isArray(category.categoryFiles) ? category.categoryFiles : [];
+    return (files.find(item => String(item.id) === String(category?.extraData?.imageCoverRelationId) && item?.file?.id)
+      || files.find(item => item?.file?.id))?.file || null;
+  }, [category]);
+  const FileComponent = presentation?.FileComponent;
   const coverUrl = useMemo(
     () => buildCoverUrl(category.categoryFiles, category?.extraData?.imageCoverRelationId),
     [category],
@@ -25,38 +33,42 @@ const CategoryCard = ({
 
   return (
     <TouchableOpacity
-      style={styles.cardTouchable}
+      accessibilityRole="button" accessibilityLabel={category.name}
+      style={cardStyles.cardTouchable}
       onPress={() => onOpen?.(category)}
       activeOpacity={0.88}
     >
       <View
         style={[
-          styles.cardImage,
-          isCompactMobile && styles.cardImageCompact,
-          isMobileCatalog && styles.cardImageMobile,
-          { backgroundColor: category.color || brandColors.primary },
+          cardStyles.cardImage,
+          isCompactMobile && cardStyles.cardImageCompact,
+          isMobileCatalog && cardStyles.cardImageMobile,
+          { backgroundColor: presentation ? presentation.background : category.color || brandColors.primary },
+          presentation && category.color ? {borderLeftWidth:4,borderLeftColor:category.color} : null,
         ]}
       >
-        {coverUrl ? (
+        {FileComponent && coverFile ? (
+          <FileComponent file={coverFile} style={cardStyles.cardCoverImage} resizeMode="cover" />
+        ) : !FileComponent && coverUrl ? (
           <Image
             source={{ uri: coverUrl }}
-            style={styles.cardCoverImage}
+            style={cardStyles.cardCoverImage}
             resizeMode="cover"
           />
         ) : null}
 
         <View
           style={[
-            styles.cardOverlay,
-            isCompactMobile && styles.cardOverlayCompact,
-            isMobileCatalog && styles.cardOverlayMobile,
+            cardStyles.cardOverlay,
+            isCompactMobile && cardStyles.cardOverlayCompact,
+            isMobileCatalog && cardStyles.cardOverlayMobile,
           ]}
         >
           <Text
             style={[
-              styles.cardOverlayName,
-              isCompactMobile && styles.cardOverlayNameCompact,
-              isMobileCatalog && styles.cardOverlayNameMobile,
+              cardStyles.cardOverlayName,
+              isCompactMobile && cardStyles.cardOverlayNameCompact,
+              isMobileCatalog && cardStyles.cardOverlayNameMobile,
             ]}
             numberOfLines={2}
           >
@@ -64,8 +76,8 @@ const CategoryCard = ({
           </Text>
         </View>
 
-        {isManagerApp ? (
-          <View style={styles.syncOverlay}>
+        {isManagerApp && (!presentation || presentation.showManagement) ? (
+          <View style={cardStyles.syncOverlay}>
             <MarketplaceSyncIndicators
               entityLabel={category.name}
               entityType="category"
@@ -76,10 +88,10 @@ const CategoryCard = ({
           </View>
         ) : null}
 
-        {isManagerApp ? (
+        {isManagerApp && (!presentation || presentation.showManagement) ? (
           <TouchableOpacity
             onPress={() => onEdit?.(category)}
-            style={styles.editOverlay}
+            style={cardStyles.editOverlay}
             activeOpacity={0.75}
           >
             <MaterialCommunityIcons name="pencil" size={14} color="#fff" />

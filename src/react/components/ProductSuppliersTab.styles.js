@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { colors } from '@controleonline/../../src/styles/colors';
+import { colors } from '@controleonline/ui-layout/src/styles/colors';
 
 const styles = StyleSheet.create({
   container: {

@@ -6,10 +6,11 @@
 export const shouldRedirectEmptyCategoriesToProducts = ({
   isManagerApp,
   data,
+  fetchError = false,
 } = {}) => {
-  if (isManagerApp) {
+  if (isManagerApp || fetchError) {
     return false;
   }
 
-  return !Array.isArray(data) || data.length === 0;
+  return Array.isArray(data) && data.length === 0;
 };

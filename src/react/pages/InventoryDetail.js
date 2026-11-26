@@ -5,8 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AnimatedModal from '@controleonline/ui-common/src/react/components/AnimatedModal';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
-import { colors } from '@controleonline/../../src/styles/colors';
+import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
+import { colors } from '@controleonline/ui-layout/src/styles/colors';
 import { skeletonStyles, styles, movStyles, editStyles } from './InventoryDetail.styles'
 
 import {

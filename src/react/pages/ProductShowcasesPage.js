@@ -5,8 +5,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import {useStore} from '@store';
 import DefaultExternalFilters from '@controleonline/ui-default/src/react/components/filters/DefaultExternalFilters';
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
-import {resolveThemePalette} from '@controleonline/../../src/styles/branding';
-import {colors} from '@controleonline/../../src/styles/colors';
+import {resolveThemePalette} from '@controleonline/ui-layout/src/styles/branding';
+import {colors} from '@controleonline/ui-layout/src/styles/colors';
 import {createStyles} from './ProductShowcasesPage.styles';
 
 const TABS = [

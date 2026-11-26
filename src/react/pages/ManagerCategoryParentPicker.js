@@ -40,9 +40,9 @@ export default function ManagerCategoryParentPicker({
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalBackdrop}>
+        <View style={styles.formModalBackdrop}>
           <TouchableWithoutFeedback>
-            <View style={styles.modalSheet}>
+            <View style={styles.formModalSheet}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Categoria pai</Text>
                 <TouchableOpacity onPress={onClose}>
