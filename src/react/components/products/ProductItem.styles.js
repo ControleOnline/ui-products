@@ -1,6 +1,56 @@
 import { Platform, StyleSheet } from 'react-native';
 
 const styles = StyleSheet.create({
+  searchResultCard: {
+    minHeight: 82,
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  searchResultImageWrap: {
+    width: 58,
+    height: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  searchResultImage: {
+    width: '100%',
+    height: '100%',
+  },
+  searchResultCopy: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 2,
+  },
+  searchResultName: {
+    fontSize: 14,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  searchResultDescription: {
+    color: '#64748B',
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  searchResultPrice: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  searchResultAction: {
+    flexShrink: 0,
+  },
   card: {
     flexDirection: 'row',
     width: '100%',

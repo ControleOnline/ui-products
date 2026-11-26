@@ -1,5 +1,6 @@
 import { ALL_PRODUCTS_SENTINEL } from '@controleonline/ui-products/src/react/constants/categorySentinels'
 import { normalizeEntityId } from './categoryPageUtils'
+const {resolveShowBottomCart} = require('../../utils/resolveShowBottomCart')
 
 export function navigateToCategoryProducts({
   category,
@@ -22,7 +23,10 @@ export function navigateToCategoryProducts({
       categoryId,
       context,
       interactionMode,
-      showBottomCart: interactionMode === 'pdv',
+      showBottomCart: resolveShowBottomCart(
+        interactionMode,
+        operationalRouteParams?.showBottomCart,
+      ),
       showBottomToolBar: interactionMode === 'pdv',
     },
     merge: false,
@@ -44,7 +48,10 @@ export function navigateToAllProducts({
       categoryId: ALL_PRODUCTS_SENTINEL['@id'],
       context,
       interactionMode,
-      showBottomCart: interactionMode === 'pdv',
+      showBottomCart: resolveShowBottomCart(
+        interactionMode,
+        operationalRouteParams?.showBottomCart,
+      ),
       showBottomToolBar: interactionMode === 'pdv',
     },
     merge: false,
