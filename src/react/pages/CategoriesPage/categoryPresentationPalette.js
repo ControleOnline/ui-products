@@ -1,7 +1,7 @@
 import {useContext, useMemo} from 'react';
 import {DefaultTableThemeContext} from '@controleonline/ui-default/src/react/components/table/useDefaultTableTheme';
-import {resolveThemePalette} from '@controleonline/../../src/styles/branding';
-import {colors} from '@controleonline/../../src/styles/colors';
+import {resolveThemePalette} from '@controleonline/ui-layout/src/styles/branding';
+import {colors} from '@controleonline/ui-layout/src/styles/colors';
 
 // Resolved presentation owns surfaces; company colors still own the brand/actions.
 export const resolveCategoryPresentationPalette = (palette, presentation, enabled) => {

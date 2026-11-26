@@ -146,6 +146,27 @@ export const inlineStyle_40_8 = (
   borderRadius: 7,
   backgroundColor: '#E2E8F0',
   marginBottom: mb,
+
+  channelChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  channelChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  channelChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    maxWidth: 90,
+  },
 });
 
 export const inlineStyle_49_24 = {

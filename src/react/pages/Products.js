@@ -10,8 +10,8 @@ import { useStore } from '@store';
 import DefaultTable from '@controleonline/ui-default/src/react/components/table/DefaultTable';
 import StateStore from '@controleonline/ui-common/src/react/components/StateStore';
 import { api } from '@controleonline/ui-common/src/api';
-import { resolveThemePalette } from '@controleonline/../../src/styles/branding';
-import { colors } from '@controleonline/../../src/styles/colors';
+import { resolveThemePalette } from '@controleonline/ui-layout/src/styles/branding';
+import { colors } from '@controleonline/ui-layout/src/styles/colors';
 import ProductItem, {
   getProductTypeLabel,
 } from '@controleonline/ui-products/src/react/components/products/ProductItem';
